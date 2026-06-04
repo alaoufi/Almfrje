@@ -1,0 +1,16 @@
+{
+  "name": "المفارجة — شجرة الأنساب",
+  "short_name": "المفارجة",
+  "description": "شجرة أنساب عائلة المفارجة",
+  "start_url": "/almfrje",
+  "scope": "/almfrje",
+  "display": "browser",
+  "orientation": "portrait",
+  "lang": "ar",
+  "dir": "rtl",
+  "background_color": "#4338CA",
+  "theme_color": "#4338CA",
+  "icons": [
+    { "src": "/almfrje/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}
