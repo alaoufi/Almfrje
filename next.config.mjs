@@ -6,7 +6,7 @@ const nextConfig = {
   },
   async rewrites() {
     return [
-      // الصفحة الرئيسية = نظام المفرجة (الأنساب)
+      // الصفحة الرئيسية = نظام المفارجة (الأنساب)
       { source: '/', destination: '/almfrje/index.html' },
       // منصّة الاستشارات القديمة — تبقى متاحة على /legacy
       { source: '/legacy', destination: '/legacy/index.html' },
@@ -33,7 +33,7 @@ const nextConfig = {
       // تطبيق مراحي — لا تخزين أثناء التطوير/التجربة
       { source: '/mrahi', headers: noCache },
       { source: '/mrahi/:path*', headers: noCache },
-      // نظام المفرجة (الأنساب)
+      // نظام المفارجة (الأنساب)
       { source: '/almfrje', headers: noCache },
       { source: '/almfrje/:path*', headers: noCache },
       // الصفحة الرئيسية
