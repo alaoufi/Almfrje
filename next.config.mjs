@@ -6,7 +6,10 @@ const nextConfig = {
   },
   async rewrites() {
     return [
-      { source: '/', destination: '/legacy/index.html' },
+      // الصفحة الرئيسية = نظام المفرجة (الأنساب)
+      { source: '/', destination: '/almfrje/index.html' },
+      // منصّة الاستشارات القديمة — تبقى متاحة على /legacy
+      { source: '/legacy', destination: '/legacy/index.html' },
       // تطبيق مراحي (ويب) — يُخدم من /mrahi
       { source: '/mrahi', destination: '/mrahi/index.html' },
       { source: '/mrahi/', destination: '/mrahi/index.html' },
