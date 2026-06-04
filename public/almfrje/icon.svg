@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <rect width="512" height="512" rx="96" fill="#4338CA"/>
+  <!-- عُقد شجرة العائلة -->
+  <g fill="#FFFFFF">
+    <circle cx="256" cy="120" r="40"/>
+    <circle cx="136" cy="320" r="34"/>
+    <circle cx="256" cy="320" r="34"/>
+    <circle cx="376" cy="320" r="34"/>
+    <circle cx="196" cy="420" r="26"/>
+    <circle cx="316" cy="420" r="26"/>
+  </g>
+  <g stroke="#FFFFFF" stroke-width="14" stroke-linecap="round" fill="none">
+    <path d="M256 160 L256 230 M136 286 L136 230 L376 230 L376 286 M256 230 L256 286"/>
+    <path d="M196 394 L196 360 L316 360 L316 394 M256 360 L256 354"/>
+  </g>
+</svg>

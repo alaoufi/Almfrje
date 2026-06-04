@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#4338CA" />
+  <!-- منع التخزين المؤقّت للمستند نهائياً -->
+  <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
+  <title>المفارجة — شجرة الأنساب</title>
+  <link rel="icon" href="/almfrje/icon.svg" type="image/svg+xml" />
+  <!-- تثبيت كتطبيق (PWA) -->
+  <link rel="manifest" href="/almfrje/manifest.webmanifest" />
+  <link rel="apple-touch-icon" href="/almfrje/icon.svg" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="المفارجة" />
+  <!-- CSS و JS يُحمّلان برابط فريد لكل فتح لمنع أي كاش للمتصفّح -->
+  <script>
+    (function () {
+      var v = Date.now();
+      document.write('<link rel="stylesheet" href="/almfrje/app.css?v=' + v + '">');
+    })();
+  </script>
+</head>
+<body>
+  <!-- شاشة المصادقة -->
+  <div id="auth" class="auth hidden"></div>
+
+  <!-- التطبيق -->
+  <div id="app" class="hidden">
+    <header class="appbar">
+      <button id="backBtn" class="icon-btn hidden" aria-label="رجوع">‹</button>
+      <h1 id="screenTitle">المفارجة</h1>
+      <button id="themeBtn" class="icon-btn" aria-label="الوضع الليلي" title="الوضع الليلي">🌙</button>
+      <button id="signoutBtn" class="icon-btn" aria-label="خروج" title="تسجيل الخروج">⎋</button>
+    </header>
+    <main id="view"></main>
+    <nav class="bottomnav" id="bottomnav"></nav>
+  </div>
+
+  <div id="loading" class="loading">… جارٍ التحميل</div>
+  <div id="modalRoot"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <!-- مكتبتا Excel و PDF ثقيلتان وتُستخدمان فقط في الاستيراد/التصدير،
+       لذا تُحمّلان عند الطلب فقط (lazyLib في app.js) لتسريع البدء. -->
+  <!-- احتياطي للاستضافة الثابتة (يُترك فارغاً عند الاعتماد على بيئة alaoufi.me) -->
+  <script src="/almfrje/config.js"></script>
+  <!-- الإعداد التلقائي من نفس متغيّرات بيئة alaoufi.me (يطغى إن وُجد) -->
+  <script src="/api/almfrje-config"></script>
+  <script>document.write('<scr' + 'ipt src="/almfrje/app.js?v=' + Date.now() + '"><\/scr' + 'ipt>');</script>
+</body>
+</html>
