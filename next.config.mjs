@@ -13,7 +13,7 @@ const nextConfig = {
       // تطبيق مراحي (ويب) — يُخدم من /mrahi
       { source: '/mrahi', destination: '/mrahi/index.html' },
       { source: '/mrahi/', destination: '/mrahi/index.html' },
-      // نظام المفرجة (الأنساب) — يُخدم من /almfrje
+      // نظام المفارجة (الأنساب) — يُخدم من /almfrje
       { source: '/almfrje', destination: '/almfrje/index.html' },
       { source: '/almfrje/', destination: '/almfrje/index.html' },
     ];
