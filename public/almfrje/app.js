@@ -1738,7 +1738,8 @@ function personMatchTokens(p, tokens) {
 }
 // بحث مشترك لاختيار شخص (المُرسِل أو والد المولود): يقبل «الاسم ثم اسم الأب» لتقليص النتائج.
 function fbPickerSearch(term, resEl, aliveOnly, onPick) {
-  const tokens = String(term || '').trim().split(/\s+/).map(normalizeAr).filter(Boolean);
+  // يقبل الفاصل مسافة أو «بن»/«ابن» بين الاسم واسم الأب — تُتجاهَل كلمة الوصل.
+  const tokens = String(term || '').trim().split(/\s+/).map(normalizeAr).filter(t => t && t !== 'بن' && t !== 'ابن');
   if (!tokens.length) { resEl.innerHTML = ''; return; }
   const pool = aliveOnly ? C.persons.filter(p => p.status !== 'dead') : C.persons;
   const list = pool.filter(p => personMatchTokens(p, tokens)).slice(0, 25);
