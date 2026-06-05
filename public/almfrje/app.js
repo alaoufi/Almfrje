@@ -682,10 +682,23 @@ function recentInfoModal(id) {
     document.getElementById('mi_open').addEventListener('click', () => { closeModal(); setHash('#/person/' + id); });
   });
 }
+// مطابقة استعلام اسم (كلمة أو أكثر) على الشخص وسلسلة نسبه:
+// الكلمة الأولى لاسمه أو لقبه، والباقي ضمن آبائه/أجداده بالترتيب (ولو بتخطّي أجيال).
+// يتجاهل المسافات والتشكيل والهمزات و«بن»/«ابن».
+function nameMatch(p, query) {
+  const toks = String(query || '').trim().split(/\s+/).map(normalizeAr).filter(t => t && t !== 'بن' && t !== 'ابن');
+  if (!toks.length) return true;
+  if (!p._n.includes(toks[0])) return false;                        // اسمه نفسه أو لقبه
+  if (toks.length === 1) return true;
+  const anc = lineage(p.id).slice(1).map(x => normalizeAr(x.name));  // آباؤه فصاعداً
+  let i = 1;
+  for (let j = 0; j < anc.length && i < toks.length; j++) if (anc[j].includes(toks[i])) i++;
+  return i === toks.length;
+}
 function instantSearch(term, box) {
   const t = normalizeAr(term.trim());
   if (!t) { box.innerHTML = ''; return; }
-  const res = C.persons.filter(p => p._n.includes(t)).slice(0, 30);
+  const res = C.persons.filter(p => nameMatch(p, term)).slice(0, 30);
   box.innerHTML = res.length ? res.map(personCard).join('') : '<div class="muted" style="padding:8px">لا نتائج</div>';
   bindGo(box);
 }
@@ -741,7 +754,7 @@ function runAdvanced() {
   searchState = { name: val('s_name'), father: val('s_father'), grand: val('s_grand'), branch: val('s_branch'), gen: val('s_gen'), city: val('s_city'), status: val('s_status'), work: val('s_work') };
   const n = normalizeAr(searchState.name), f = normalizeAr(searchState.father), g = normalizeAr(searchState.grand), c = normalizeAr(searchState.city);
   const res = C.persons.filter(p => {
-    if (n && !p._n.includes(n)) return false;
+    if (n && !nameMatch(p, searchState.name)) return false;
     if (searchState.branch && String(p.branch_id) !== searchState.branch) return false;
     if (searchState.gen && String(p.generation) !== searchState.gen) return false;
     if (searchState.status && p.status !== searchState.status) return false;
@@ -1137,7 +1150,7 @@ function pickPerson(title, onPick, filterFn) {
     const run = () => {
       const t = normalizeAr(q.value.trim()); let list = C.persons;
       if (filterFn) list = list.filter(filterFn);
-      if (t) list = list.filter(p => p._n.includes(t));
+      if (t) list = list.filter(p => nameMatch(p, q.value));
       list = list.slice(0, 40);
       res.innerHTML = list.length ? list.map(p => `<div class="card click" data-pid="${p.id}" style="margin:6px 0;padding:10px"><div class="li-title">${esc(p.name)}</div><div class="li-sub">${esc(lineageShort(p.id))}</div></div>`).join('') : '<div class="muted" style="padding:8px">لا نتائج</div>';
       res.querySelectorAll('[data-pid]').forEach(c => c.addEventListener('click', () => { onPick(byId.get(parseInt(c.dataset.pid, 10))); closeModal(); }));
@@ -3225,7 +3238,7 @@ function renderAuth() {
     if (gi) {
       try { gi.focus(); } catch (e) {}
       let _gt = null;
-      gi.addEventListener('input', () => { clearTimeout(_gt); _gt = setTimeout(guestGateEnter, 600); });
+      gi.addEventListener('input', () => { clearTimeout(_gt); _gt = setTimeout(guestGateEnter, 350); });
       gi.addEventListener('keydown', e => { if (e.key === 'Enter') { clearTimeout(_gt); guestGateEnter(); } });
     }
     return;
