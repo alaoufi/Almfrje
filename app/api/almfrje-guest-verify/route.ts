@@ -47,42 +47,37 @@ export async function POST(request: NextRequest) {
     if (!data || data.length < 1000) break;
   }
   const byId = new Map<number, P>(persons.map((p) => [p.id, p]));
-  const lineageSig = (pid: number, n: number): string | null => {
-    const chain: string[] = [];
+  // تطبيع اسم واحد: يتجاهل التشكيل/الهمزات/التطويل/المسافات و«ال» في البداية.
+  const normWord = (s: string): string =>
+    String(s || '')
+      .replace(/[ً-ْٰ]/g, '')
+      .replace(/[أإآ]/g, 'ا').replace(/ى/g, 'ي').replace(/ة/g, 'ه').replace(/ؤ/g, 'و').replace(/ئ/g, 'ي').replace(/ـ/g, '')
+      .replace(/\s+/g, '').replace(/^ال/, '').toLowerCase();
+  // سلسلة أسماء الشخص (هو ثم آباؤه) مطبَّعة كلمةً كلمة
+  const lineageWords = (pid: number): string[] => {
+    const out: string[] = [];
     let cur: number | null = pid; let guard = 0;
-    while (cur != null && chain.length < n && guard++ < 80) {
-      const p = byId.get(cur); if (!p) break;
-      chain.push(p.name); cur = p.father_id;
-    }
-    if (chain.length < n) return null;
-    return normGen(chain.join(' '));
+    while (cur != null && guard++ < 80) { const p = byId.get(cur); if (!p) break; out.push(normWord(p.name)); cur = p.father_id; }
+    return out;
   };
-  // عدد الأحياء الذين يطابق أول d اسماً منهم ما كتبه المستخدم (صاحب الاسم نفسه يجب أن يكون حيّاً).
-  const countLiving = (d: number): number => {
-    const s = normGen(names.slice(0, d).join(' '));
-    return persons.filter((p) => p.status !== 'dead' && lineageSig(p.id, d) === s).length;
+  const toks = names.map(normWord).filter(Boolean);
+  // التطابق: أول كلمة = اسمه نفسه، وبقية ما كتبه تظهر بالترتيب ضمن آبائه/أجداده (ولو بتخطّي أجيال).
+  const matchSubseq = (ln: string[]): boolean => {
+    if (toks.length === 0 || ln.length === 0 || ln[0] !== toks[0]) return false;
+    let i = 1, j = 1;
+    while (i < toks.length && j < ln.length) { if (ln[j] === toks[i]) i++; j++; }
+    return i === toks.length;
   };
-  // ندخل عند أصغر عمق يصبح فيه الاسم فريداً (بدءاً من الحدّ الأدنى gens، عادةً اسمان).
-  // فإن كان «اسمه واسم أبيه» فريداً دخل فوراً دون اشتراط عدد ثابت.
-  let last = 0;
-  for (let d = gens; d <= names.length; d++) {
-    const c = countLiving(d);
-    if (c === 1) return NextResponse.json({ ok: true });   // فريد → ادخل
-    last = c;
-    if (c === 0) break;   // هذه البادئة غير موجودة بين الأحياء
+  // مجرد التطابق مع شخص حيّ → يدخل (بلا اشتراط تفرّد).
+  if (persons.some((p) => p.status !== 'dead' && matchSubseq(lineageWords(p.id)))) {
+    return NextResponse.json({ ok: true });
   }
-  if (last > 1) return NextResponse.json({ ok: false, needMore: true, error: 'الاسم يطابق أكثر من شخص — أضِف اسم الجدّ التالي ثم أعد المحاولة' });
-
-  // لم يُطابَق أحد عند الحد الأدنى — نشخّص السبب لرسالة أوضح:
-  const sigFloor = normGen(names.slice(0, gens).join(' '));
-  const deadAtFloor = persons.filter((p) => p.status === 'dead' && lineageSig(p.id, gens) === sigFloor).length;
-  if (deadAtFloor > 0) {
+  // تشخيص الفشل لرسالة أوضح:
+  if (persons.some((p) => p.status === 'dead' && matchSubseq(lineageWords(p.id)))) {
     return NextResponse.json({ ok: false, error: 'هذا الاسم مُسجّل في الشجرة كمتوفّى — الدخول للأحياء فقط.' });
   }
-  const sigOne = normGen(names.slice(0, 1).join(' '));
-  const livingFirst = persons.filter((p) => p.status !== 'dead' && lineageSig(p.id, 1) === sigOne).length;
-  if (livingFirst > 0) {
-    return NextResponse.json({ ok: false, error: 'وُجد اسمك، لكن اسم الأب لا يطابق المُسجّل — اكتب اسم أبيك المباشر كما في الشجرة (لا جدّاً أعلى).' });
+  if (persons.some((p) => p.status !== 'dead' && normWord(p.name) === toks[0])) {
+    return NextResponse.json({ ok: false, error: 'وُجد اسمك، لكن لم نجد آباءك/أجدادك بما كتبت — تأكّد من ترتيب الأسماء.' });
   }
   return NextResponse.json({ ok: false });   // غير مسجّل إطلاقاً
 }
