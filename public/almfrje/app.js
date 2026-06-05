@@ -198,6 +198,8 @@ let guestHide = { ...GUEST_HIDE_DEFAULT };
 let recentSince = '';      // تاريخ تصفير «آخر الإضافات» (ISO) — يُحدّده المدير
 const DEFAULT_BANNER = 'المفرجي قبيلة من ولد حسين من الصواعد من عوف من حرب';
 let bannerText = DEFAULT_BANNER;
+const DEFAULT_FB_THANKS = 'شكراً لك 🌿\nتم إرسال ملاحظتك، وهي محل اهتمامنا.';
+let feedbackThanks = DEFAULT_FB_THANKS;
 const C = { persons: [], branches: [], members: [], documents: [] };
 const TABLES = { persons: 'almfrje_persons', branches: 'almfrje_branches', members: 'almfrje_members', documents: 'almfrje_documents' };
 
@@ -307,6 +309,7 @@ async function loadSettings() {
     statLabels = Object.assign({ ...LABELS_DEFAULT }, (map.status_labels && typeof map.status_labels === 'object') ? map.status_labels : {});
     recentSince = typeof map.recent_since === 'string' ? map.recent_since : '';
     bannerText = typeof map.banner_text === 'string' ? map.banner_text : DEFAULT_BANNER;
+    feedbackThanks = typeof map.feedback_thanks === 'string' && map.feedback_thanks ? map.feedback_thanks : DEFAULT_FB_THANKS;
     // تطبيق نصوص التعليمات المعدّلة من الإعدادات فوق الافتراضية
     applyHintOverrides(map.hints_overrides);
   } catch (e) { /* تجاهل — تبقى القيم الافتراضية */ }
@@ -1692,13 +1695,19 @@ function screenStats() {
 
 /* ===== ملاحظات الزوار ===== */
 // نموذج إرسال ملاحظة/خطأ للإدارة — متاح للجميع (زائر/عضو).
-let fbFather = null;     // الأب المختار عند موضوع «إضافة مولود»
+let fbFather = null;     // والد المولود (عند موضوع «إضافة مولود»)
+let fbSender = null;     // المُرسِل يعرّف نفسه من الشجرة
 let fbFilter = 'new';    // تبويب شاشة المدير: new | done | all
 function screenFeedback() {
-  fbFather = null;
+  fbFather = null; fbSender = null;
   view().innerHTML = `
-    <div class="muted" style="margin-bottom:8px">اختر نوع الملاحظة ثم أكمل الحقول المطلوبة. ستصل للإدارة لمراجعتها واتخاذ الإجراء.</div>
+    <div class="muted" style="margin-bottom:8px">عرّف بنفسك أولاً، ثم اختر نوع الملاحظة وأكمل الحقول. ستصل للإدارة لمراجعتها.</div>
     <div class="card">
+      <div class="field"><label>من أنت؟ اختر اسمك من الشجرة (اكتب اسمك ثم اسم أبيك) *</label>
+        <input id="fb_msearch" type="text" placeholder="مثال: محمد سالم">
+        <div id="fb_mresults" style="max-height:200px;overflow:auto"></div>
+        <div id="fb_mselected" class="muted" style="margin-top:6px"></div>
+      </div>
       <div class="field"><label>الموضوع *</label>
         <select id="fb_subject">
           <option value="">— اختر الموضوع —</option>
@@ -1711,13 +1720,37 @@ function screenFeedback() {
       <div class="field"><label id="fb_details_lbl">التفاصيل *</label><textarea id="fb_details" rows="4" placeholder="اكتب التفاصيل…"></textarea></div>
       <button class="btn btn-lg" id="fb_send">✉️ إرسال للإدارة</button>
     </div>`;
+  const ms = document.getElementById('fb_msearch');
+  ms.addEventListener('input', () => fbPickerSearch(ms.value, document.getElementById('fb_mresults'), false, (p) => {
+    fbSender = p;
+    document.getElementById('fb_mselected').innerHTML = p ? '✅ أنت: <b>' + esc(lineageShort(p.id, 10)) + '</b>' : '';
+    ms.value = p ? p.name : '';
+  }));
   const sub = document.getElementById('fb_subject');
   sub.addEventListener('change', () => renderFbDynamic(sub.value));
   document.getElementById('fb_send').addEventListener('click', sendFeedback);
   renderFbDynamic('');
 }
+// مطابقة شخص بعدّة كلمات: الكلمة الأولى لاسمه، التالية لأبيه، ثم جدّه… (لتقليص القائمة).
+function personMatchTokens(p, tokens) {
+  const ln = lineage(p.id).map(x => normalizeAr(x.name));
+  return tokens.every((tok, i) => (ln[i] || '').includes(tok));
+}
+// بحث مشترك لاختيار شخص (المُرسِل أو والد المولود): يقبل «الاسم ثم اسم الأب» لتقليص النتائج.
+function fbPickerSearch(term, resEl, aliveOnly, onPick) {
+  const tokens = String(term || '').trim().split(/\s+/).map(normalizeAr).filter(Boolean);
+  if (!tokens.length) { resEl.innerHTML = ''; return; }
+  const pool = aliveOnly ? C.persons.filter(p => p.status !== 'dead') : C.persons;
+  const list = pool.filter(p => personMatchTokens(p, tokens)).slice(0, 25);
+  resEl.innerHTML = list.length
+    ? list.map(p => `<div class="row click" data-pk="${p.id}"><span class="k">${esc(p.name)}</span><span class="v" style="font-size:.78rem">${esc(lineageShort(p.id, 6))}</span></div>`).join('')
+    : '<div class="muted" style="padding:6px">لا نتائج — اكتب الاسم ثم اسم الأب لتقليص القائمة</div>';
+  resEl.querySelectorAll('[data-pk]').forEach(el => el.addEventListener('click', () => {
+    onPick(byId.get(parseInt(el.dataset.pk, 10))); resEl.innerHTML = '';
+  }));
+}
 // حقول النموذج تتغيّر حسب الموضوع:
-//  إضافة مولود → اختيار الأب بالبحث/التنقّل (لا فرع).  ملاحظة → الفرع + الخطأ.  اقتراح → بلا فرع.
+//  إضافة مولود → اختيار والد المولود (حيّ فقط).  ملاحظة → الفرع + الخطأ.  اقتراح → بلا فرع.
 function renderFbDynamic(subject) {
   const wrap = document.getElementById('fb_dynamic');
   const lbl = document.getElementById('fb_details_lbl');
@@ -1725,13 +1758,17 @@ function renderFbDynamic(subject) {
   if (subject === 'إضافة مولود') {
     lbl.textContent = 'تفاصيل المولود (الاسم، الحالة، الأم… اختياري)';
     wrap.innerHTML = `
-      <div class="field"><label>اختر الأب (ابحث ثم اضغط الاسم للوصول إليه) *</label>
-        <input id="fb_fsearch" type="text" placeholder="ابحث باسم الأب…">
-        <div id="fb_fresults" style="max-height:220px;overflow:auto"></div>
+      <div class="field"><label>والد المولود — اكتب اسمه ثم اسم أبيه لتقليص القائمة *</label>
+        <input id="fb_fsearch" type="text" placeholder="مثال: سالم خالد">
+        <div id="fb_fresults" style="max-height:200px;overflow:auto"></div>
         <div id="fb_fselected" class="muted" style="margin-top:6px"></div>
       </div>`;
     const fs = document.getElementById('fb_fsearch');
-    fs.addEventListener('input', () => fbSearchFather(fs.value));
+    fs.addEventListener('input', () => fbPickerSearch(fs.value, document.getElementById('fb_fresults'), true, (p) => {
+      fbFather = p;
+      document.getElementById('fb_fselected').innerHTML = p ? '✅ الأب: <b>' + esc(lineageShort(p.id, 12)) + '</b>' : '';
+      fs.value = p ? p.name : '';
+    }));
   } else if (subject === 'ملاحظة') {
     lbl.textContent = 'تفاصيل الملاحظة *';
     const branchOpts = C.branches.slice().sort((a, b) => String(a.name).localeCompare(String(b.name), 'ar'))
@@ -1741,45 +1778,33 @@ function renderFbDynamic(subject) {
       <div class="field"><label>الخطأ — ما هو الخطأ؟</label><textarea id="fb_error" rows="3" placeholder="صِف الخطأ والتصحيح المقترح (اختياري)"></textarea></div>`;
   } else {
     lbl.textContent = subject === 'اقتراح' ? 'اقتراحك *' : 'التفاصيل *';
-    wrap.innerHTML = '';   // اقتراح: بلا فرع
+    wrap.innerHTML = '';
   }
 }
-function fbSearchFather(term) {
-  const res = document.getElementById('fb_fresults');
-  const t = normalizeAr((term || '').trim());
-  if (!t) { res.innerHTML = ''; return; }
-  // المتوفّى لا يُضاف له مولود — فلا نعرضه في بحث اختيار الأب.
-  const list = C.persons.filter(p => p.status !== 'dead' && (p._n || '').includes(t)).slice(0, 20);
-  res.innerHTML = list.length
-    ? list.map(p => `<div class="row click" data-fbf="${p.id}"><span class="k">${esc(p.name)}</span><span class="v" style="font-size:.78rem">${esc(lineageShort(p.id, 6))}</span></div>`).join('')
-    : '<div class="muted" style="padding:6px">لا نتائج</div>';
-  res.querySelectorAll('[data-fbf]').forEach(el => el.addEventListener('click', () => {
-    fbFather = byId.get(parseInt(el.dataset.fbf, 10));
-    document.getElementById('fb_fselected').innerHTML = fbFather ? '✅ الأب المختار: <b>' + esc(lineageShort(fbFather.id, 10)) + '</b>' : '';
-    res.innerHTML = '';
-    document.getElementById('fb_fsearch').value = fbFather ? fbFather.name : '';
-  }));
-}
 async function sendFeedback() {
+  if (!fbSender) { toast('عرّف بنفسك أولاً — اختر اسمك من الشجرة'); return; }
   const subject = val('fb_subject').trim();
-  if (!subject) { toast('اختر الموضوع أولاً'); return; }
+  if (!subject) { toast('اختر الموضوع'); return; }
   const details = val('fb_details').trim();
   let branch_id = null, error_desc = '', fullDetails = details;
   if (subject === 'إضافة مولود') {
-    if (!fbFather) { toast('اختر الأب من البحث أولاً'); return; }
+    if (!fbFather) { toast('اختر والد المولود من البحث'); return; }
     branch_id = fbFather.branch_id || null;
-    fullDetails = 'الأب: ' + lineageShort(fbFather.id, 12) + (details ? '\n' + details : '');
+    fullDetails = 'والد المولود: ' + lineageShort(fbFather.id, 12) + (details ? '\n' + details : '');
   } else if (subject === 'ملاحظة') {
     branch_id = val('fb_branch') ? parseInt(val('fb_branch'), 10) : null;
     error_desc = document.getElementById('fb_error') ? val('fb_error').trim() : '';
   }
   if (!fullDetails && !error_desc) { toast('اكتب التفاصيل'); return; }
-  const who = (me && (me.full_name || me.username)) || 'زائر';
+  const who = lineageShort(fbSender.id, 10);
   const ok = await guard(async () => {
     const { error } = await sb.from('almfrje_feedback').insert({ subject, branch_id, details: fullDetails, error_desc, created_by_name: who });
     if (error) throw error;
   });
-  if (ok) { toast('تم إرسال ملاحظتك للإدارة ✅ شكراً لك'); goBack(); }
+  if (ok) {
+    openModal('✅ تم الإرسال', `<div style="text-align:center;white-space:pre-wrap;font-size:1.05rem;line-height:1.9;padding:6px 0">${esc(feedbackThanks)}</div>`);
+    setTimeout(() => { closeModal(); location.hash = '#/home'; }, 2800);
+  }
 }
 // عرض الملاحظات للمدير — مرتّب باحترافية: تبويبات (قيد المراجعة/منجزة/الكل) + بطاقات مصنّفة بالنوع.
 async function screenFeedbacks() {
@@ -2469,6 +2494,10 @@ function screenTexts() {
       <p class="muted" style="font-size:.85rem;margin-top:-2px">يظهر أعلى الصفحة الرئيسية للجميع.</p>
       ${fTextarea('النص', 'tx_banner', bannerText)}
       <button class="btn sm" id="tx_bannerSave" style="margin-top:6px">حفظ النص</button></div>
+    <div class="card"><h3>💬 رسالة الشكر بعد إرسال ملاحظة</h3>
+      <p class="muted" style="font-size:.85rem;margin-top:-2px">تظهر للمُرسِل في موديل بعد إرسال ملاحظته.</p>
+      ${fTextarea('النص', 'tx_fbthanks', feedbackThanks)}
+      <button class="btn sm" id="tx_fbthanksSave" style="margin-top:6px">حفظ النص</button></div>
     <div class="card"><h3>🎨 تعريف ألوان الحالة</h3>
       <p class="muted" style="font-size:.85rem;margin-top:-2px">تظهر دلالة الألوان أسفل الرئيسية. عدّل المسميات كما تريد.</p>
       ${fInput('الاسم بلون عادي يعني', 'tx_alive', statLabels.alive)}
@@ -2484,6 +2513,11 @@ function screenTexts() {
     const txt = val('tx_banner').trim();
     const ok = await guard(async () => { const { error } = await sb.from('almfrje_settings').upsert({ key: 'banner_text', value: txt, updated_at: new Date().toISOString() }, { onConflict: 'key' }); if (error) throw error; });
     if (ok) { bannerText = txt; toast('تم حفظ النص'); }
+  });
+  document.getElementById('tx_fbthanksSave').addEventListener('click', async () => {
+    const txt = val('tx_fbthanks').trim() || DEFAULT_FB_THANKS;
+    const ok = await guard(async () => { const { error } = await sb.from('almfrje_settings').upsert({ key: 'feedback_thanks', value: txt, updated_at: new Date().toISOString() }, { onConflict: 'key' }); if (error) throw error; });
+    if (ok) { feedbackThanks = txt; toast('تم حفظ رسالة الشكر'); }
   });
   document.getElementById('tx_lblSave').addEventListener('click', async () => {
     const next = { alive: val('tx_alive').trim() || LABELS_DEFAULT.alive, dead: val('tx_dead').trim() || LABELS_DEFAULT.dead, noissue: val('tx_noissue').trim() || LABELS_DEFAULT.noissue };
