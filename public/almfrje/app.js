@@ -3121,6 +3121,14 @@ async function rpcEnsureGuest() {
   }
   return data;
 }
+// ===== انتهاء جلسة الزائر: عند الخروج والعودة (sessionStorage يُمسح بإغلاق التبويب)،
+//       أو بعد ساعة خمول، أو بزرّ الخروج. =====
+const GUEST_IDLE_MS = 60 * 60 * 1000;   // ساعة
+function bumpGuestTs() { try { sessionStorage.setItem('almfrje_guest_ts', String(Date.now())); } catch (e) { /* تجاهل */ } }
+function guestSessionFresh() {
+  try { const ts = parseInt(sessionStorage.getItem('almfrje_guest_ts') || '0', 10); return !!ts && (Date.now() - ts) < GUEST_IDLE_MS; } catch (e) { return false; }
+}
+async function endGuestSession() { try { sessionStorage.removeItem('almfrje_guest_ts'); } catch (e) { /* */ } _authUid = null; me = null; try { await sb.auth.signOut(); } catch (e) { /* */ } }
 async function browseAsGuest(msgEl) {
   try {
     let { error } = await sb.auth.signInWithPassword({ email: GUEST_EMAIL, password: GUEST_PASS });
@@ -3131,7 +3139,7 @@ async function browseAsGuest(msgEl) {
     }
     await rpcEnsureGuest();   // فعّل دور viewer للحساب المخصّص (آمن — لا يمنح أعلى)
     const { data: { session } } = await sb.auth.getSession();
-    if (session) { _authUid = session.user.id; await enterApp(session); return true; }
+    if (session) { _authUid = session.user.id; bumpGuestTs(); await enterApp(session); return true; }
     if (msgEl) { msgEl.classList.add('err'); msgEl.textContent = 'تعذّر فتح وضع الزائر'; }
     return false;
   } catch (e) { if (msgEl) { msgEl.classList.add('err'); msgEl.textContent = translateAuthError(e.message); } return false; }
@@ -3262,7 +3270,7 @@ async function enterApp(session) {
   }
   if (!me.is_active) { showLoading(false); renderPending(); return; }
   // الزائر حساب مشترك تلقائي — لا يحتاج زرّ خروج (يبقى للمسؤول/المشرف).
-  document.getElementById('signoutBtn').classList.toggle('hidden', isGuestUser());
+  document.getElementById('signoutBtn').classList.toggle('hidden', isGuestUser() && guestGens <= 0);
   try { await loadAll(); } catch (e) { toast('خطأ تحميل: ' + e.message); }
   showLoading(false);
   // الزائر دخل عبر رابط الإدارة سهواً؟ حوّله للرئيسية بدل بقائه على #login
@@ -3291,9 +3299,17 @@ async function init() {
   // (الجداول تُنشأ مرة واحدة؛ النداء يعمل في الخلفية دون تعطيل البدء.)
   try { fetch('/api/almfrje-setup', { method: 'POST' }).catch(() => {}); } catch (e) { /* تجاهل */ }
   document.getElementById('backBtn').addEventListener('click', goBack);
-  // خروج المسؤول/المشرف يعيده لشاشة الدخول (#login). الزائر لا يملك زرّ خروج.
-  document.getElementById('signoutBtn').addEventListener('click', async () => { location.hash = '#login'; await sb.auth.signOut(); });
+  // خروج المسؤول → شاشة دخول الإدارة (#login). خروج الزائر → بوابة التحقق (الرئيسية).
+  document.getElementById('signoutBtn').addEventListener('click', async () => {
+    if (isGuestUser()) { try { sessionStorage.removeItem('almfrje_guest_ts'); } catch (e) { /* */ } location.hash = '#/home'; }
+    else { location.hash = '#login'; }
+    await sb.auth.signOut();
+  });
   window.addEventListener('hashchange', () => { if (me && me.is_active) render(); });
+  // جلسة الزائر تنتهي: نشاطه يُجدّد المؤقّت، والخمول (ساعة) أو العودة بعد إغلاق التبويب يُنهيانها.
+  ['click', 'keydown', 'touchstart'].forEach(ev => document.addEventListener(ev, () => { if (isGuestUser()) bumpGuestTs(); }, { passive: true }));
+  setInterval(() => { if (isGuestUser() && guestGens > 0 && !guestSessionFresh()) endGuestSession(); }, 60000);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden && isGuestUser() && guestGens > 0 && !guestSessionFresh()) endGuestSession(); });
   // لا تُعِد دخول التطبيق إلا عند تغيّر هوية المستخدم فعلياً. أحداث مثل
   // TOKEN_REFRESHED تتكرر (خصوصاً على الجوال عند فتح منتقي الملفات والرجوع)،
   // وإعادة الرسم معها كانت تمسح حقل الملف المختار. نتجاهلها هنا.
@@ -3316,7 +3332,11 @@ async function init() {
     // جلسة زائر مع طلب دخول الإدارة أو إغلاق الموقع → سجّل خروج الزائر واعرض شاشة الدخول
     if (guestSess && (wantAdmin || !guestOpen)) {
       _authUid = null; me = null; await sb.auth.signOut(); showLoading(false); renderAuth();
+    } else if (guestSess && guestGens > 0 && !guestSessionFresh()) {
+      // جلسة زائر لكن أُغلق التبويب سابقاً (sessionStorage مُسح) أو مرّت ساعة خمول → أعد التحقق
+      await endGuestSession(); showLoading(false); renderAuth();
     } else {
+      if (guestSess) bumpGuestTs();
       _authUid = session.user.id; await enterApp(session);
     }
   } else if (!wantAdmin && guestOpen && guestGens <= 0) {
