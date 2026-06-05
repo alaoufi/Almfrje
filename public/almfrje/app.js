@@ -245,6 +245,14 @@ function siblingNameExists(father, name, excludeId) {
   const sibs = fid ? childrenOf(fid) : roots();
   return sibs.some(c => c.id !== excludeId && normalizeAr(c.name) === norm);
 }
+// الإخوة الذين يحملون نفس الاسم (مطبَّعاً) لنفس الأب — للتمييز بين تكرار على حيّ (ممنوع) أو متوفّى (مسموح بتأكيد).
+function sameNameSiblings(father, name, excludeId) {
+  const fid = father ? father.id : null;
+  const norm = normalizeAr((name || '').trim());
+  if (!norm) return [];
+  const sibs = fid ? childrenOf(fid) : roots();
+  return sibs.filter(c => c.id !== excludeId && normalizeAr(c.name) === norm);
+}
 // الأدوار:
 //  • مدير النظام: صلاحيات مفتوحة كاملة (بلا تحديد).
 //  • مسؤول فرع: الإضافة والتعديل ضمن فروعه/جدّه المصرّح له بها فقط (لا يتجاوزها).
@@ -1422,8 +1430,15 @@ async function abwConfirmSave() {
   const name = val('p_name').trim();
   if (!name) { toast('أدخل اسم المولود'); return; }
   if (isManager() && (!editFather || !inMyBranch(editFather))) { toast('اختر أباً ضمن فرعك'); return; }
-  // منع تطابق اسم المولود مع أخٍ له من نفس الأب
-  if (siblingNameExists(editFather, name)) { toast('يوجد ابن بنفس الاسم لنفس الأب — اختر اسماً مختلفاً'); return; }
+  // تكرار اسم المولود لنفس الأب: ممنوع إن كان الموجود حيّاً، ومسموح إن كان متوفّى بعد تحذير وتأكيد مكرّر.
+  const dups = sameNameSiblings(editFather, name);
+  if (dups.length) {
+    if (dups.some(c => c.status !== 'dead')) {
+      toast('يوجد ابن حيّ بنفس الاسم لنفس الأب — غير مسموح. اختر اسماً مختلفاً'); return;
+    }
+    if (!(await confirm2(`⚠️ يوجد بالفعل «${name}» (متوفّى) ابناً لنفس الأب.\nتسمية مولود جديد باسم متوفّى مسموحة — لكن تأكّد أنه ليس تكراراً بالخطأ.`, { title: 'اسم مكرّر لمتوفّى', okText: 'متابعة', danger: true }))) return;
+    if (!(await confirm2(`تأكيد نهائي: إضافة «${name}» رغم وجود «${name}» (متوفّى) تحت نفس الأب؟`, { title: 'تأكيد التكرار', okText: 'نعم، أضف', danger: true }))) return;
+  }
   // عرض سلسلة النسب الكاملة للموافقة النهائية
   const okConfirm = await confirm2(`تأكيد إضافة:\n${[name].concat(lineage(editFather ? editFather.id : 0).map(x => x.name)).join(' بن ')}`, { title: 'مراجعة النسب', okText: 'حفظ المولود', danger: false });
   if (!okConfirm) return;
@@ -1437,8 +1452,8 @@ async function saveBirth(name) {
     if (!father) { toast('اختر الأب أولاً'); return; }
     if (!inMyBranch(father)) { toast('الأب خارج فرعك المصرّح به — لا يمكن الإضافة'); return; }
   }
-  // حارس نهائي: لا اسمان متطابقان لنفس الأب
-  if (siblingNameExists(father, name)) { toast('يوجد ابن بنفس الاسم لنفس الأب — اختر اسماً مختلفاً'); return; }
+  // حارس نهائي: يُمنع فقط تطابق الاسم مع أخٍ حيّ (التكرار على متوفّى مسموح بعد تأكيد المعالج)
+  if (sameNameSiblings(father, name).some(c => c.status !== 'dead')) { toast('يوجد ابن حيّ بنفس الاسم لنفس الأب — اختر اسماً مختلفاً'); return; }
   const generation = father ? (father.generation + 1) : 1;
   let branch_id = father ? father.branch_id : null;
   if (isManager() && branch_id == null) branch_id = myBranch();
