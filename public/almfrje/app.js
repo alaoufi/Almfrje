@@ -2810,11 +2810,9 @@ function screenMembers() {
         <label class="perm-chk"><input type="checkbox" data-ghide="media" ${guestHide.media ? 'checked' : ''}><span>الصور والمستندات</span></label>
         <label class="perm-chk"><input type="checkbox" data-ghide="notes" ${guestHide.notes ? 'checked' : ''}><span>الملاحظات والحالة الوظيفية</span></label>
         <div class="muted" style="font-size:.78rem;margin-top:4px">تُحفظ التغييرات فور التأشير. الأسماء والنسب والأجيال والمدن وتواريخ الميلاد/الوفاة تبقى ظاهرة.</div>
-        <div style="margin-top:12px;border-top:1px solid var(--line,#e5e5e5);padding-top:10px"><div class="li-sub" style="font-weight:700;margin-bottom:4px">🔐 بوابة التحقق بالنسب قبل دخول الزائر</div>
-          <div class="muted" style="font-size:.78rem;margin-bottom:6px;line-height:1.9"><b>اتركه فارغاً</b> = تحقّق تلقائي بالحد الأدنى الذي يميّز كل زائر.<br><b>0</b> = دخول مباشر بلا تحقّق.<br><b>رقم</b> = حدّ أدنى ثابت لعدد الأسماء.<br>وفي كل الحالات: إن تكرّر الاسم بين أكثر من شخص يُطلب اسم جدٍّ إضافي تلقائياً. (تُتجاهل المسافة و«بن»/«ابن»/«ال» والهمزات.)</div>
-          <div class="muted" style="font-size:.78rem;margin-bottom:6px;line-height:1.9">حالات التشابه (أشخاص غير مميَّزين) حسب عدد الأجيال:<br>عند ٢: <b>${nonUniqueAtDepth(2)}</b> • عند ٣: <b>${nonUniqueAtDepth(3)}</b> • عند ٤: <b>${nonUniqueAtDepth(4)}</b> • عند ٥: <b>${nonUniqueAtDepth(5)}</b></div>
-          <input id="guestGensInp" type="number" min="0" max="10" placeholder="تلقائي" value="${guestGens === 2 ? '' : guestGens}" style="width:90px">
-          <button class="btn sm" id="guestGensSave" style="margin-right:6px">حفظ</button>
+        <div style="margin-top:12px;border-top:1px solid var(--line,#e5e5e5);padding-top:10px"><div class="li-sub" style="font-weight:700;margin-bottom:4px">🔐 تحقّق دخول الزائر بالاسم</div>
+          <div class="muted" style="font-size:.78rem;margin-bottom:8px;line-height:1.9">عند التفعيل: يكتب الزائر اسمه ثم آباءه، ويدخل <b>تلقائياً بلا زر</b> بمجرد أن يصبح اسمه مميّزاً (غير مكرّر). وإن تكرّر يُطلب اسم جدٍّ إضافي تلقائياً حتى يتفرّد. (تُتجاهل المسافة و«بن»/«ابن»/«ال» والهمزات، وصاحب الاسم يجب أن يكون حيّاً.)</div>
+          <label class="perm-chk"><input type="checkbox" id="guestVerifyChk" ${guestGens > 0 ? 'checked' : ''}><span>اشتراط التحقّق بالاسم قبل دخول الزائر</span></label>
         </div></div>` : ''}</div>
     <div class="card"><h3>المستخدمون (${list.length}) ${hintBtn('member_role')}</h3>
       <p class="muted" style="font-size:.85rem;margin-top:-4px">اضغط على اسم لعرض تفاصيله والتحكّم به.</p>
@@ -2831,14 +2829,11 @@ function screenMembers() {
     const ok = await guard(async () => { const { error } = await sb.from('almfrje_settings').upsert({ key: 'guest_hide', value: next, updated_at: new Date().toISOString() }, { onConflict: 'key' }); if (error) throw error; });
     if (ok) { guestHide = next; toast('تم الحفظ'); } else { cb.checked = !cb.checked; }
   }));
-  const ggSave = document.getElementById('guestGensSave');
-  if (ggSave) ggSave.addEventListener('click', async () => {
-    const raw = val('guestGensInp').trim();
-    const p = parseInt(raw, 10) || 0;
-    // فارغ = 2 (تلقائي بالحد الأدنى)؛ 0 = دخول مباشر؛ وأي بوابة حدّها الأدنى اسمان.
-    const n = raw === '' ? 2 : (p <= 0 ? 0 : Math.max(2, Math.min(10, p)));
+  const gvc = document.getElementById('guestVerifyChk');
+  if (gvc) gvc.addEventListener('change', async () => {
+    const n = gvc.checked ? 2 : 0;   // 2 = تحقّق تلقائي (اسمان فأكثر حتى التميّز)؛ 0 = دخول مباشر
     const ok = await guard(async () => { const { error } = await sb.from('almfrje_settings').upsert({ key: 'guest_verify_gens', value: n, updated_at: new Date().toISOString() }, { onConflict: 'key' }); if (error) throw error; });
-    if (ok) { guestGens = n; toast(n === 0 ? 'دخول مباشر بلا تحقّق' : n === 2 ? 'تحقّق تلقائي (اسمان فأكثر حتى التمييز)' : `حدّ أدنى ${n} أسماء (مع التصعيد عند التكرار)`); }
+    if (ok) { guestGens = n; toast(n > 0 ? 'فُعِّل التحقّق بالاسم (دخول تلقائي عند التميّز)' : 'أُلغي التحقّق (دخول مباشر)'); } else { gvc.checked = !gvc.checked; }
   });
   bindMemberRows();
 }
@@ -3168,14 +3163,17 @@ async function browseAsGuest(msgEl) {
     return false;
   } catch (e) { if (msgEl) { msgEl.classList.add('err'); msgEl.textContent = translateAuthError(e.message); } return false; }
 }
-// بوابة دخول الزائر: تحقّق من النسب عبر الخادم، فإن طابق فُتح وضع الزائر.
+// بوابة دخول الزائر (تلقائية): تتحقّق فور كتابة اسمين فأكثر، وتُدخله بمجرد أن يصبح اسمه فريداً — بلا زر.
+let _gateBusy = false;
 async function guestGateEnter() {
-  const m = document.getElementById('a_msg');
+  if (_gateBusy) return;
+  const m = document.getElementById('a_msg'); if (!m) return;
   const inp = (val('g_lineage') || '').trim();
+  const names = inp.split(/\s+/).filter(w => w && w !== 'بن' && w !== 'ابن');
   m.className = 'auth-msg';
-  if (!inp) { m.classList.add('err'); m.textContent = 'اكتب اسمك بالتسلسل أولاً'; return; }
-  const firstName = inp.split(/\s+/).filter(Boolean)[0] || inp;
-  m.textContent = '… جارٍ التحقق';
+  if (names.length < 2) { m.textContent = names.length ? 'تابع: اكتب اسم أبيك بعد اسمك…' : 'اكتب اسمك ثم اسم أبيك…'; return; }
+  const firstName = names[0];
+  _gateBusy = true; m.textContent = '… جارٍ التحقق';
   try {
     const res = await fetch('/api/almfrje-guest-verify', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ input: inp }) });
     const j = await res.json().catch(() => ({}));
@@ -3187,13 +3185,13 @@ async function guestGateEnter() {
         openModal('🌿 أهلاً وسهلاً', `<div style="text-align:center;white-space:pre-wrap;font-size:1.1rem;line-height:1.95;padding:8px 2px">${esc(msg)}</div><button class="btn btn-lg" id="welcomeOk" style="margin-top:16px;width:100%">🌳 ابدأ التصفّح</button>`);
         const wb = document.getElementById('welcomeOk'); if (wb) wb.addEventListener('click', closeModal);
       }
-    } else if (j.error) {
-      // إرشاد من الخادم: عدد الأسماء غير كافٍ، أو يلزم اسم جدّ إضافي لأن الاسم متكرّر
-      m.classList.add('err'); m.textContent = j.error;
+    } else if (j.needMore) {
+      m.classList.add('err'); m.textContent = j.error || 'الاسم يطابق أكثر من شخص — أضِف اسم الجدّ التالي ثم تابع';
     } else {
       m.classList.add('err'); m.textContent = (guestWelcomeFail || DEFAULT_GUEST_FAIL).replace(/\{name\}/g, firstName);
     }
   } catch (e) { m.classList.add('err'); m.textContent = 'تعذّر التحقق، حاول مجدداً'; }
+  finally { _gateBusy = false; }
 }
 // رابط دخول المسؤول/المشرف: #login أو #admin (يُخفي شاشة الدخول عن الزوّار العاديين).
 function isAdminLoginUrl() {
@@ -3217,15 +3215,18 @@ function renderAuth() {
       <div class="logo" style="font-size:3.2rem">🌳</div>
       <h2 style="margin:.2rem 0 .1rem">المفارجة</h2>
       <div style="font-size:.95rem;line-height:1.85;margin-bottom:16px;font-weight:700">${esc(bannerText || 'شجرة أنساب العائلة')}</div>
-      <div style="font-size:1.1rem;font-weight:800;margin-bottom:6px">اكتب اسمك ${esc(gensWord(guestGens))} للدخول</div>
-      <div style="font-size:.92rem;font-weight:700;margin-bottom:12px">اسمك ثم آباؤك بالترتيب — مثال: <span style="color:var(--brand)">${esc(gensExample(guestGens))}</span></div>
+      <div style="font-size:1.1rem;font-weight:800;margin-bottom:6px">اكتب اسمك ثم آباءك للدخول</div>
+      <div style="font-size:.92rem;font-weight:700;margin-bottom:12px">تدخل تلقائياً بمجرد أن يتميّز اسمك — مثال: <span style="color:var(--brand)">${esc(gensExample(3))}</span></div>
       ${fInput('اكتب اسمك بالتسلسل هنا', 'g_lineage', '')}
-      <button class="btn btn-lg" id="g_enter">🌿 دخول</button>
       <div class="auth-msg" id="a_msg"></div>
     </div>`;
-    document.getElementById('g_enter').addEventListener('click', guestGateEnter);
     const gi = document.getElementById('g_lineage');
-    if (gi) { try { gi.focus(); } catch (e) {} gi.addEventListener('keydown', e => { if (e.key === 'Enter') guestGateEnter(); }); }
+    if (gi) {
+      try { gi.focus(); } catch (e) {}
+      let _gt = null;
+      gi.addEventListener('input', () => { clearTimeout(_gt); _gt = setTimeout(guestGateEnter, 600); });
+      gi.addEventListener('keydown', e => { if (e.key === 'Enter') { clearTimeout(_gt); guestGateEnter(); } });
+    }
     return;
   }
   // ===== واجهة المسؤول/المشرف =====
