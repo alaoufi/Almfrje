@@ -1699,7 +1699,12 @@ function screenFeedback() {
   view().innerHTML = `
     <div class="muted" style="margin-bottom:8px">صف ملاحظتك أو الخطأ الذي لاحظته، وستصل للإدارة لمراجعتها واتخاذ الإجراء.</div>
     <div class="card">
-      <div class="field"><label>الموضوع *</label><input id="fb_subject" type="text" placeholder="عنوان مختصر للملاحظة"></div>
+      <div class="field"><label>الموضوع *</label><select id="fb_subject">
+        <option value="">— اختر الموضوع —</option>
+        <option value="إضافة مولود">إضافة مولود</option>
+        <option value="اقتراح">اقتراح</option>
+        <option value="ملاحظة">ملاحظة</option>
+      </select></div>
       <div class="field"><label>الفرع</label><select id="fb_branch"><option value="">— اختر الفرع —</option>${branchOpts}</select></div>
       <div class="field"><label>التفاصيل (اذكر التسلسل: فلان بن فلان بن فلان…)</label><textarea id="fb_details" rows="4" placeholder="مثال: محمد بن سالم بن خالد — ثم التفاصيل…"></textarea></div>
       <div class="field"><label>الخطأ — ما هو الخطأ؟</label><textarea id="fb_error" rows="3" placeholder="صِف الخطأ والتصحيح المقترح (إن وُجد)"></textarea></div>
@@ -1709,7 +1714,7 @@ function screenFeedback() {
 }
 async function sendFeedback() {
   const subject = val('fb_subject').trim();
-  if (!subject) { toast('اكتب الموضوع أولاً'); return; }
+  if (!subject) { toast('اختر الموضوع أولاً'); return; }
   const branch_id = val('fb_branch') ? parseInt(val('fb_branch'), 10) : null;
   const details = val('fb_details').trim();
   const error_desc = val('fb_error').trim();
