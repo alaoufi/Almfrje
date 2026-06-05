@@ -1748,7 +1748,8 @@ function fbSearchFather(term) {
   const res = document.getElementById('fb_fresults');
   const t = normalizeAr((term || '').trim());
   if (!t) { res.innerHTML = ''; return; }
-  const list = C.persons.filter(p => (p._n || '').includes(t)).slice(0, 20);
+  // المتوفّى لا يُضاف له مولود — فلا نعرضه في بحث اختيار الأب.
+  const list = C.persons.filter(p => p.status !== 'dead' && (p._n || '').includes(t)).slice(0, 20);
   res.innerHTML = list.length
     ? list.map(p => `<div class="row click" data-fbf="${p.id}"><span class="k">${esc(p.name)}</span><span class="v" style="font-size:.78rem">${esc(lineageShort(p.id, 6))}</span></div>`).join('')
     : '<div class="muted" style="padding:6px">لا نتائج</div>';
