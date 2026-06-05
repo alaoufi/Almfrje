@@ -1328,13 +1328,17 @@ async function deletePerson(id, p) {
   if (childCount > 0) msg = `⚠️ تنبيه: «${p.name}» له ${childCount} من الأبناء المباشرين، وسيصبحون بلا أب عند الحذف.\n\nيُفضّل نقل أبنائه أولاً. المتابعة رغم ذلك؟`;
   if (!(await confirm2(msg, { title: '🗑️ تأكيد حذف الاسم', okText: 'متابعة', danger: true }))) return;
   if (!(await confirm2(`تأكيد نهائي — حذف «${p.name}» من الشجرة؟`, { title: 'تأكيد نهائي', okText: 'نعم، احذف', danger: true }))) return;
+  const snap = byId.get(id);
   const ok = await guard(async () => {
-    await trashSnap('persons', id, 'delete', p.name);
-    const { error } = await sb.from('almfrje_persons').delete().eq('id', id);
+    // تحقّق فعلي من الحذف: RLS قد تُرجع نجاحاً بلا حذف أي صف — .select() يُعيد الصفوف المحذوفة فعلاً.
+    const { data: del, error } = await sb.from('almfrje_persons').delete().eq('id', id).select('id');
     if (error) throw error;
+    if (!del || !del.length) throw new Error('لم يُحذف الاسم — صلاحية الحذف غير مفعّلة في قاعدة البيانات (RLS). راجع تفعيل سياسة الحذف للمدير.');
+    // نحفظ النسخة في السلة فقط بعد تأكيد الحذف الفعلي (حتى لا تظهر «نُقل للسلة» وهو لم يُحذف).
+    try { await sb.from('almfrje_trash').insert({ tbl: 'persons', rec_id: id, action: 'delete', label: p.name || '', data: snap, actor_name: (me && me.full_name) || '' }); } catch (e) { /* أفضل جهد */ }
+    await auditLog('delete', id, p.name);
   });
   if (ok) {
-    await auditLog('delete', id, p.name);
     toast(`تم نقل «${p.name}» إلى سلة المحذوفات`);
     await loadAll();
     location.hash = p.father_id ? '#/person/' + p.father_id : '#/tree';
@@ -1646,7 +1650,8 @@ function screenDuplicates() {
     <div class="muted" style="margin-bottom:8px">الأسماء المتطابقة لأبناء نفس الأب (تتجاهل التشكيل والهمزات والمسافات: «عبدالله»=«عبد الله»)${mgr ? ' — ضمن فرعك فقط' : ''}. اضغط الاسم لفتحه وتعديله.</div>
     <div class="card"><div class="li-title">${list.length ? '🔁 ' + list.length + ' حالة تكرار' : '✅ لا يوجد أي تكرار'}</div></div>
     ${list.map(g => `<div class="card" style="padding:12px">
-      <div class="li-sub">الأب: <b>${g.father ? esc(g.father.name) : '— (الأصل)'}</b> • الاسم المكرّر: <b class="n-noissue">${esc(g.items[0].name)}</b> (${g.items.length})</div>
+      <div class="li-sub">📜 الأب: <b>${g.father ? esc(lineageShort(g.father.id, 8)) : '— (الأصل)'}</b></div>
+      <div class="li-sub">الاسم المكرّر: <b class="n-noissue">${esc(g.items[0].name)}</b> (${g.items.length})</div>
       <div style="margin-top:6px">${g.items.map(c => `<div class="row"><span class="k"><a href="#/person/${c.id}" style="color:var(--brand);text-decoration:none">${esc(c.name)}</a></span><span class="v" style="font-size:.8rem">${esc(lineageShort(c.id))}</span></div>`).join('')}</div>
     </div>`).join('')}`;
   bindGo();
