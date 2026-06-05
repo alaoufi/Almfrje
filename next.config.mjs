@@ -4,14 +4,10 @@ const nextConfig = {
   outputFileTracingIncludes: {
     '/api/setup': ['./database/setup.sql'],
   },
-  async redirects() {
-    return [
-      // الجذر يحوّل إلى المفارجة على رابطها النظيف /almfrji
-      { source: '/', destination: '/almfrji', permanent: false },
-    ];
-  },
   async rewrites() {
     return [
+      // الرئيسية مقفلة = صفحة بيضاء فارغة (المفارجة على /almfrji فقط)
+      { source: '/', destination: '/blank.html' },
       // نظام المفارجة (الأنساب) — الرابط المعتمد /almfrji (مع إبقاء /almfrje كمرادف)
       { source: '/almfrji', destination: '/almfrje/index.html' },
       { source: '/almfrji/', destination: '/almfrje/index.html' },
