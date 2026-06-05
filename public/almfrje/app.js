@@ -201,6 +201,10 @@ const DEFAULT_BANNER = 'المفرجي قبيلة من ولد حسين من ال
 let bannerText = DEFAULT_BANNER;
 const DEFAULT_FB_THANKS = 'شكراً لك 🌿\nتم إرسال ملاحظتك، وهي محل اهتمامنا.';
 let feedbackThanks = DEFAULT_FB_THANKS;
+const DEFAULT_GUEST_OK = 'مرحباً بك يا ابن العم {name} 🌿\nداخل مكانك وبين ربعك وجماعتك.. نسعد بوجودك';
+const DEFAULT_GUEST_FAIL = 'مرحباً بك يا {name} 🙏\nنأسف، الاسم غير مسجّل — تأكّد من كتابة اسمك الصحيح بالتسلسل.';
+let guestWelcomeOk = DEFAULT_GUEST_OK;
+let guestWelcomeFail = DEFAULT_GUEST_FAIL;
 const C = { persons: [], branches: [], members: [], documents: [] };
 const TABLES = { persons: 'almfrje_persons', branches: 'almfrje_branches', members: 'almfrje_members', documents: 'almfrje_documents' };
 
@@ -312,6 +316,8 @@ async function loadSettings() {
     recentSince = typeof map.recent_since === 'string' ? map.recent_since : '';
     bannerText = typeof map.banner_text === 'string' ? map.banner_text : DEFAULT_BANNER;
     feedbackThanks = typeof map.feedback_thanks === 'string' && map.feedback_thanks ? map.feedback_thanks : DEFAULT_FB_THANKS;
+    guestWelcomeOk = typeof map.guest_welcome_ok === 'string' && map.guest_welcome_ok ? map.guest_welcome_ok : DEFAULT_GUEST_OK;
+    guestWelcomeFail = typeof map.guest_welcome_fail === 'string' && map.guest_welcome_fail ? map.guest_welcome_fail : DEFAULT_GUEST_FAIL;
     // تطبيق نصوص التعليمات المعدّلة من الإعدادات فوق الافتراضية
     applyHintOverrides(map.hints_overrides);
   } catch (e) { /* تجاهل — تبقى القيم الافتراضية */ }
@@ -2501,6 +2507,14 @@ function screenTexts() {
       <p class="muted" style="font-size:.85rem;margin-top:-2px">تظهر للمُرسِل في موديل بعد إرسال ملاحظته.</p>
       ${fTextarea('النص', 'tx_fbthanks', feedbackThanks)}
       <button class="btn sm" id="tx_fbthanksSave" style="margin-top:6px">حفظ النص</button></div>
+    <div class="card"><h3>🌿 ترحيب الزائر — عند نجاح التحقق</h3>
+      <p class="muted" style="font-size:.85rem;margin-top:-2px">يظهر للزائر بعد مطابقة اسمه. اكتب <b>{name}</b> مكان اسم الزائر.</p>
+      ${fTextarea('النص', 'tx_gok', guestWelcomeOk)}
+      <button class="btn sm" id="tx_gokSave" style="margin-top:6px">حفظ</button></div>
+    <div class="card"><h3>🙏 ترحيب الزائر — عند فشل التحقق</h3>
+      <p class="muted" style="font-size:.85rem;margin-top:-2px">يظهر إذا لم يُطابق الاسم. اكتب <b>{name}</b> مكان اسم الزائر.</p>
+      ${fTextarea('النص', 'tx_gfail', guestWelcomeFail)}
+      <button class="btn sm" id="tx_gfailSave" style="margin-top:6px">حفظ</button></div>
     <div class="card"><h3>🎨 تعريف ألوان الحالة</h3>
       <p class="muted" style="font-size:.85rem;margin-top:-2px">تظهر دلالة الألوان أسفل الرئيسية. عدّل المسميات كما تريد.</p>
       ${fInput('الاسم بلون عادي يعني', 'tx_alive', statLabels.alive)}
@@ -2521,6 +2535,16 @@ function screenTexts() {
     const txt = val('tx_fbthanks').trim() || DEFAULT_FB_THANKS;
     const ok = await guard(async () => { const { error } = await sb.from('almfrje_settings').upsert({ key: 'feedback_thanks', value: txt, updated_at: new Date().toISOString() }, { onConflict: 'key' }); if (error) throw error; });
     if (ok) { feedbackThanks = txt; toast('تم حفظ رسالة الشكر'); }
+  });
+  document.getElementById('tx_gokSave').addEventListener('click', async () => {
+    const txt = val('tx_gok').trim() || DEFAULT_GUEST_OK;
+    const ok = await guard(async () => { const { error } = await sb.from('almfrje_settings').upsert({ key: 'guest_welcome_ok', value: txt, updated_at: new Date().toISOString() }, { onConflict: 'key' }); if (error) throw error; });
+    if (ok) { guestWelcomeOk = txt; toast('تم حفظ ترحيب النجاح'); }
+  });
+  document.getElementById('tx_gfailSave').addEventListener('click', async () => {
+    const txt = val('tx_gfail').trim() || DEFAULT_GUEST_FAIL;
+    const ok = await guard(async () => { const { error } = await sb.from('almfrje_settings').upsert({ key: 'guest_welcome_fail', value: txt, updated_at: new Date().toISOString() }, { onConflict: 'key' }); if (error) throw error; });
+    if (ok) { guestWelcomeFail = txt; toast('تم حفظ ترحيب الفشل'); }
   });
   document.getElementById('tx_lblSave').addEventListener('click', async () => {
     const next = { alive: val('tx_alive').trim() || LABELS_DEFAULT.alive, dead: val('tx_dead').trim() || LABELS_DEFAULT.dead, noissue: val('tx_noissue').trim() || LABELS_DEFAULT.noissue };
@@ -3118,12 +3142,24 @@ async function guestGateEnter() {
   const inp = (val('g_lineage') || '').trim();
   m.className = 'auth-msg';
   if (!inp) { m.classList.add('err'); m.textContent = 'اكتب اسمك بالتسلسل أولاً'; return; }
+  const firstName = inp.split(/\s+/).filter(Boolean)[0] || inp;
   m.textContent = '… جارٍ التحقق';
   try {
     const res = await fetch('/api/almfrje-guest-verify', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ input: inp }) });
     const j = await res.json().catch(() => ({}));
-    if (res.ok && j.ok) { m.textContent = '… تم التحقق، جارٍ الدخول'; location.hash = '#/home'; await browseAsGuest(m); }
-    else { m.classList.add('err'); m.textContent = j.error || 'لم يُطابق اسمك سلسلة النسب. اكتب اسمك ثم آباءك بالترتيب.'; }
+    if (res.ok && j.ok) {
+      location.hash = '#/home';
+      const entered = await browseAsGuest(m);
+      if (entered) {
+        const msg = (guestWelcomeOk || DEFAULT_GUEST_OK).replace(/\{name\}/g, firstName);
+        openModal('🌿 أهلاً وسهلاً', `<div style="text-align:center;white-space:pre-wrap;font-size:1.08rem;line-height:1.95;padding:8px 2px">${esc(msg)}</div>`);
+        setTimeout(closeModal, 3200);
+      }
+    } else if (j.error && j.error.indexOf('اكتب') === 0) {
+      m.classList.add('err'); m.textContent = j.error;   // إرشاد: عدد الأجيال غير كافٍ
+    } else {
+      m.classList.add('err'); m.textContent = (guestWelcomeFail || DEFAULT_GUEST_FAIL).replace(/\{name\}/g, firstName);
+    }
   } catch (e) { m.classList.add('err'); m.textContent = 'تعذّر التحقق، حاول مجدداً'; }
 }
 // رابط دخول المسؤول/المشرف: #login أو #admin (يُخفي شاشة الدخول عن الزوّار العاديين).
@@ -3153,10 +3189,8 @@ function renderAuth() {
       ${fInput('اكتب اسمك بالتسلسل هنا', 'g_lineage', '')}
       <button class="btn btn-lg" id="g_enter">🌿 دخول</button>
       <div class="auth-msg" id="a_msg"></div>
-      <button class="auth-guest-link" id="to_admin">دخول الإدارة →</button>
     </div>`;
     document.getElementById('g_enter').addEventListener('click', guestGateEnter);
-    document.getElementById('to_admin').addEventListener('click', () => { location.hash = '#login'; renderAuth(); });
     const gi = document.getElementById('g_lineage');
     if (gi) { try { gi.focus(); } catch (e) {} gi.addEventListener('keydown', e => { if (e.key === 'Enter') guestGateEnter(); }); }
     return;
