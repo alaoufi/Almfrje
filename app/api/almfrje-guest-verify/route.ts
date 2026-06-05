@@ -32,10 +32,11 @@ export async function POST(request: NextRequest) {
   (settings || []).forEach((r: { key: string; value: unknown }) => { map[r.key] = r.value; });
   if (map.guest_open !== true) return NextResponse.json({ ok: false, error: 'الموقع مغلق للزوّار' }, { status: 403 });
   const gens = Math.max(0, parseInt(String(map.guest_verify_gens ?? 0), 10) || 0);
-  if (gens <= 0) return NextResponse.json({ ok: true });   // بلا بوابة تحقّق
+  if (gens <= 0) return NextResponse.json({ ok: true });   // التحقّق غير مفعّل → دخول مباشر
 
   const names = input.split(/\s+/).map((w) => w.trim()).filter((w) => w && w !== 'بن' && w !== 'ابن');
-  if (names.length < gens) return NextResponse.json({ ok: false, error: `اكتب اسمك ثم آباءك (${gens} أسماء على الأقل بالترتيب)` });
+  // الحد الأدنى ثابت = اسمان (اسمك + أحد آبائك)، بصرف النظر عن أي قيمة قديمة مخزّنة.
+  if (names.length < 2) return NextResponse.json({ ok: false, error: 'اكتب اسمك ثم أحد آبائك (اسمين على الأقل بالترتيب)' });
 
   // تحميل الأشخاص (صفحات)
   type P = { id: number; name: string; father_id: number | null; status: string };
