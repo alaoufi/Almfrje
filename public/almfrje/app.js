@@ -110,7 +110,7 @@ const HINTS = {
   add_father: ['الأب المباشر', 'اضغط «اختيار الأب» وابحث عن والد المولود.\nيُحدَّد فرع المولود تلقائياً من فرع أبيه.\n\nمسؤول الفرع يختار أباً ضمن فرعه فقط.'],
   add_status: ['الحالة', 'حي أو متوفى.\nتظهر شارة «متوفى» فقط لمن حالته متوفى.'],
   add_work: ['الحالة الوظيفية', 'اختياري:\nلم تحدد (الافتراضي) / موظف / متقاعد.'],
-  edit_lock: ['تعديل البيانات', 'يمكنك تعديل بيانات الشخص.\nحذف الأسماء غير متاح نهائياً — تبقى النسخة السابقة محفوظة في سلة المحذوفات للتراجع.'],
+  edit_lock: ['تعديل البيانات', 'يمكنك تعديل بيانات الشخص.\nحذف الأسماء متاح لمدير النظام فقط (مع تأكيد)، وتُحفظ نسخة في سلة المحذوفات للتراجع.'],
   // ——— الأدوات ———
   bulk: ['التعديل الجماعي', 'لتعديل عدّة أشخاص دفعة واحدة:\n١) حدّد المجموعة (الجيل أو ضمن جدّ).\n٢) اختر الحقل (الحالة/المدينة…) وقيمته.\n٣) تظهر الأسماء كلها مؤشّرة — أزل تأشير من لا تريد.\n٤) طبّق على المحدّدين.\n\nملاحظة: عند تعديل الجوال أو الحالة الوظيفية أو المدينة أو سنة الميلاد، تظهر أسماء المتوفّين بلا إمكان اختيار لأنها لا تخصّهم.'],
   import: ['استيراد Excel', 'لإدخال الشجرة كاملة من ملف Excel مرة واحدة:\nكل عمود = جيل (العمود الأقصى يميناً = الأصل).\nالأسماء المتتالية في نفس العمود = إخوة.\n\nيتجاهل جدول الإحصائيات في نهاية الملف تلقائياً. راجع المعاينة قبل التنفيذ.'],
@@ -1303,8 +1303,34 @@ function screenPersonEdit(arg) {
     </div>
     <div class="card"><h3>ملاحظات (اختياري)</h3>${fTextarea('ملاحظات', 'p_notes', p.notes)}</div>
     <button class="btn btn-lg" id="saveBtn">💾 حفظ التعديل</button>
-    <p class="muted" style="text-align:center;font-size:.82rem;margin-top:8px">🔒 حذف الأسماء غير متاح — التعديل فقط، والنسخة السابقة تُحفظ في سلة المحذوفات.</p>`;
+    ${isAdmin()
+      ? `<button class="btn btn-lg danger" id="delBtn" style="margin-top:12px">🗑️ حذف هذا الاسم</button>
+    <p class="muted" style="text-align:center;font-size:.8rem;margin-top:6px">الحذف لمدير النظام فقط — تُحفظ نسخة في سلة المحذوفات ويمكن استرجاعها.</p>`
+      : `<p class="muted" style="text-align:center;font-size:.82rem;margin-top:8px">🔒 حذف الأسماء غير متاح — التعديل فقط، والنسخة السابقة تُحفظ في سلة المحذوفات.</p>`}`;
   document.getElementById('saveBtn').addEventListener('click', () => savePerson(id, p));
+  const delB = document.getElementById('delBtn');
+  if (delB) delB.addEventListener('click', () => deletePerson(id, p));
+}
+
+// حذف اسم (لمدير النظام فقط) — حذف مؤقت إلى سلة المحذوفات مع تأكيدين قبل التنفيذ.
+async function deletePerson(id, p) {
+  if (!isAdmin()) { toast('الحذف لمدير النظام فقط'); return; }
+  const childCount = (kids.get(id) || []).length;
+  let msg = `حذف الاسم «${p.name}»؟\nتُحفظ نسخة كاملة في سلة المحذوفات ويمكن استرجاعها لاحقاً.`;
+  if (childCount > 0) msg = `⚠️ تنبيه: «${p.name}» له ${childCount} من الأبناء المباشرين، وسيصبحون بلا أب عند الحذف.\n\nيُفضّل نقل أبنائه أولاً. المتابعة رغم ذلك؟`;
+  if (!(await confirm2(msg, { title: '🗑️ تأكيد حذف الاسم', okText: 'متابعة', danger: true }))) return;
+  if (!(await confirm2(`تأكيد نهائي — حذف «${p.name}» من الشجرة؟`, { title: 'تأكيد نهائي', okText: 'نعم، احذف', danger: true }))) return;
+  const ok = await guard(async () => {
+    await trashSnap('persons', id, 'delete', p.name);
+    const { error } = await sb.from('almfrje_persons').delete().eq('id', id);
+    if (error) throw error;
+  });
+  if (ok) {
+    await auditLog('delete', id, p.name);
+    toast(`تم نقل «${p.name}» إلى سلة المحذوفات`);
+    await loadAll();
+    location.hash = p.father_id ? '#/person/' + p.father_id : '#/tree';
+  }
 }
 
 /* ===== معالج إضافة مولود (عرض هرمي → الأب → الاسم → مراجعة النسب → حفظ) ===== */
