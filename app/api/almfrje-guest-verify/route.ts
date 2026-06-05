@@ -36,10 +36,6 @@ export async function POST(request: NextRequest) {
 
   const names = input.split(/\s+/).map((w) => w.trim()).filter((w) => w && w !== 'بن' && w !== 'ابن');
   if (names.length < gens) return NextResponse.json({ ok: false, error: `اكتب اسمك ثم آباءك (${gens} أسماء على الأقل بالترتيب)` });
-  // نطابق بكل ما كتبه المستخدم (قد يكون أكثر من الحدّ الأدنى)، ونشترط أن يكون فريداً.
-  const depth = names.length;
-  const sig = normGen(names.join(' '));
-  if (!sig) return NextResponse.json({ ok: false });
 
   // تحميل الأشخاص (صفحات)
   type P = { id: number; name: string; father_id: number | null; status: string };
@@ -61,12 +57,20 @@ export async function POST(request: NextRequest) {
     if (chain.length < n) return null;
     return normGen(chain.join(' '));
   };
-  // الأشخاص الذين يطابق نسبُهم ما كتبه المستخدم — بشرط أن يكون صاحب الاسم نفسه (الزائر) حيّاً.
-  const matches = persons.filter((p) => p.status !== 'dead' && lineageSig(p.id, depth) === sig).length;
-  if (matches === 1) return NextResponse.json({ ok: true });
-  if (matches > 1) {
-    // التطابق ليس فريداً (تكرار في الأسماء) → اطلب اسم جدٍّ إضافي للتمييز (٣ ← ٤ …)
-    return NextResponse.json({ ok: false, needMore: true, matches, error: `يوجد ${matches} أشخاص بنفس هذا الاسم — أضِف اسم الجدّ التالي ثم أعد المحاولة` });
+  // عدد الأحياء الذين يطابق أول d اسماً منهم ما كتبه المستخدم (صاحب الاسم نفسه يجب أن يكون حيّاً).
+  const countLiving = (d: number): number => {
+    const s = normGen(names.slice(0, d).join(' '));
+    return persons.filter((p) => p.status !== 'dead' && lineageSig(p.id, d) === s).length;
+  };
+  // ندخل عند أصغر عمق يصبح فيه الاسم فريداً (بدءاً من الحدّ الأدنى gens، عادةً اسمان).
+  // فإن كان «اسمه واسم أبيه» فريداً دخل فوراً دون اشتراط عدد ثابت.
+  let last = 0;
+  for (let d = gens; d <= names.length; d++) {
+    const c = countLiving(d);
+    if (c === 1) return NextResponse.json({ ok: true });   // فريد → ادخل
+    last = c;
+    if (c === 0) break;   // هذه البادئة غير موجودة بين الأحياء
   }
-  return NextResponse.json({ ok: false });   // 0 → غير مسجّل
+  if (last > 1) return NextResponse.json({ ok: false, needMore: true, error: 'الاسم يطابق أكثر من شخص — أضِف اسم الجدّ التالي ثم أعد المحاولة' });
+  return NextResponse.json({ ok: false });   // غير مسجّل (أو صاحب الاسم متوفّى)
 }

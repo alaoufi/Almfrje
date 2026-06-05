@@ -3216,9 +3216,9 @@ function renderAuth() {
     box.innerHTML = `<div class="auth-box">
       <div class="logo" style="font-size:3.2rem">🌳</div>
       <h2 style="margin:.2rem 0 .1rem">المفارجة</h2>
-      <div class="muted" style="font-size:.82rem;line-height:1.7;margin-bottom:16px">${esc(bannerText || 'شجرة أنساب العائلة')}</div>
-      <div class="sub" style="margin-bottom:4px">اكتب اسمك ${esc(gensWord(guestGens))} للدخول</div>
-      <div class="muted" style="font-size:.78rem;margin-bottom:10px">اسمك ثم آباؤك بالترتيب — مثال: ${esc(gensExample(guestGens))}</div>
+      <div style="font-size:.95rem;line-height:1.85;margin-bottom:16px;font-weight:700">${esc(bannerText || 'شجرة أنساب العائلة')}</div>
+      <div style="font-size:1.1rem;font-weight:800;margin-bottom:6px">اكتب اسمك ${esc(gensWord(guestGens))} للدخول</div>
+      <div style="font-size:.92rem;font-weight:700;margin-bottom:12px">اسمك ثم آباؤك بالترتيب — مثال: <span style="color:var(--brand)">${esc(gensExample(guestGens))}</span></div>
       ${fInput('اكتب اسمك بالتسلسل هنا', 'g_lineage', '')}
       <button class="btn btn-lg" id="g_enter">🌿 دخول</button>
       <div class="auth-msg" id="a_msg"></div>
