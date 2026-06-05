@@ -2811,10 +2811,10 @@ function screenMembers() {
         <label class="perm-chk"><input type="checkbox" data-ghide="notes" ${guestHide.notes ? 'checked' : ''}><span>الملاحظات والحالة الوظيفية</span></label>
         <div class="muted" style="font-size:.78rem;margin-top:4px">تُحفظ التغييرات فور التأشير. الأسماء والنسب والأجيال والمدن وتواريخ الميلاد/الوفاة تبقى ظاهرة.</div>
         <div style="margin-top:12px;border-top:1px solid var(--line,#e5e5e5);padding-top:10px"><div class="li-sub" style="font-weight:700;margin-bottom:4px">🔐 بوابة التحقق بالنسب قبل دخول الزائر</div>
-          <div class="muted" style="font-size:.78rem;margin-bottom:6px">عدد الأجيال التي يكتبها الزائر ليُسمح له (0 = بلا تحقّق، دخول مباشر). مثال: 3 = اسمه ثم أبوه ثم جدّه — ويُطابَق مع تجاهل المسافة و«بن» و«ابن» و«ال» والهمزات. وإذا تطابق الاسم مع أكثر من شخص يُطلب اسم جدٍّ إضافي تلقائياً.</div>
-          <div class="muted" style="font-size:.78rem;margin-bottom:6px;line-height:1.9">حالات التشابه (أشخاص غير مميَّزين) حسب عدد الأجيال — اختر رقماً تكون عنده الحالات قليلة/صفر:<br>عند ٢: <b>${nonUniqueAtDepth(2)}</b> • عند ٣: <b>${nonUniqueAtDepth(3)}</b> • عند ٤: <b>${nonUniqueAtDepth(4)}</b> • عند ٥: <b>${nonUniqueAtDepth(5)}</b></div>
-          <input id="guestGensInp" type="number" min="0" max="10" value="${guestGens}" style="width:90px">
-          <button class="btn sm" id="guestGensSave" style="margin-right:6px">حفظ عدد الأجيال</button>
+          <div class="muted" style="font-size:.78rem;margin-bottom:6px;line-height:1.9"><b>اتركه فارغاً</b> = تحقّق تلقائي بالحد الأدنى الذي يميّز كل زائر.<br><b>0</b> = دخول مباشر بلا تحقّق.<br><b>رقم</b> = حدّ أدنى ثابت لعدد الأسماء.<br>وفي كل الحالات: إن تكرّر الاسم بين أكثر من شخص يُطلب اسم جدٍّ إضافي تلقائياً. (تُتجاهل المسافة و«بن»/«ابن»/«ال» والهمزات.)</div>
+          <div class="muted" style="font-size:.78rem;margin-bottom:6px;line-height:1.9">حالات التشابه (أشخاص غير مميَّزين) حسب عدد الأجيال:<br>عند ٢: <b>${nonUniqueAtDepth(2)}</b> • عند ٣: <b>${nonUniqueAtDepth(3)}</b> • عند ٤: <b>${nonUniqueAtDepth(4)}</b> • عند ٥: <b>${nonUniqueAtDepth(5)}</b></div>
+          <input id="guestGensInp" type="number" min="0" max="10" placeholder="تلقائي" value="${guestGens === 1 ? '' : guestGens}" style="width:90px">
+          <button class="btn sm" id="guestGensSave" style="margin-right:6px">حفظ</button>
         </div></div>` : ''}</div>
     <div class="card"><h3>المستخدمون (${list.length}) ${hintBtn('member_role')}</h3>
       <p class="muted" style="font-size:.85rem;margin-top:-4px">اضغط على اسم لعرض تفاصيله والتحكّم به.</p>
@@ -2833,9 +2833,10 @@ function screenMembers() {
   }));
   const ggSave = document.getElementById('guestGensSave');
   if (ggSave) ggSave.addEventListener('click', async () => {
-    const n = Math.max(0, Math.min(10, parseInt(val('guestGensInp'), 10) || 0));
+    const raw = val('guestGensInp').trim();
+    const n = raw === '' ? 1 : Math.max(0, Math.min(10, parseInt(raw, 10) || 0));   // فارغ = 1 (تلقائي بالحد الأدنى)
     const ok = await guard(async () => { const { error } = await sb.from('almfrje_settings').upsert({ key: 'guest_verify_gens', value: n, updated_at: new Date().toISOString() }, { onConflict: 'key' }); if (error) throw error; });
-    if (ok) { guestGens = n; toast(n > 0 ? `سيُطلب من الزائر ${n} أجيال للتحقق` : 'أُلغيت بوابة التحقق (دخول مباشر)'); }
+    if (ok) { guestGens = n; toast(n === 0 ? 'دخول مباشر بلا تحقّق' : n === 1 ? 'تحقّق تلقائي بالحد الأدنى المميِّز' : `حدّ أدنى ${n} أسماء (مع التصعيد عند التكرار)`); }
   });
   bindMemberRows();
 }
@@ -3198,8 +3199,8 @@ function isAdminLoginUrl() {
   return h === 'login' || h === 'admin';
 }
 // وصف عدد الأجيال (ثلاثي/رباعي…) ومثال للاسم بالتسلسل — لشاشة دخول الزائر.
-function gensWord(n) { return { 2: 'ثنائياً', 3: 'ثلاثياً', 4: 'رباعياً', 5: 'خماسياً', 6: 'سداسياً', 7: 'سباعياً' }[n] || ('بـ ' + n + ' أجيال'); }
-function gensExample(n) { return ['محمد', 'سالم', 'خالد', 'عبدالله', 'راشد', 'حمد', 'فهد'].slice(0, Math.max(2, n || 3)).join(' '); }
+function gensWord(n) { if (n <= 1) return 'كاملاً (اسمك ثم آباؤك حتى يتميّز)'; return { 2: 'ثنائياً', 3: 'ثلاثياً', 4: 'رباعياً', 5: 'خماسياً', 6: 'سداسياً', 7: 'سباعياً' }[n] || ('بـ ' + n + ' أجيال'); }
+function gensExample(n) { return ['محمد', 'سالم', 'خالد', 'عبدالله', 'راشد', 'حمد', 'فهد'].slice(0, Math.max(3, n > 0 ? n : 3)).join(' '); }
 // شاشة الدخول — مختصرة: دخول المسؤول/المشرف فقط، أو تصفّح كزائر. لا تسجيل حسابات
 // (الحسابات يُنشئها المدير من داخل التطبيق).
 function renderAuth() {
