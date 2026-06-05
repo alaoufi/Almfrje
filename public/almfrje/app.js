@@ -183,6 +183,7 @@ function normalizeAr(s) {
     .replace(/[ً-ْٰ]/g, '')
     .replace(/[أإآ]/g, 'ا').replace(/ى/g, 'ي').replace(/ة/g, 'ه')
     .replace(/ؤ/g, 'و').replace(/ئ/g, 'ي').replace(/ـ/g, '')
+    .replace(/\s+/g, '')
     .trim().toLowerCase();
 }
 
@@ -1601,7 +1602,7 @@ function screenDuplicates() {
   let list = mgr ? groups.filter(g => g.items.some(c => inMyBranch(c))) : groups;
   list.sort((a, b) => b.items.length - a.items.length);
   view().innerHTML = `
-    <div class="muted" style="margin-bottom:8px">الأسماء المتطابقة لأبناء نفس الأب (تتجاهل التشكيل والهمزات)${mgr ? ' — ضمن فرعك فقط' : ''}. اضغط الاسم لفتحه وتعديله.</div>
+    <div class="muted" style="margin-bottom:8px">الأسماء المتطابقة لأبناء نفس الأب (تتجاهل التشكيل والهمزات والمسافات: «عبدالله»=«عبد الله»)${mgr ? ' — ضمن فرعك فقط' : ''}. اضغط الاسم لفتحه وتعديله.</div>
     <div class="card"><div class="li-title">${list.length ? '🔁 ' + list.length + ' حالة تكرار' : '✅ لا يوجد أي تكرار'}</div></div>
     ${list.map(g => `<div class="card" style="padding:12px">
       <div class="li-sub">الأب: <b>${g.father ? esc(g.father.name) : '— (الأصل)'}</b> • الاسم المكرّر: <b class="n-noissue">${esc(g.items[0].name)}</b> (${g.items.length})</div>
