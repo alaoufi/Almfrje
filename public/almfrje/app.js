@@ -3326,10 +3326,11 @@ async function init() {
   // (الجداول تُنشأ مرة واحدة؛ النداء يعمل في الخلفية دون تعطيل البدء.)
   try { fetch('/api/almfrje-setup', { method: 'POST' }).catch(() => {}); } catch (e) { /* تجاهل */ }
   document.getElementById('backBtn').addEventListener('click', goBack);
-  // خروج المسؤول → شاشة دخول الإدارة (#login). خروج الزائر → بوابة التحقق (الرئيسية).
+  // الخروج (مسؤولاً كان أو زائراً) → بوابة التحقق من الاسم فقط، لا شاشة دخول إدارة.
+  // (الإدارة تعود للدخول عبر الرابط المباشر #login.)
   document.getElementById('signoutBtn').addEventListener('click', async () => {
-    if (isGuestUser()) { try { sessionStorage.removeItem('almfrje_guest_ts'); } catch (e) { /* */ } location.hash = '#/home'; }
-    else { location.hash = '#login'; }
+    try { sessionStorage.removeItem('almfrje_guest_ts'); } catch (e) { /* */ }
+    location.hash = '#/home';
     await sb.auth.signOut();
   });
   window.addEventListener('hashchange', () => { if (me && me.is_active) render(); });
