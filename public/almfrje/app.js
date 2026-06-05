@@ -1709,29 +1709,35 @@ let fbFilter = 'new';    // تبويب شاشة المدير: new | done | all
 function screenFeedback() {
   fbFather = null; fbSender = null;
   view().innerHTML = `
-    <div class="muted" style="margin-bottom:8px">عرّف بنفسك أولاً، ثم اختر نوع الملاحظة وأكمل الحقول. ستصل للإدارة لمراجعتها.</div>
+    <div class="card" style="text-align:center;border:2px solid var(--brand)">
+      <div style="font-size:2rem;line-height:1">✉️</div>
+      <h3 style="margin:.3rem 0 .15rem">إرسال ملاحظة للإدارة</h3>
+      <div class="muted" style="font-size:.84rem;line-height:1.7">عرّف بنفسك، اختر نوع الملاحظة وأكملها — وستصل للإدارة لمراجعتها واتخاذ الإجراء.</div>
+    </div>
     <div class="card">
-      <div class="field"><label>من أنت؟ اختر اسمك من الشجرة (اكتب اسمك ثم اسم أبيك) *</label>
+      <div class="li-title" style="margin-bottom:10px">١) من أنت؟ <span class="muted" style="font-weight:normal;font-size:.8rem">(للأحياء فقط)</span></div>
+      <div class="field"><label>اكتب اسمك ثم اسم أبيك لتقليص القائمة</label>
         <input id="fb_msearch" type="text" placeholder="مثال: محمد سالم">
-        <div id="fb_mresults" style="max-height:200px;overflow:auto"></div>
-        <div id="fb_mselected" class="muted" style="margin-top:6px"></div>
+        <div id="fb_mresults" style="max-height:200px;overflow:auto;margin-top:4px"></div>
+        <div id="fb_mselected" style="margin-top:8px"></div>
       </div>
-      <div class="field"><label>الموضوع *</label>
-        <select id="fb_subject">
-          <option value="">— اختر الموضوع —</option>
-          <option value="إضافة مولود">👶 إضافة مولود</option>
-          <option value="ملاحظة">📝 ملاحظة / تصحيح</option>
-          <option value="اقتراح">💡 اقتراح</option>
-        </select>
-      </div>
+    </div>
+    <div class="card">
+      <div class="li-title" style="margin-bottom:10px">٢) نوع الملاحظة</div>
+      <div class="field"><select id="fb_subject">
+        <option value="">— اختر الموضوع —</option>
+        <option value="إضافة مولود">👶 إضافة مولود</option>
+        <option value="ملاحظة">📝 ملاحظة / تصحيح</option>
+        <option value="اقتراح">💡 اقتراح</option>
+      </select></div>
       <div id="fb_dynamic"></div>
       <div class="field"><label id="fb_details_lbl">التفاصيل *</label><textarea id="fb_details" rows="4" placeholder="اكتب التفاصيل…"></textarea></div>
-      <button class="btn btn-lg" id="fb_send">✉️ إرسال للإدارة</button>
-    </div>`;
+    </div>
+    <button class="btn btn-lg" id="fb_send" style="width:100%">✉️ إرسال للإدارة</button>`;
   const ms = document.getElementById('fb_msearch');
   ms.addEventListener('input', () => fbPickerSearch(ms.value, document.getElementById('fb_mresults'), true, (p) => {
     fbSender = p;
-    document.getElementById('fb_mselected').innerHTML = p ? '✅ أنت: <b>' + esc(lineageShort(p.id, 10)) + '</b>' : '';
+    document.getElementById('fb_mselected').innerHTML = p ? '<div style="padding:8px 10px;border:1px solid var(--brand);border-radius:8px;font-size:.9rem">✅ أنت: <b>' + esc(lineageShort(p.id, 10)) + '</b></div>' : '';
     ms.value = p ? p.name : '';
   }));
   const sub = document.getElementById('fb_subject');
@@ -1775,7 +1781,7 @@ function renderFbDynamic(subject) {
     const fs = document.getElementById('fb_fsearch');
     fs.addEventListener('input', () => fbPickerSearch(fs.value, document.getElementById('fb_fresults'), true, (p) => {
       fbFather = p;
-      document.getElementById('fb_fselected').innerHTML = p ? '✅ الأب: <b>' + esc(lineageShort(p.id, 12)) + '</b>' : '';
+      document.getElementById('fb_fselected').innerHTML = p ? '<div style="padding:8px 10px;border:1px solid var(--brand);border-radius:8px;font-size:.9rem">✅ والد المولود: <b>' + esc(lineageShort(p.id, 12)) + '</b></div>' : '';
       fs.value = p ? p.name : '';
     }));
   } else if (subject === 'ملاحظة') {
