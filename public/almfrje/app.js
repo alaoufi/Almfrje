@@ -1692,66 +1692,128 @@ function screenStats() {
 
 /* ===== ملاحظات الزوار ===== */
 // نموذج إرسال ملاحظة/خطأ للإدارة — متاح للجميع (زائر/عضو).
+let fbFather = null;     // الأب المختار عند موضوع «إضافة مولود»
+let fbFilter = 'new';    // تبويب شاشة المدير: new | done | all
 function screenFeedback() {
-  const branchOpts = C.branches.slice()
-    .sort((a, b) => String(a.name).localeCompare(String(b.name), 'ar'))
-    .map(b => `<option value="${b.id}">${esc(b.name)}</option>`).join('');
+  fbFather = null;
   view().innerHTML = `
-    <div class="muted" style="margin-bottom:8px">صف ملاحظتك أو الخطأ الذي لاحظته، وستصل للإدارة لمراجعتها واتخاذ الإجراء.</div>
+    <div class="muted" style="margin-bottom:8px">اختر نوع الملاحظة ثم أكمل الحقول المطلوبة. ستصل للإدارة لمراجعتها واتخاذ الإجراء.</div>
     <div class="card">
-      <div class="field"><label>الموضوع *</label><select id="fb_subject">
-        <option value="">— اختر الموضوع —</option>
-        <option value="إضافة مولود">إضافة مولود</option>
-        <option value="اقتراح">اقتراح</option>
-        <option value="ملاحظة">ملاحظة</option>
-      </select></div>
-      <div class="field"><label>الفرع</label><select id="fb_branch"><option value="">— اختر الفرع —</option>${branchOpts}</select></div>
-      <div class="field"><label>التفاصيل (اذكر التسلسل: فلان بن فلان بن فلان…)</label><textarea id="fb_details" rows="4" placeholder="مثال: محمد بن سالم بن خالد — ثم التفاصيل…"></textarea></div>
-      <div class="field"><label>الخطأ — ما هو الخطأ؟</label><textarea id="fb_error" rows="3" placeholder="صِف الخطأ والتصحيح المقترح (إن وُجد)"></textarea></div>
+      <div class="field"><label>الموضوع *</label>
+        <select id="fb_subject">
+          <option value="">— اختر الموضوع —</option>
+          <option value="إضافة مولود">👶 إضافة مولود</option>
+          <option value="ملاحظة">📝 ملاحظة / تصحيح</option>
+          <option value="اقتراح">💡 اقتراح</option>
+        </select>
+      </div>
+      <div id="fb_dynamic"></div>
+      <div class="field"><label id="fb_details_lbl">التفاصيل *</label><textarea id="fb_details" rows="4" placeholder="اكتب التفاصيل…"></textarea></div>
       <button class="btn btn-lg" id="fb_send">✉️ إرسال للإدارة</button>
     </div>`;
+  const sub = document.getElementById('fb_subject');
+  sub.addEventListener('change', () => renderFbDynamic(sub.value));
   document.getElementById('fb_send').addEventListener('click', sendFeedback);
+  renderFbDynamic('');
+}
+// حقول النموذج تتغيّر حسب الموضوع:
+//  إضافة مولود → اختيار الأب بالبحث/التنقّل (لا فرع).  ملاحظة → الفرع + الخطأ.  اقتراح → بلا فرع.
+function renderFbDynamic(subject) {
+  const wrap = document.getElementById('fb_dynamic');
+  const lbl = document.getElementById('fb_details_lbl');
+  fbFather = null;
+  if (subject === 'إضافة مولود') {
+    lbl.textContent = 'تفاصيل المولود (الاسم، الحالة، الأم… اختياري)';
+    wrap.innerHTML = `
+      <div class="field"><label>اختر الأب (ابحث ثم اضغط الاسم للوصول إليه) *</label>
+        <input id="fb_fsearch" type="text" placeholder="ابحث باسم الأب…">
+        <div id="fb_fresults" style="max-height:220px;overflow:auto"></div>
+        <div id="fb_fselected" class="muted" style="margin-top:6px"></div>
+      </div>`;
+    const fs = document.getElementById('fb_fsearch');
+    fs.addEventListener('input', () => fbSearchFather(fs.value));
+  } else if (subject === 'ملاحظة') {
+    lbl.textContent = 'تفاصيل الملاحظة *';
+    const branchOpts = C.branches.slice().sort((a, b) => String(a.name).localeCompare(String(b.name), 'ar'))
+      .map(b => `<option value="${b.id}">${esc(b.name)}</option>`).join('');
+    wrap.innerHTML = `
+      <div class="field"><label>الفرع</label><select id="fb_branch"><option value="">— اختر الفرع —</option>${branchOpts}</select></div>
+      <div class="field"><label>الخطأ — ما هو الخطأ؟</label><textarea id="fb_error" rows="3" placeholder="صِف الخطأ والتصحيح المقترح (اختياري)"></textarea></div>`;
+  } else {
+    lbl.textContent = subject === 'اقتراح' ? 'اقتراحك *' : 'التفاصيل *';
+    wrap.innerHTML = '';   // اقتراح: بلا فرع
+  }
+}
+function fbSearchFather(term) {
+  const res = document.getElementById('fb_fresults');
+  const t = normalizeAr((term || '').trim());
+  if (!t) { res.innerHTML = ''; return; }
+  const list = C.persons.filter(p => (p._n || '').includes(t)).slice(0, 20);
+  res.innerHTML = list.length
+    ? list.map(p => `<div class="row click" data-fbf="${p.id}"><span class="k">${esc(p.name)}</span><span class="v" style="font-size:.78rem">${esc(lineageShort(p.id, 6))}</span></div>`).join('')
+    : '<div class="muted" style="padding:6px">لا نتائج</div>';
+  res.querySelectorAll('[data-fbf]').forEach(el => el.addEventListener('click', () => {
+    fbFather = byId.get(parseInt(el.dataset.fbf, 10));
+    document.getElementById('fb_fselected').innerHTML = fbFather ? '✅ الأب المختار: <b>' + esc(lineageShort(fbFather.id, 10)) + '</b>' : '';
+    res.innerHTML = '';
+    document.getElementById('fb_fsearch').value = fbFather ? fbFather.name : '';
+  }));
 }
 async function sendFeedback() {
   const subject = val('fb_subject').trim();
   if (!subject) { toast('اختر الموضوع أولاً'); return; }
-  const branch_id = val('fb_branch') ? parseInt(val('fb_branch'), 10) : null;
   const details = val('fb_details').trim();
-  const error_desc = val('fb_error').trim();
+  let branch_id = null, error_desc = '', fullDetails = details;
+  if (subject === 'إضافة مولود') {
+    if (!fbFather) { toast('اختر الأب من البحث أولاً'); return; }
+    branch_id = fbFather.branch_id || null;
+    fullDetails = 'الأب: ' + lineageShort(fbFather.id, 12) + (details ? '\n' + details : '');
+  } else if (subject === 'ملاحظة') {
+    branch_id = val('fb_branch') ? parseInt(val('fb_branch'), 10) : null;
+    error_desc = document.getElementById('fb_error') ? val('fb_error').trim() : '';
+  }
+  if (!fullDetails && !error_desc) { toast('اكتب التفاصيل'); return; }
   const who = (me && (me.full_name || me.username)) || 'زائر';
   const ok = await guard(async () => {
-    const { error } = await sb.from('almfrje_feedback').insert({ subject, branch_id, details, error_desc, created_by_name: who });
+    const { error } = await sb.from('almfrje_feedback').insert({ subject, branch_id, details: fullDetails, error_desc, created_by_name: who });
     if (error) throw error;
   });
   if (ok) { toast('تم إرسال ملاحظتك للإدارة ✅ شكراً لك'); goBack(); }
 }
-// عرض الملاحظات الواردة للمدير — منسّقة، مع وضع علامة «تم» عند اتخاذ الإجراء.
+// عرض الملاحظات للمدير — مرتّب باحترافية: تبويبات (قيد المراجعة/منجزة/الكل) + بطاقات مصنّفة بالنوع.
 async function screenFeedbacks() {
   if (!isAdmin()) { view().innerHTML = noPerm(); return; }
   showLoading(true);
   let list = [];
   try {
-    const { data, error } = await sb.from('almfrje_feedback').select('*').order('created_at', { ascending: false }).limit(1000);
+    const { data, error } = await sb.from('almfrje_feedback').select('*').order('created_at', { ascending: false }).limit(2000);
     if (error) throw error; list = data || [];
   } catch (e) { showLoading(false); view().innerHTML = '<div class="center-empty">تعذّر تحميل الملاحظات.<br>' + esc(e.message || '') + '</div>'; return; }
   showLoading(false);
   const newCount = list.filter(f => f.status !== 'done').length;
+  const doneCount = list.length - newCount;
+  const icon = { 'إضافة مولود': '👶', 'ملاحظة': '📝', 'اقتراح': '💡' };
+  const shown = list.filter(f => fbFilter === 'all' ? true : fbFilter === 'done' ? f.status === 'done' : f.status !== 'done');
+  const tab = (k, t) => `<button class="btn sm ${fbFilter === k ? '' : 'outline'}" data-fbfilter="${k}" style="margin:0 3px 6px 0">${t}</button>`;
   view().innerHTML = `
-    <div class="muted" style="margin-bottom:8px">ملاحظات الزوار الواردة (${list.length}) — قيد المراجعة: <b class="n-noissue">${newCount}</b>. اضغط «✓ تم» بعد اتخاذ الإجراء.</div>
-    ${list.length ? list.map(f => `
-      <div class="card" style="padding:12px;${f.status !== 'done' ? 'border-right:4px solid var(--brand)' : 'opacity:.8'}">
-        <div class="li-title">${esc(f.subject)} ${f.status === 'done' ? '<span class="badge add">✓ تم</span>' : '<span class="badge off">جديد</span>'}</div>
-        ${f.branch_id ? `<div class="li-sub">الفرع: <b>${esc(branchName(f.branch_id))}</b></div>` : ''}
-        ${f.details ? `<div class="li-sub" style="margin-top:4px;white-space:pre-wrap">📜 ${esc(f.details)}</div>` : ''}
-        ${f.error_desc ? `<div class="li-sub" style="margin-top:4px;white-space:pre-wrap">⚠️ الخطأ: ${esc(f.error_desc)}</div>` : ''}
-        <div class="li-sub muted" style="margin-top:6px;font-size:.75rem">من: ${esc(f.created_by_name || 'زائر')} • ${fmtDateTime(f.created_at)}${f.status === 'done' && f.done_by_name ? ' • أنجزها: ' + esc(f.done_by_name) : ''}</div>
+    <div class="muted" style="margin-bottom:6px">ملاحظات الزوار — الإجمالي ${list.length} • قيد المراجعة ${newCount} • منجزة ${doneCount}</div>
+    <div style="margin-bottom:10px">${tab('new', '🔵 قيد المراجعة (' + newCount + ')')}${tab('done', '✓ منجزة (' + doneCount + ')')}${tab('all', 'الكل (' + list.length + ')')}</div>
+    ${shown.length ? shown.map(f => `
+      <div class="card" style="padding:12px;${f.status !== 'done' ? 'border-right:4px solid var(--brand)' : 'opacity:.72'}">
+        <div class="row" style="border:0;padding:0;align-items:center">
+          <span class="li-title">${icon[f.subject] || '•'} ${esc(f.subject)}</span>
+          <span>${f.status === 'done' ? '<span class="badge add">✓ تم</span>' : '<span class="badge off">جديد</span>'}</span>
+        </div>
+        ${f.branch_id ? `<div class="li-sub" style="margin-top:4px">🗂️ الفرع: <b>${esc(branchName(f.branch_id))}</b></div>` : ''}
+        ${f.details ? `<div class="li-sub" style="margin-top:4px;white-space:pre-wrap">${esc(f.details)}</div>` : ''}
+        ${f.error_desc ? `<div class="li-sub" style="margin-top:4px;white-space:pre-wrap">⚠️ ${esc(f.error_desc)}</div>` : ''}
+        <div class="muted" style="margin-top:6px;font-size:.74rem">👤 ${esc(f.created_by_name || 'زائر')} • ${fmtDateTime(f.created_at)}${f.status === 'done' && f.done_by_name ? ' • أنجزها ' + esc(f.done_by_name) : ''}</div>
         <div class="btn-row" style="margin-top:8px">
-          ${f.status !== 'done'
-            ? `<button class="btn sm" data-fbdone="${f.id}">✓ تم — اتخذتُ الإجراء</button>`
-            : `<button class="btn sm outline" data-fbreopen="${f.id}">↩ إعادة فتح</button>`}
+          ${f.status !== 'done' ? `<button class="btn sm" data-fbdone="${f.id}">✓ تم</button>` : `<button class="btn sm outline" data-fbreopen="${f.id}">↩ إعادة فتح</button>`}
           <button class="btn sm danger" data-fbdel="${f.id}">حذف</button>
         </div>
-      </div>`).join('') : '<div class="center-empty">لا توجد ملاحظات بعد.</div>'}`;
+      </div>`).join('') : '<div class="center-empty">لا توجد عناصر في هذا التبويب.</div>'}`;
+  view().querySelectorAll('[data-fbfilter]').forEach(b => b.addEventListener('click', () => { fbFilter = b.dataset.fbfilter; screenFeedbacks(); }));
   view().querySelectorAll('[data-fbdone]').forEach(b => b.addEventListener('click', () => markFeedback(b.dataset.fbdone, 'done')));
   view().querySelectorAll('[data-fbreopen]').forEach(b => b.addEventListener('click', () => markFeedback(b.dataset.fbreopen, 'new')));
   view().querySelectorAll('[data-fbdel]').forEach(b => b.addEventListener('click', () => delFeedback(b.dataset.fbdel)));
