@@ -3160,8 +3160,8 @@ async function guestGateEnter() {
       const entered = await browseAsGuest(m);
       if (entered) {
         const msg = (guestWelcomeOk || DEFAULT_GUEST_OK).replace(/\{name\}/g, firstName);
-        openModal('🌿 أهلاً وسهلاً', `<div style="text-align:center;white-space:pre-wrap;font-size:1.08rem;line-height:1.95;padding:8px 2px">${esc(msg)}</div>`);
-        setTimeout(closeModal, 3200);
+        openModal('🌿 أهلاً وسهلاً', `<div style="text-align:center;white-space:pre-wrap;font-size:1.1rem;line-height:1.95;padding:8px 2px">${esc(msg)}</div><button class="btn btn-lg" id="welcomeOk" style="margin-top:16px;width:100%">🌳 ابدأ التصفّح</button>`);
+        const wb = document.getElementById('welcomeOk'); if (wb) wb.addEventListener('click', closeModal);
       }
     } else if (j.error && j.error.indexOf('اكتب') === 0) {
       m.classList.add('err'); m.textContent = j.error;   // إرشاد: عدد الأجيال غير كافٍ
