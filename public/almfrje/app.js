@@ -438,6 +438,8 @@ const ROUTES = {
   profile: { t: 'ملفي الشخصي', back: true, fn: screenProfile },
   stats: { t: 'التقرير الإحصائي', back: true, fn: screenStats },
   dups: { t: 'الأسماء المكرّرة', back: true, fn: screenDuplicates },
+  feedback: { t: 'إرسال ملاحظة للإدارة', back: true, fn: screenFeedback },
+  feedbacks: { t: 'ملاحظات الزوار', back: true, fn: screenFeedbacks },
   trash: { t: 'سلة المحذوفات', back: true, fn: screenTrash },
 };
 function parseHash() { const raw = (location.hash || '#/home').replace(/^#\//, ''); const p = raw.split('/'); return { name: p[0] || 'home', arg: p[1] }; }
@@ -588,6 +590,12 @@ function screenHome() {
     ${!isGuestUser() && !pwChanged() ? `<div class="notice-pw">🔐 ننصحك بتغيير كلمة المرور الآن لحماية حسابك. <button class="btn sm" id="pwGo" style="margin-top:6px">تغيير كلمة المرور</button> <button class="btn sm outline" id="pwSkip" style="margin-top:6px">لاحقاً</button></div>` : ''}
     <div class="title-lg">شجرة المفارجة</div>
     <div class="muted">أهلاً ${esc(me.full_name || '')} • ${arOf(ROLES, me.role)}${isManager() && myBranches().length ? ' (' + myBranches().map(b => esc(branchName(b))).join('، ') + ')' : ''}</div>
+    <div class="card" style="border:2px solid var(--brand);background:color-mix(in srgb, var(--brand) 7%, transparent)">
+      <h3 style="margin:0 0 4px">📝 ملاحظات الزوار</h3>
+      <p class="muted" style="margin:0 0 8px;font-size:.88rem">لاحظت خطأً في اسم أو نسب؟ أو لديك إضافة أو تصحيح؟ أرسل ملاحظتك للإدارة وستُراجَع.</p>
+      <button class="btn" data-go="#/feedback">✉️ أرسل ملاحظة للإدارة</button>
+      ${isAdmin() ? `<button class="btn outline" data-go="#/feedbacks" style="margin-top:8px">📨 عرض الملاحظات الواردة</button>` : ''}
+    </div>
     <div class="search"><input id="q" placeholder="ابحث بالاسم أو اللقب…"></div><div id="qr"></div>
     <div class="stats">
       <div class="stat"><div class="n">${total}</div><div class="l">إجمالي الأفراد</div></div>
@@ -1682,6 +1690,80 @@ function screenStats() {
   const prn = document.getElementById('prn'); if (prn) prn.addEventListener('click', () => window.print());
 }
 
+/* ===== ملاحظات الزوار ===== */
+// نموذج إرسال ملاحظة/خطأ للإدارة — متاح للجميع (زائر/عضو).
+function screenFeedback() {
+  const branchOpts = C.branches.slice()
+    .sort((a, b) => String(a.name).localeCompare(String(b.name), 'ar'))
+    .map(b => `<option value="${b.id}">${esc(b.name)}</option>`).join('');
+  view().innerHTML = `
+    <div class="muted" style="margin-bottom:8px">صف ملاحظتك أو الخطأ الذي لاحظته، وستصل للإدارة لمراجعتها واتخاذ الإجراء.</div>
+    <div class="card">
+      <div class="field"><label>الموضوع *</label><input id="fb_subject" type="text" placeholder="عنوان مختصر للملاحظة"></div>
+      <div class="field"><label>الفرع</label><select id="fb_branch"><option value="">— اختر الفرع —</option>${branchOpts}</select></div>
+      <div class="field"><label>التفاصيل (اذكر التسلسل: فلان بن فلان بن فلان…)</label><textarea id="fb_details" rows="4" placeholder="مثال: محمد بن سالم بن خالد — ثم التفاصيل…"></textarea></div>
+      <div class="field"><label>الخطأ — ما هو الخطأ؟</label><textarea id="fb_error" rows="3" placeholder="صِف الخطأ والتصحيح المقترح (إن وُجد)"></textarea></div>
+      <button class="btn btn-lg" id="fb_send">✉️ إرسال للإدارة</button>
+    </div>`;
+  document.getElementById('fb_send').addEventListener('click', sendFeedback);
+}
+async function sendFeedback() {
+  const subject = val('fb_subject').trim();
+  if (!subject) { toast('اكتب الموضوع أولاً'); return; }
+  const branch_id = val('fb_branch') ? parseInt(val('fb_branch'), 10) : null;
+  const details = val('fb_details').trim();
+  const error_desc = val('fb_error').trim();
+  const who = (me && (me.full_name || me.username)) || 'زائر';
+  const ok = await guard(async () => {
+    const { error } = await sb.from('almfrje_feedback').insert({ subject, branch_id, details, error_desc, created_by_name: who });
+    if (error) throw error;
+  });
+  if (ok) { toast('تم إرسال ملاحظتك للإدارة ✅ شكراً لك'); goBack(); }
+}
+// عرض الملاحظات الواردة للمدير — منسّقة، مع وضع علامة «تم» عند اتخاذ الإجراء.
+async function screenFeedbacks() {
+  if (!isAdmin()) { view().innerHTML = noPerm(); return; }
+  showLoading(true);
+  let list = [];
+  try {
+    const { data, error } = await sb.from('almfrje_feedback').select('*').order('created_at', { ascending: false }).limit(1000);
+    if (error) throw error; list = data || [];
+  } catch (e) { showLoading(false); view().innerHTML = '<div class="center-empty">تعذّر تحميل الملاحظات.<br>' + esc(e.message || '') + '</div>'; return; }
+  showLoading(false);
+  const newCount = list.filter(f => f.status !== 'done').length;
+  view().innerHTML = `
+    <div class="muted" style="margin-bottom:8px">ملاحظات الزوار الواردة (${list.length}) — قيد المراجعة: <b class="n-noissue">${newCount}</b>. اضغط «✓ تم» بعد اتخاذ الإجراء.</div>
+    ${list.length ? list.map(f => `
+      <div class="card" style="padding:12px;${f.status !== 'done' ? 'border-right:4px solid var(--brand)' : 'opacity:.8'}">
+        <div class="li-title">${esc(f.subject)} ${f.status === 'done' ? '<span class="badge add">✓ تم</span>' : '<span class="badge off">جديد</span>'}</div>
+        ${f.branch_id ? `<div class="li-sub">الفرع: <b>${esc(branchName(f.branch_id))}</b></div>` : ''}
+        ${f.details ? `<div class="li-sub" style="margin-top:4px;white-space:pre-wrap">📜 ${esc(f.details)}</div>` : ''}
+        ${f.error_desc ? `<div class="li-sub" style="margin-top:4px;white-space:pre-wrap">⚠️ الخطأ: ${esc(f.error_desc)}</div>` : ''}
+        <div class="li-sub muted" style="margin-top:6px;font-size:.75rem">من: ${esc(f.created_by_name || 'زائر')} • ${fmtDateTime(f.created_at)}${f.status === 'done' && f.done_by_name ? ' • أنجزها: ' + esc(f.done_by_name) : ''}</div>
+        <div class="btn-row" style="margin-top:8px">
+          ${f.status !== 'done'
+            ? `<button class="btn sm" data-fbdone="${f.id}">✓ تم — اتخذتُ الإجراء</button>`
+            : `<button class="btn sm outline" data-fbreopen="${f.id}">↩ إعادة فتح</button>`}
+          <button class="btn sm danger" data-fbdel="${f.id}">حذف</button>
+        </div>
+      </div>`).join('') : '<div class="center-empty">لا توجد ملاحظات بعد.</div>'}`;
+  view().querySelectorAll('[data-fbdone]').forEach(b => b.addEventListener('click', () => markFeedback(b.dataset.fbdone, 'done')));
+  view().querySelectorAll('[data-fbreopen]').forEach(b => b.addEventListener('click', () => markFeedback(b.dataset.fbreopen, 'new')));
+  view().querySelectorAll('[data-fbdel]').forEach(b => b.addEventListener('click', () => delFeedback(b.dataset.fbdel)));
+}
+async function markFeedback(id, status) {
+  const upd = status === 'done'
+    ? { status: 'done', done_by_name: (me && me.full_name) || '', done_at: new Date().toISOString() }
+    : { status: 'new', done_at: null, done_by_name: '' };
+  const ok = await guard(async () => { const { error } = await sb.from('almfrje_feedback').update(upd).eq('id', id); if (error) throw error; });
+  if (ok) { toast(status === 'done' ? 'تم وضع علامة «تم» ✓' : 'أُعيد فتح الملاحظة'); screenFeedbacks(); }
+}
+async function delFeedback(id) {
+  if (!(await confirm2('حذف هذه الملاحظة نهائياً؟', { title: 'تأكيد الحذف', okText: 'حذف', danger: true }))) return;
+  const ok = await guard(async () => { const { error } = await sb.from('almfrje_feedback').delete().eq('id', id); if (error) throw error; });
+  if (ok) { toast('حُذفت الملاحظة'); screenFeedbacks(); }
+}
+
 /* ===== المزيد ===== */
 function screenMore() {
   const r0 = roots()[0];
@@ -1697,6 +1779,7 @@ function screenMore() {
   if (isAdmin()) data.push(['📥 استيراد ملف Excel', '#/import', 'import']);
   if (isAdmin() || isManager()) data.push(['✏️ تعديل جماعي', '#/bulk', 'bulk']);
   if (isAdmin() || isManager()) data.push(['🔁 كشف الأسماء المكرّرة لنفس الأب', '#/dups', 'dups']);
+  if (isAdmin()) data.push(['📨 ملاحظات الزوار الواردة', '#/feedbacks', 'feedbacks']);
   if (isManager() && !isAdmin()) data.push(['📋 سجل تعديلاتي (تراجع)', '#/audit', 'audit']);
   if (canExport() && !isAdmin()) data.push(['💾 النسخ والتصدير', '#/backups', 'backups']);   // للمدير ضمن لوحة التحكم
   if (data.length) groups.push(['🗂️ البيانات', data]);

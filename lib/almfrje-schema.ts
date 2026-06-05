@@ -324,4 +324,26 @@ export const ALMFRJE_SCHEMA_SQL = `
       DROP POLICY IF EXISTS bkp_del ON public.almfrje_backups; CREATE POLICY bkp_del ON public.almfrje_backups FOR DELETE USING (public.almfrje_is_admin());
 
       GRANT SELECT ON public.almfrje_settings TO anon, authenticated;
+
+      -- ملاحظات الزوار: يرسلها أي زائر/عضو، ويراجعها المدير ويضع علامة «تم».
+      CREATE TABLE IF NOT EXISTS public.almfrje_feedback (
+        id bigint generated always as identity primary key,
+        subject text not null,
+        branch_id bigint references public.almfrje_branches(id) on delete set null,
+        details text default '',
+        error_desc text default '',
+        status text not null default 'new' check (status in ('new','done')),
+        created_by uuid default auth.uid(),
+        created_by_name text default '',
+        done_by_name text default '',
+        done_at timestamptz,
+        created_at timestamptz not null default now()
+      );
+      ALTER TABLE public.almfrje_feedback ENABLE ROW LEVEL SECURITY;
+      DROP POLICY IF EXISTS feedback_ins ON public.almfrje_feedback; CREATE POLICY feedback_ins ON public.almfrje_feedback FOR INSERT WITH CHECK (true);
+      DROP POLICY IF EXISTS feedback_sel ON public.almfrje_feedback; CREATE POLICY feedback_sel ON public.almfrje_feedback FOR SELECT USING (public.almfrje_is_admin());
+      DROP POLICY IF EXISTS feedback_upd ON public.almfrje_feedback; CREATE POLICY feedback_upd ON public.almfrje_feedback FOR UPDATE USING (public.almfrje_is_admin()) WITH CHECK (public.almfrje_is_admin());
+      DROP POLICY IF EXISTS feedback_del ON public.almfrje_feedback; CREATE POLICY feedback_del ON public.almfrje_feedback FOR DELETE USING (public.almfrje_is_admin());
+      GRANT INSERT ON public.almfrje_feedback TO anon, authenticated;
+      GRANT SELECT, UPDATE, DELETE ON public.almfrje_feedback TO authenticated;
 `;
