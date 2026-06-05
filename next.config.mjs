@@ -4,18 +4,24 @@ const nextConfig = {
   outputFileTracingIncludes: {
     '/api/setup': ['./database/setup.sql'],
   },
+  async redirects() {
+    return [
+      // الجذر يحوّل إلى المفارجة على رابطها النظيف /almfrji
+      { source: '/', destination: '/almfrji', permanent: false },
+    ];
+  },
   async rewrites() {
     return [
-      // الصفحة الرئيسية = نظام المفارجة (الأنساب)
-      { source: '/', destination: '/almfrje/index.html' },
+      // نظام المفارجة (الأنساب) — الرابط المعتمد /almfrji (مع إبقاء /almfrje كمرادف)
+      { source: '/almfrji', destination: '/almfrje/index.html' },
+      { source: '/almfrji/', destination: '/almfrje/index.html' },
+      { source: '/almfrje', destination: '/almfrje/index.html' },
+      { source: '/almfrje/', destination: '/almfrje/index.html' },
       // منصّة الاستشارات القديمة — تبقى متاحة على /legacy
       { source: '/legacy', destination: '/legacy/index.html' },
       // تطبيق مراحي (ويب) — يُخدم من /mrahi
       { source: '/mrahi', destination: '/mrahi/index.html' },
       { source: '/mrahi/', destination: '/mrahi/index.html' },
-      // نظام المفارجة (الأنساب) — يُخدم من /almfrje
-      { source: '/almfrje', destination: '/almfrje/index.html' },
-      { source: '/almfrje/', destination: '/almfrje/index.html' },
     ];
   },
   async headers() {
@@ -34,6 +40,7 @@ const nextConfig = {
       { source: '/mrahi', headers: noCache },
       { source: '/mrahi/:path*', headers: noCache },
       // نظام المفارجة (الأنساب)
+      { source: '/almfrji', headers: noCache },
       { source: '/almfrje', headers: noCache },
       { source: '/almfrje/:path*', headers: noCache },
       // الصفحة الرئيسية
