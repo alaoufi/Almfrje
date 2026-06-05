@@ -1729,7 +1729,7 @@ function screenFeedback() {
       <button class="btn btn-lg" id="fb_send">✉️ إرسال للإدارة</button>
     </div>`;
   const ms = document.getElementById('fb_msearch');
-  ms.addEventListener('input', () => fbPickerSearch(ms.value, document.getElementById('fb_mresults'), false, (p) => {
+  ms.addEventListener('input', () => fbPickerSearch(ms.value, document.getElementById('fb_mresults'), true, (p) => {
     fbSender = p;
     document.getElementById('fb_mselected').innerHTML = p ? '✅ أنت: <b>' + esc(lineageShort(p.id, 10)) + '</b>' : '';
     ms.value = p ? p.name : '';
