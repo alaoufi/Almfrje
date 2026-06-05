@@ -375,6 +375,20 @@ function lineageShort(id, max = 4) {
   return s;
 }
 function descendants(id) { const out = []; const st = [...childrenOf(id)]; while (st.length) { const p = st.pop(); out.push(p); for (const c of childrenOf(p.id)) st.push(c); } return out; }
+// تطبيع سلسلة نسب للمطابقة (مطابق لمنطق التحقق في الخادم): يتجاهل التشكيل/الهمزات/المسافات/«بن»/«ابن»/«ال».
+function normGenChain(s) {
+  const t = String(s || '').replace(/[ً-ْٰ]/g, '').replace(/[أإآ]/g, 'ا').replace(/ى/g, 'ي').replace(/ة/g, 'ه').replace(/ؤ/g, 'و').replace(/ئ/g, 'ي').replace(/ـ/g, '');
+  const parts = t.split(/\s+/).filter(w => w && w !== 'بن' && w !== 'ابن');
+  return parts.join('').replace(/ال/g, '').toLowerCase();
+}
+function lineageMatchSig(id, n) { const ln = lineage(id).slice(0, n).map(x => x.name); return ln.length < n ? null : normGenChain(ln.join(' ')); }
+// عدد الأشخاص غير المميَّزين (يتشاركون نفس سلسلة n أجيال) — يساعد المدير على اختيار عدد الأجيال للتحقق.
+function nonUniqueAtDepth(n) {
+  const cnt = new Map();
+  C.persons.forEach(p => { const s = lineageMatchSig(p.id, n); if (s) cnt.set(s, (cnt.get(s) || 0) + 1); });
+  let total = 0; cnt.forEach(c => { if (c > 1) total += c; });
+  return total;
+}
 const maxGen = () => C.persons.reduce((m, p) => Math.max(m, p.generation || 1), 0);
 
 async function refreshAndRender() { showLoading(true); try { await loadAll(); } catch (e) { toast('خطأ تحميل: ' + e.message); } showLoading(false); render(); }
@@ -2797,7 +2811,8 @@ function screenMembers() {
         <label class="perm-chk"><input type="checkbox" data-ghide="notes" ${guestHide.notes ? 'checked' : ''}><span>الملاحظات والحالة الوظيفية</span></label>
         <div class="muted" style="font-size:.78rem;margin-top:4px">تُحفظ التغييرات فور التأشير. الأسماء والنسب والأجيال والمدن وتواريخ الميلاد/الوفاة تبقى ظاهرة.</div>
         <div style="margin-top:12px;border-top:1px solid var(--line,#e5e5e5);padding-top:10px"><div class="li-sub" style="font-weight:700;margin-bottom:4px">🔐 بوابة التحقق بالنسب قبل دخول الزائر</div>
-          <div class="muted" style="font-size:.78rem;margin-bottom:6px">عدد الأجيال التي يكتبها الزائر ليُسمح له (0 = بلا تحقّق، دخول مباشر). مثال: 3 = اسمه ثم أبوه ثم جدّه — ويُطابَق مع تجاهل المسافة و«بن» و«ابن» و«ال» والهمزات.</div>
+          <div class="muted" style="font-size:.78rem;margin-bottom:6px">عدد الأجيال التي يكتبها الزائر ليُسمح له (0 = بلا تحقّق، دخول مباشر). مثال: 3 = اسمه ثم أبوه ثم جدّه — ويُطابَق مع تجاهل المسافة و«بن» و«ابن» و«ال» والهمزات. وإذا تطابق الاسم مع أكثر من شخص يُطلب اسم جدٍّ إضافي تلقائياً.</div>
+          <div class="muted" style="font-size:.78rem;margin-bottom:6px;line-height:1.9">حالات التشابه (أشخاص غير مميَّزين) حسب عدد الأجيال — اختر رقماً تكون عنده الحالات قليلة/صفر:<br>عند ٢: <b>${nonUniqueAtDepth(2)}</b> • عند ٣: <b>${nonUniqueAtDepth(3)}</b> • عند ٤: <b>${nonUniqueAtDepth(4)}</b> • عند ٥: <b>${nonUniqueAtDepth(5)}</b></div>
           <input id="guestGensInp" type="number" min="0" max="10" value="${guestGens}" style="width:90px">
           <button class="btn sm" id="guestGensSave" style="margin-right:6px">حفظ عدد الأجيال</button>
         </div></div>` : ''}</div>
@@ -3169,8 +3184,9 @@ async function guestGateEnter() {
         openModal('🌿 أهلاً وسهلاً', `<div style="text-align:center;white-space:pre-wrap;font-size:1.1rem;line-height:1.95;padding:8px 2px">${esc(msg)}</div><button class="btn btn-lg" id="welcomeOk" style="margin-top:16px;width:100%">🌳 ابدأ التصفّح</button>`);
         const wb = document.getElementById('welcomeOk'); if (wb) wb.addEventListener('click', closeModal);
       }
-    } else if (j.error && j.error.indexOf('اكتب') === 0) {
-      m.classList.add('err'); m.textContent = j.error;   // إرشاد: عدد الأجيال غير كافٍ
+    } else if (j.error) {
+      // إرشاد من الخادم: عدد الأسماء غير كافٍ، أو يلزم اسم جدّ إضافي لأن الاسم متكرّر
+      m.classList.add('err'); m.textContent = j.error;
     } else {
       m.classList.add('err'); m.textContent = (guestWelcomeFail || DEFAULT_GUEST_FAIL).replace(/\{name\}/g, firstName);
     }

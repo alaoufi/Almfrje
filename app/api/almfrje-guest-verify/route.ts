@@ -35,8 +35,10 @@ export async function POST(request: NextRequest) {
   if (gens <= 0) return NextResponse.json({ ok: true });   // بلا بوابة تحقّق
 
   const names = input.split(/\s+/).map((w) => w.trim()).filter((w) => w && w !== 'بن' && w !== 'ابن');
-  if (names.length < gens) return NextResponse.json({ ok: false, error: `اكتب اسمك و${gens - 1} من آبائك بالترتيب` });
-  const sig = normGen(names.slice(0, gens).join(' '));
+  if (names.length < gens) return NextResponse.json({ ok: false, error: `اكتب اسمك و${gens - 1} من آبائك على الأقل بالترتيب` });
+  // نطابق بكل ما كتبه المستخدم (قد يكون أكثر من الحدّ الأدنى)، ونشترط أن يكون فريداً.
+  const depth = names.length;
+  const sig = normGen(names.join(' '));
   if (!sig) return NextResponse.json({ ok: false });
 
   // تحميل الأشخاص (صفحات)
@@ -59,6 +61,12 @@ export async function POST(request: NextRequest) {
     if (chain.length < n) return null;
     return normGen(chain.join(' '));
   };
-  const matched = persons.some((p) => lineageSig(p.id, gens) === sig);
-  return NextResponse.json({ ok: matched });
+  // عدد الأشخاص الذين يطابق نسبُهم ما كتبه المستخدم بالكامل
+  const matches = persons.filter((p) => lineageSig(p.id, depth) === sig).length;
+  if (matches === 1) return NextResponse.json({ ok: true });
+  if (matches > 1) {
+    // التطابق ليس فريداً (تكرار في الأسماء) → اطلب اسم جدٍّ إضافي للتمييز (٣ ← ٤ …)
+    return NextResponse.json({ ok: false, needMore: true, matches, error: `يوجد ${matches} أشخاص بنفس هذا الاسم — أضِف اسم الجدّ التالي ثم أعد المحاولة` });
+  }
+  return NextResponse.json({ ok: false });   // 0 → غير مسجّل
 }
