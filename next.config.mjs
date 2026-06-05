@@ -13,8 +13,9 @@ const nextConfig = {
       { source: '/almfrji/', destination: '/almfrje/index.html' },
       { source: '/almfrje', destination: '/almfrje/index.html' },
       { source: '/almfrje/', destination: '/almfrje/index.html' },
-      // منصّة الاستشارات القديمة — تبقى متاحة على /legacy
-      { source: '/legacy', destination: '/legacy/index.html' },
+      // منصّة الاستشارات — تُخدَم على /con
+      { source: '/con', destination: '/legacy/index.html' },
+      { source: '/con/', destination: '/legacy/index.html' },
       // تطبيق مراحي (ويب) — يُخدم من /mrahi
       { source: '/mrahi', destination: '/mrahi/index.html' },
       { source: '/mrahi/', destination: '/mrahi/index.html' },
@@ -30,7 +31,8 @@ const nextConfig = {
       { key: 'Expires', value: '0' },
     ];
     return [
-      // ملفات الواجهة القديمة (JS/CSS داخل /legacy/)
+      // منصّة الاستشارات على /con (وملفاتها داخل /legacy/)
+      { source: '/con', headers: noCache },
       { source: '/legacy/:path*', headers: noCache },
       // تطبيق مراحي — لا تخزين أثناء التطوير/التجربة
       { source: '/mrahi', headers: noCache },
