@@ -72,5 +72,17 @@ export async function POST(request: NextRequest) {
     if (c === 0) break;   // هذه البادئة غير موجودة بين الأحياء
   }
   if (last > 1) return NextResponse.json({ ok: false, needMore: true, error: 'الاسم يطابق أكثر من شخص — أضِف اسم الجدّ التالي ثم أعد المحاولة' });
-  return NextResponse.json({ ok: false });   // غير مسجّل (أو صاحب الاسم متوفّى)
+
+  // لم يُطابَق أحد عند الحد الأدنى — نشخّص السبب لرسالة أوضح:
+  const sigFloor = normGen(names.slice(0, gens).join(' '));
+  const deadAtFloor = persons.filter((p) => p.status === 'dead' && lineageSig(p.id, gens) === sigFloor).length;
+  if (deadAtFloor > 0) {
+    return NextResponse.json({ ok: false, error: 'هذا الاسم مُسجّل في الشجرة كمتوفّى — الدخول للأحياء فقط.' });
+  }
+  const sigOne = normGen(names.slice(0, 1).join(' '));
+  const livingFirst = persons.filter((p) => p.status !== 'dead' && lineageSig(p.id, 1) === sigOne).length;
+  if (livingFirst > 0) {
+    return NextResponse.json({ ok: false, error: 'وُجد اسمك، لكن اسم الأب لا يطابق المُسجّل — اكتب اسم أبيك المباشر كما في الشجرة (لا جدّاً أعلى).' });
+  }
+  return NextResponse.json({ ok: false });   // غير مسجّل إطلاقاً
 }

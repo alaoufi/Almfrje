@@ -3185,8 +3185,9 @@ async function guestGateEnter() {
         openModal('🌿 أهلاً وسهلاً', `<div style="text-align:center;white-space:pre-wrap;font-size:1.1rem;line-height:1.95;padding:8px 2px">${esc(msg)}</div><button class="btn btn-lg" id="welcomeOk" style="margin-top:16px;width:100%">🌳 ابدأ التصفّح</button>`);
         const wb = document.getElementById('welcomeOk'); if (wb) wb.addEventListener('click', closeModal);
       }
-    } else if (j.needMore) {
-      m.classList.add('err'); m.textContent = j.error || 'الاسم يطابق أكثر من شخص — أضِف اسم الجدّ التالي ثم تابع';
+    } else if (j.error) {
+      // رسالة تشخيصية من الخادم: متكرّر (أضف جدّاً)، أو متوفّى، أو اسم الأب لا يطابق
+      m.classList.add('err'); m.textContent = j.error;
     } else {
       m.classList.add('err'); m.textContent = (guestWelcomeFail || DEFAULT_GUEST_FAIL).replace(/\{name\}/g, firstName);
     }
