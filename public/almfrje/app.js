@@ -3131,29 +3131,49 @@ function isAdminLoginUrl() {
   const h = (location.hash || '').replace(/^#\/?/, '').toLowerCase();
   return h === 'login' || h === 'admin';
 }
+// وصف عدد الأجيال (ثلاثي/رباعي…) ومثال للاسم بالتسلسل — لشاشة دخول الزائر.
+function gensWord(n) { return { 2: 'ثنائياً', 3: 'ثلاثياً', 4: 'رباعياً', 5: 'خماسياً', 6: 'سداسياً', 7: 'سباعياً' }[n] || ('بـ ' + n + ' أجيال'); }
+function gensExample(n) { return ['محمد', 'سالم', 'خالد', 'عبدالله', 'راشد', 'حمد', 'فهد'].slice(0, Math.max(2, n || 3)).join(' '); }
 // شاشة الدخول — مختصرة: دخول المسؤول/المشرف فقط، أو تصفّح كزائر. لا تسجيل حسابات
 // (الحسابات يُنشئها المدير من داخل التطبيق).
 function renderAuth() {
   document.querySelectorAll('.fab').forEach(f => f.remove());   // أزل الأزرار العائمة عند الخروج
   document.getElementById('app').classList.add('hidden');
   const box = document.getElementById('auth'); box.classList.remove('hidden');
+  const gated = guestOpen && guestGens > 0;
+  const adminMode = isAdminLoginUrl() || !guestOpen;   // واجهة المسؤول على #login أو عند إغلاق الزوّار
+  if (!adminMode && gated) {
+    // ===== واجهة الزائر: حقل واحد فقط (الاسم بالتسلسل) =====
+    box.innerHTML = `<div class="auth-box">
+      <div class="logo" style="font-size:3.2rem">🌳</div>
+      <h2 style="margin:.2rem 0 .1rem">المفارجة</h2>
+      <div class="muted" style="font-size:.82rem;line-height:1.7;margin-bottom:16px">${esc(bannerText || 'شجرة أنساب العائلة')}</div>
+      <div class="sub" style="margin-bottom:4px">اكتب اسمك ${esc(gensWord(guestGens))} للدخول</div>
+      <div class="muted" style="font-size:.78rem;margin-bottom:10px">اسمك ثم آباؤك بالترتيب — مثال: ${esc(gensExample(guestGens))}</div>
+      ${fInput('اكتب اسمك بالتسلسل هنا', 'g_lineage', '')}
+      <button class="btn btn-lg" id="g_enter">🌿 دخول</button>
+      <div class="auth-msg" id="a_msg"></div>
+      <button class="auth-guest-link" id="to_admin">دخول الإدارة →</button>
+    </div>`;
+    document.getElementById('g_enter').addEventListener('click', guestGateEnter);
+    document.getElementById('to_admin').addEventListener('click', () => { location.hash = '#login'; renderAuth(); });
+    const gi = document.getElementById('g_lineage');
+    if (gi) { try { gi.focus(); } catch (e) {} gi.addEventListener('keydown', e => { if (e.key === 'Enter') guestGateEnter(); }); }
+    return;
+  }
+  // ===== واجهة المسؤول/المشرف =====
   box.innerHTML = `<div class="auth-box">
     <div class="logo">🌳</div><h2>المفارجة</h2><div class="sub">دخول المسؤول / مسؤول الفرع</div>
     ${fInput('الجوال أو اسم المستخدم', 'a_id', '')}
     ${pinField('الرقم السري', 'a_pin')}
     <button class="btn" id="a_submit">تسجيل الدخول</button>
     <div class="auth-msg" id="a_msg"></div>
-    ${guestOpen ? (guestGens > 0
-      ? `<div style="margin-top:14px;border-top:1px solid var(--line,#e5e5e5);padding-top:12px">
-           <div class="sub" style="margin-bottom:6px">للتصفّح كزائر: اكتب اسمك ثم آباءك (${guestGens} أجيال على الأقل)</div>
-           ${fInput('اسمك بالتسلسل — مثال: محمد بن سالم بن خالد', 'g_lineage', '')}
-           <button class="btn outline" id="g_enter">دخول كزائر ←</button>
-         </div>`
-      : `<button class="auth-guest-link" id="a_guest">تصفّح الموقع كزائر ←</button>`) : ''}
+    ${guestOpen && guestGens <= 0 ? `<button class="auth-guest-link" id="a_guest">تصفّح الموقع كزائر ←</button>` : ''}
+    ${gated ? `<button class="auth-guest-link" id="to_guest">→ دخول الزوّار</button>` : ''}
     </div>`;
   document.getElementById('a_submit').addEventListener('click', submit);
   { const gb = document.getElementById('a_guest'); if (gb) gb.addEventListener('click', () => { const m = document.getElementById('a_msg'); m.className = 'auth-msg'; m.textContent = '… جارٍ فتح التصفّح'; location.hash = '#/home'; browseAsGuest(m); }); }
-  { const ge = document.getElementById('g_enter'); if (ge) ge.addEventListener('click', guestGateEnter); }
+  { const tg = document.getElementById('to_guest'); if (tg) tg.addEventListener('click', () => { location.hash = '#/home'; renderAuth(); }); }
   box.querySelectorAll('.eye').forEach(b => b.addEventListener('click', () => { const inp = document.getElementById(b.dataset.eye); const show = inp.type === 'password'; inp.type = show ? 'text' : 'password'; b.textContent = show ? '🙈' : '👁'; }));
   box.querySelectorAll('input').forEach(inp => inp.addEventListener('keydown', e => { if (e.key === 'Enter') submit(); }));
 
