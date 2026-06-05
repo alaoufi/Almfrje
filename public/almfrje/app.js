@@ -193,6 +193,7 @@ let me = null;
 let _authUid = null;   // هوية الجلسة الحالية — لتجاهل أحداث المصادقة المتكررة
 let imported = false;
 let guestOpen = false;    // إتاحة زر «تصفّح كزائر» بحساب زائر مدمج (قراءة فقط)
+let guestGens = 0;        // عدد الأجيال المطلوبة للتحقق قبل دخول الزائر (0 = بلا تحقّق)
 const GUEST_HIDE_DEFAULT = { phone: true, media: true, notes: true };  // ما يُخفى عن الزائر افتراضياً
 let guestHide = { ...GUEST_HIDE_DEFAULT };
 let recentSince = '';      // تاريخ تصفير «آخر الإضافات» (ISO) — يُحدّده المدير
@@ -305,6 +306,7 @@ async function loadSettings() {
     const map = {}; (data || []).forEach(r => map[r.key] = r.value);
     imported = map.imported === true;
     guestOpen = map.guest_open === true;
+    guestGens = Number.isFinite(+map.guest_verify_gens) ? Math.max(0, parseInt(map.guest_verify_gens, 10) || 0) : 0;
     guestHide = Object.assign({ ...GUEST_HIDE_DEFAULT }, (map.guest_hide && typeof map.guest_hide === 'object') ? map.guest_hide : {});
     statLabels = Object.assign({ ...LABELS_DEFAULT }, (map.status_labels && typeof map.status_labels === 'object') ? map.status_labels : {});
     recentSince = typeof map.recent_since === 'string' ? map.recent_since : '';
@@ -2763,7 +2765,12 @@ function screenMembers() {
         <label class="perm-chk"><input type="checkbox" data-ghide="phone" ${guestHide.phone ? 'checked' : ''}><span>أرقام الجوال والبريد</span></label>
         <label class="perm-chk"><input type="checkbox" data-ghide="media" ${guestHide.media ? 'checked' : ''}><span>الصور والمستندات</span></label>
         <label class="perm-chk"><input type="checkbox" data-ghide="notes" ${guestHide.notes ? 'checked' : ''}><span>الملاحظات والحالة الوظيفية</span></label>
-        <div class="muted" style="font-size:.78rem;margin-top:4px">تُحفظ التغييرات فور التأشير. الأسماء والنسب والأجيال والمدن وتواريخ الميلاد/الوفاة تبقى ظاهرة.</div></div>` : ''}</div>
+        <div class="muted" style="font-size:.78rem;margin-top:4px">تُحفظ التغييرات فور التأشير. الأسماء والنسب والأجيال والمدن وتواريخ الميلاد/الوفاة تبقى ظاهرة.</div>
+        <div style="margin-top:12px;border-top:1px solid var(--line,#e5e5e5);padding-top:10px"><div class="li-sub" style="font-weight:700;margin-bottom:4px">🔐 بوابة التحقق بالنسب قبل دخول الزائر</div>
+          <div class="muted" style="font-size:.78rem;margin-bottom:6px">عدد الأجيال التي يكتبها الزائر ليُسمح له (0 = بلا تحقّق، دخول مباشر). مثال: 3 = اسمه ثم أبوه ثم جدّه — ويُطابَق مع تجاهل المسافة و«بن» و«ابن» و«ال» والهمزات.</div>
+          <input id="guestGensInp" type="number" min="0" max="10" value="${guestGens}" style="width:90px">
+          <button class="btn sm" id="guestGensSave" style="margin-right:6px">حفظ عدد الأجيال</button>
+        </div></div>` : ''}</div>
     <div class="card"><h3>المستخدمون (${list.length}) ${hintBtn('member_role')}</h3>
       <p class="muted" style="font-size:.85rem;margin-top:-4px">اضغط على اسم لعرض تفاصيله والتحكّم به.</p>
       <div class="mlist">${list.map(memberRow).join('')}</div>
@@ -2779,6 +2786,12 @@ function screenMembers() {
     const ok = await guard(async () => { const { error } = await sb.from('almfrje_settings').upsert({ key: 'guest_hide', value: next, updated_at: new Date().toISOString() }, { onConflict: 'key' }); if (error) throw error; });
     if (ok) { guestHide = next; toast('تم الحفظ'); } else { cb.checked = !cb.checked; }
   }));
+  const ggSave = document.getElementById('guestGensSave');
+  if (ggSave) ggSave.addEventListener('click', async () => {
+    const n = Math.max(0, Math.min(10, parseInt(val('guestGensInp'), 10) || 0));
+    const ok = await guard(async () => { const { error } = await sb.from('almfrje_settings').upsert({ key: 'guest_verify_gens', value: n, updated_at: new Date().toISOString() }, { onConflict: 'key' }); if (error) throw error; });
+    if (ok) { guestGens = n; toast(n > 0 ? `سيُطلب من الزائر ${n} أجيال للتحقق` : 'أُلغيت بوابة التحقق (دخول مباشر)'); }
+  });
   bindMemberRows();
 }
 // صف عضو: اسم فقط (مطويّ)، أو اسم + بطاقة كاملة (مفتوح)
@@ -3099,6 +3112,20 @@ async function browseAsGuest(msgEl) {
     return false;
   } catch (e) { if (msgEl) { msgEl.classList.add('err'); msgEl.textContent = translateAuthError(e.message); } return false; }
 }
+// بوابة دخول الزائر: تحقّق من النسب عبر الخادم، فإن طابق فُتح وضع الزائر.
+async function guestGateEnter() {
+  const m = document.getElementById('a_msg');
+  const inp = (val('g_lineage') || '').trim();
+  m.className = 'auth-msg';
+  if (!inp) { m.classList.add('err'); m.textContent = 'اكتب اسمك بالتسلسل أولاً'; return; }
+  m.textContent = '… جارٍ التحقق';
+  try {
+    const res = await fetch('/api/almfrje-guest-verify', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ input: inp }) });
+    const j = await res.json().catch(() => ({}));
+    if (res.ok && j.ok) { m.textContent = '… تم التحقق، جارٍ الدخول'; location.hash = '#/home'; await browseAsGuest(m); }
+    else { m.classList.add('err'); m.textContent = j.error || 'لم يُطابق اسمك سلسلة النسب. اكتب اسمك ثم آباءك بالترتيب.'; }
+  } catch (e) { m.classList.add('err'); m.textContent = 'تعذّر التحقق، حاول مجدداً'; }
+}
 // رابط دخول المسؤول/المشرف: #login أو #admin (يُخفي شاشة الدخول عن الزوّار العاديين).
 function isAdminLoginUrl() {
   const h = (location.hash || '').replace(/^#\/?/, '').toLowerCase();
@@ -3116,10 +3143,17 @@ function renderAuth() {
     ${pinField('الرقم السري', 'a_pin')}
     <button class="btn" id="a_submit">تسجيل الدخول</button>
     <div class="auth-msg" id="a_msg"></div>
-    ${guestOpen ? `<button class="auth-guest-link" id="a_guest">تصفّح الموقع كزائر ←</button>` : ''}
+    ${guestOpen ? (guestGens > 0
+      ? `<div style="margin-top:14px;border-top:1px solid var(--line,#e5e5e5);padding-top:12px">
+           <div class="sub" style="margin-bottom:6px">للتصفّح كزائر: اكتب اسمك ثم آباءك (${guestGens} أجيال على الأقل)</div>
+           ${fInput('اسمك بالتسلسل — مثال: محمد بن سالم بن خالد', 'g_lineage', '')}
+           <button class="btn outline" id="g_enter">دخول كزائر ←</button>
+         </div>`
+      : `<button class="auth-guest-link" id="a_guest">تصفّح الموقع كزائر ←</button>`) : ''}
     </div>`;
   document.getElementById('a_submit').addEventListener('click', submit);
   { const gb = document.getElementById('a_guest'); if (gb) gb.addEventListener('click', () => { const m = document.getElementById('a_msg'); m.className = 'auth-msg'; m.textContent = '… جارٍ فتح التصفّح'; location.hash = '#/home'; browseAsGuest(m); }); }
+  { const ge = document.getElementById('g_enter'); if (ge) ge.addEventListener('click', guestGateEnter); }
   box.querySelectorAll('.eye').forEach(b => b.addEventListener('click', () => { const inp = document.getElementById(b.dataset.eye); const show = inp.type === 'password'; inp.type = show ? 'text' : 'password'; b.textContent = show ? '🙈' : '👁'; }));
   box.querySelectorAll('input').forEach(inp => inp.addEventListener('keydown', e => { if (e.key === 'Enter') submit(); }));
 
@@ -3217,7 +3251,7 @@ async function init() {
     } else {
       _authUid = null; me = null;
       // بعد الخروج: إن كان الموقع مفتوحاً للزوّار ولسنا على رابط الإدارة، اعرض التصفّح مباشرةً.
-      if (guestOpen && !isAdminLoginUrl()) browseAsGuest(); else renderAuth();
+      if (guestOpen && guestGens <= 0 && !isAdminLoginUrl()) browseAsGuest(); else renderAuth();
     }
   });
   await loadSettings();
@@ -3231,8 +3265,8 @@ async function init() {
     } else {
       _authUid = session.user.id; await enterApp(session);
     }
-  } else if (!wantAdmin && guestOpen) {
-    // لا جلسة + الموقع مفتوح + لسنا على رابط الإدارة → دخول الزائر مباشرةً للتصفّح
+  } else if (!wantAdmin && guestOpen && guestGens <= 0) {
+    // لا جلسة + الموقع مفتوح بلا بوابة تحقّق → دخول الزائر مباشرةً للتصفّح
     const ok = await browseAsGuest();
     if (!ok) { showLoading(false); renderAuth(); }
   } else {
