@@ -2244,7 +2244,8 @@ async function undoBulk(snapshots, labels, auditId) {
 async function undoFromAudit(row) {
   const ud = row && row.undo_data;
   if (!ud || !ud.items || !ud.items.length) { toast('لا تتوفّر بيانات تراجع لهذا السطر'); return; }
-  if (!(await confirm2(`التراجع عن هذا التعديل وإعادة القيم السابقة لعدد ${ud.items.length} فرد؟`, { title: 'تأكيد التراجع', okText: 'تراجع' }))) return;
+  if (!(await confirm2(`⚠️ تنبيه: سيُعاد ${ud.items.length} فرد إلى قيمهم قبل هذا التعديل، وتُلغى التغييرات الحالية.\n\nالمتابعة بالتراجع؟`, { title: '↩ تأكيد التراجع', okText: 'نعم، تراجع', danger: true }))) return;
+  if (!(await confirm2('تأكيد نهائي للتراجع — لا يمكن إلغاؤه إلا بتعديل يدوي. متابعة؟', { title: 'تأكيد نهائي', okText: 'تراجع الآن', danger: true }))) return;
   showLoading(true);
   const ok = await guard(async () => {
     await restorePersons(ud.items);
@@ -2356,6 +2357,7 @@ async function screenAudit() {
           ${a.person_id ? `<a href="#/person/${a.person_id}" style="color:var(--brand);text-decoration:none">${esc(a.person_name || '—')}</a>` : esc(a.person_name || '—')}</span>
         <span class="v" style="text-align:left">${esc(a.actor_name || '—')}<br><small class="muted">${fmtDateTime(a.created_at)}</small></span>
       </div>
+      ${a.person_id && byId.get(a.person_id) ? `<div class="li-sub" style="margin-top:4px">📜 ${esc(lineageShort(a.person_id, 6))}</div>` : ''}
       ${canUndo ? `<div class="btn-row" style="margin-top:8px"><button class="btn sm outline" data-undo="${a.id}">↩ تراجع عن هذا التعديل</button></div>`
         : (a.undone ? `<div class="muted" style="margin-top:6px;font-size:.75rem">↩ تم التراجع${a.undone_by ? ' — ' + esc(a.undone_by) : ''}</div>` : '')}
       </div>`;
