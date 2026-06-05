@@ -35,17 +35,17 @@ export async function POST(request: NextRequest) {
   if (gens <= 0) return NextResponse.json({ ok: true });   // بلا بوابة تحقّق
 
   const names = input.split(/\s+/).map((w) => w.trim()).filter((w) => w && w !== 'بن' && w !== 'ابن');
-  if (names.length < gens) return NextResponse.json({ ok: false, error: `اكتب اسمك و${gens - 1} من آبائك على الأقل بالترتيب` });
+  if (names.length < gens) return NextResponse.json({ ok: false, error: `اكتب اسمك ثم آباءك (${gens} أسماء على الأقل بالترتيب)` });
   // نطابق بكل ما كتبه المستخدم (قد يكون أكثر من الحدّ الأدنى)، ونشترط أن يكون فريداً.
   const depth = names.length;
   const sig = normGen(names.join(' '));
   if (!sig) return NextResponse.json({ ok: false });
 
   // تحميل الأشخاص (صفحات)
-  type P = { id: number; name: string; father_id: number | null };
+  type P = { id: number; name: string; father_id: number | null; status: string };
   const persons: P[] = [];
   for (let from = 0; from < 50000; from += 1000) {
-    const { data, error } = await admin.from('almfrje_persons').select('id,name,father_id').range(from, from + 999);
+    const { data, error } = await admin.from('almfrje_persons').select('id,name,father_id,status').range(from, from + 999);
     if (error) break;
     persons.push(...((data || []) as P[]));
     if (!data || data.length < 1000) break;
@@ -61,8 +61,8 @@ export async function POST(request: NextRequest) {
     if (chain.length < n) return null;
     return normGen(chain.join(' '));
   };
-  // عدد الأشخاص الذين يطابق نسبُهم ما كتبه المستخدم بالكامل
-  const matches = persons.filter((p) => lineageSig(p.id, depth) === sig).length;
+  // الأشخاص الذين يطابق نسبُهم ما كتبه المستخدم — بشرط أن يكون صاحب الاسم نفسه (الزائر) حيّاً.
+  const matches = persons.filter((p) => p.status !== 'dead' && lineageSig(p.id, depth) === sig).length;
   if (matches === 1) return NextResponse.json({ ok: true });
   if (matches > 1) {
     // التطابق ليس فريداً (تكرار في الأسماء) → اطلب اسم جدٍّ إضافي للتمييز (٣ ← ٤ …)
