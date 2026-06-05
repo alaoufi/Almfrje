@@ -1328,14 +1328,17 @@ async function deletePerson(id, p) {
   if (childCount > 0) msg = `⚠️ تنبيه: «${p.name}» له ${childCount} من الأبناء المباشرين، وسيصبحون بلا أب عند الحذف.\n\nيُفضّل نقل أبنائه أولاً. المتابعة رغم ذلك؟`;
   if (!(await confirm2(msg, { title: '🗑️ تأكيد حذف الاسم', okText: 'متابعة', danger: true }))) return;
   if (!(await confirm2(`تأكيد نهائي — حذف «${p.name}» من الشجرة؟`, { title: 'تأكيد نهائي', okText: 'نعم، احذف', danger: true }))) return;
-  const snap = byId.get(id);
   const ok = await guard(async () => {
-    // تحقّق فعلي من الحذف: RLS قد تُرجع نجاحاً بلا حذف أي صف — .select() يُعيد الصفوف المحذوفة فعلاً.
-    const { data: del, error } = await sb.from('almfrje_persons').delete().eq('id', id).select('id');
-    if (error) throw error;
-    if (!del || !del.length) throw new Error('لم يُحذف الاسم — صلاحية الحذف غير مفعّلة في قاعدة البيانات (RLS). راجع تفعيل سياسة الحذف للمدير.');
-    // نحفظ النسخة في السلة فقط بعد تأكيد الحذف الفعلي (حتى لا تظهر «نُقل للسلة» وهو لم يُحذف).
-    try { await sb.from('almfrje_trash').insert({ tbl: 'persons', rec_id: id, action: 'delete', label: p.name || '', data: snap, actor_name: (me && me.full_name) || '' }); } catch (e) { /* أفضل جهد */ }
+    // الحذف عبر الخادم بصلاحية كاملة (يتجاوز RLS) — يتحقق الخادم أنّ المُستدعي مديرٌ مفعّل،
+    // ويحفظ نسخة في سلة المحذوفات قبل الحذف.
+    const { data: { session } } = await sb.auth.getSession();
+    const res = await fetch('/api/almfrje-delete-person', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${(session && session.access_token) || ''}` },
+      body: JSON.stringify({ id }),
+    });
+    const j = await res.json().catch(() => ({}));
+    if (!res.ok || !j.ok) throw new Error(j.error || 'تعذّر الحذف');
     await auditLog('delete', id, p.name);
   });
   if (ok) {
