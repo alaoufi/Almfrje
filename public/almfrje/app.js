@@ -402,7 +402,15 @@ async function refreshAndRender() { showLoading(true); try { await loadAll(); } 
 async function guard(fn) {
   try { await fn(); } catch (e) {
     const msg = (e.message || ('' + e));
-    toast(/Could not find the table|schema cache/i.test(msg) ? 'لم تُنشأ جداول المفارجة بعد — شغّل ترقية alaoufi.me (/api/migrate) مرة واحدة.' : 'تعذّر الحفظ: ' + msg);
+    let out;
+    if (/rate limit|over_email_send/i.test(msg))
+      out = 'تعذّر إنشاء الحساب: تجاوز حدّ إرسال البريد. أوقِف «تأكيد البريد» (Confirm email) في إعدادات مصادقة Supabase، ثم أعد المحاولة.';
+    else if (/not confirmed|confirm.*email|email.*confirm|signups? .*disabled|Email signups are disabled|Database error saving new user/i.test(msg))
+      out = 'تعذّر إنشاء الحساب: إعداد المصادقة يمنعه. أوقِف «تأكيد البريد» (Confirm email) في إعدادات Supabase ثم أعد المحاولة.';
+    else if (/Could not find the table|schema cache|Could not find the .* column/i.test(msg))
+      out = 'تعذّر الوصول لجدول/عمود في القاعدة (قد يكون المخطط قيد التحديث). أعِد المحاولة بعد لحظات أو أعد تحميل الصفحة.';
+    else out = 'تعذّر الحفظ: ' + msg;
+    toast(out);
     return false;
   }
   return true;
