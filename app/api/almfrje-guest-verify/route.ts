@@ -48,12 +48,12 @@ export async function POST(request: NextRequest) {
     if (!data || data.length < 1000) break;
   }
   const byId = new Map<number, P>(persons.map((p) => [p.id, p]));
-  // تطبيع اسم واحد: يتجاهل التشكيل/الهمزات/التطويل/المسافات و«ال» في البداية.
+  // تطبيع اسم واحد (مطابق لـ normalizeAr في الواجهة): يتجاهل التشكيل/الهمزات/التطويل/المسافات.
   const normWord = (s: string): string =>
     String(s || '')
       .replace(/[ً-ْٰ]/g, '')
       .replace(/[أإآ]/g, 'ا').replace(/ى/g, 'ي').replace(/ة/g, 'ه').replace(/ؤ/g, 'و').replace(/ئ/g, 'ي').replace(/ـ/g, '')
-      .replace(/\s+/g, '').replace(/^ال/, '').toLowerCase();
+      .replace(/\s+/g, '').toLowerCase();
   // سلسلة أسماء الشخص (هو ثم آباؤه) مطبَّعة كلمةً كلمة
   const lineageWords = (pid: number): string[] => {
     const out: string[] = [];
@@ -62,11 +62,12 @@ export async function POST(request: NextRequest) {
     return out;
   };
   const toks = names.map(normWord).filter(Boolean);
-  // التطابق: أول كلمة = اسمه نفسه، وبقية ما كتبه تظهر بالترتيب ضمن آبائه/أجداده (ولو بتخطّي أجيال).
+  // التطابق (مطابق لمنطق البحث في الواجهة): الكلمة الأولى تظهر ضمن اسمه نفسه،
+  // وبقية ما كتبه يظهر بالترتيب ضمن آبائه/أجداده (تطابق جزئي «يحتوي» وبتخطّي أجيال).
   const matchSubseq = (ln: string[]): boolean => {
-    if (toks.length === 0 || ln.length === 0 || ln[0] !== toks[0]) return false;
+    if (toks.length === 0 || ln.length === 0 || !ln[0].includes(toks[0])) return false;
     let i = 1, j = 1;
-    while (i < toks.length && j < ln.length) { if (ln[j] === toks[i]) i++; j++; }
+    while (i < toks.length && j < ln.length) { if (ln[j].includes(toks[i])) i++; j++; }
     return i === toks.length;
   };
   // مجرد التطابق مع شخص حيّ → يدخل (بلا اشتراط تفرّد).
@@ -77,7 +78,7 @@ export async function POST(request: NextRequest) {
   if (persons.some((p) => p.status === 'dead' && matchSubseq(lineageWords(p.id)))) {
     return NextResponse.json({ ok: false, error: 'هذا الاسم مُسجّل في الشجرة كمتوفّى — الدخول للأحياء فقط.' });
   }
-  if (persons.some((p) => p.status !== 'dead' && normWord(p.name) === toks[0])) {
+  if (persons.some((p) => p.status !== 'dead' && normWord(p.name).includes(toks[0]))) {
     return NextResponse.json({ ok: false, error: 'وُجد اسمك، لكن لم نجد آباءك/أجدادك بما كتبت — تأكّد من ترتيب الأسماء.' });
   }
   return NextResponse.json({ ok: false });   // غير مسجّل إطلاقاً
