@@ -62,13 +62,12 @@ export async function POST(request: NextRequest) {
     return out;
   };
   const toks = names.map(normWord).filter(Boolean);
-  // التطابق (مطابق لمنطق البحث في الواجهة): الكلمة الأولى تظهر ضمن اسمه نفسه،
-  // وبقية ما كتبه يظهر بالترتيب ضمن آبائه/أجداده (تطابق جزئي «يحتوي» وبتخطّي أجيال).
+  // التطابق (مطابق لمنطق البحث في الواجهة): الكلمة الأولى ضمن اسمه نفسه،
+  // وكل اسم لاحق يطابق الأب المباشر التالي بالترتيب (دون تخطّي أجيال) — أدقّ وأأمن.
   const matchSubseq = (ln: string[]): boolean => {
-    if (toks.length === 0 || ln.length === 0 || !ln[0].includes(toks[0])) return false;
-    let i = 1, j = 1;
-    while (i < toks.length && j < ln.length) { if (ln[j].includes(toks[i])) i++; j++; }
-    return i === toks.length;
+    if (ln.length < toks.length || !ln[0].includes(toks[0])) return false;
+    for (let i = 1; i < toks.length; i++) { if (!ln[i].includes(toks[i])) return false; }
+    return true;
   };
   // المطابقون الأحياء فقط (الاسم الأول شرط أن يكون من الأحياء — المتوفّى مستثنى).
   const liveMatches = persons.filter((p) => p.status !== 'dead' && matchSubseq(lineageWords(p.id)));

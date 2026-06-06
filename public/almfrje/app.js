@@ -688,12 +688,12 @@ function recentInfoModal(id) {
 function nameMatch(p, query) {
   const toks = String(query || '').trim().split(/\s+/).map(normalizeAr).filter(t => t && t !== 'بن' && t !== 'ابن');
   if (!toks.length) return true;
-  if (!p._n.includes(toks[0])) return false;                        // اسمه نفسه أو لقبه
+  if (!p._n.includes(toks[0])) return false;             // الكلمة الأولى: اسمه نفسه أو لقبه
   if (toks.length === 1) return true;
-  const anc = lineage(p.id).slice(1).map(x => normalizeAr(x.name));  // آباؤه فصاعداً
-  let i = 1;
-  for (let j = 0; j < anc.length && i < toks.length; j++) if (anc[j].includes(toks[i])) i++;
-  return i === toks.length;
+  const ln = lineage(p.id).map(x => normalizeAr(x.name));  // هو ثم آباؤه بالترتيب
+  // كل اسم لاحق يطابق الأب المباشر التالي بالترتيب (لا تخطّي أجيال) — أدقّ تصفية.
+  for (let i = 1; i < toks.length; i++) { if (!ln[i] || !ln[i].includes(toks[i])) return false; }
+  return true;
 }
 function instantSearch(term, box) {
   const t = normalizeAr(term.trim());
