@@ -1800,12 +1800,16 @@ function renderFbDynamic(subject) {
   const lbl = document.getElementById('fb_details_lbl');
   fbFather = null;
   if (subject === 'إضافة مولود') {
-    lbl.textContent = 'تفاصيل المولود (الاسم، الحالة، الأم… اختياري)';
     wrap.innerHTML = `
       <div class="field"><label>والد المولود — اكتب اسمه ثم اسم أبيه لتقليص القائمة *</label>
         <input id="fb_fsearch" type="text" placeholder="مثال: سالم خالد">
         <div id="fb_fresults" style="max-height:200px;overflow:auto"></div>
         <div id="fb_fselected" class="muted" style="margin-top:6px"></div>
+      </div>
+      <div class="field"><label>اسم المولود *</label><input id="fb_baby_name" type="text" placeholder="اكتب اسم المولود"></div>
+      <div class="grid2">
+        <div class="field"><label>سنة الولادة (اختياري)</label><input id="fb_baby_birth" type="text" placeholder="مثال: 1440هـ"></div>
+        <div class="field"><label>المدينة (اختياري)</label><input id="fb_baby_city" type="text" placeholder="اختياري"></div>
       </div>`;
     const fs = document.getElementById('fb_fsearch');
     fs.addEventListener('input', () => fbPickerSearch(fs.value, document.getElementById('fb_fresults'), true, (p) => {
@@ -1824,6 +1828,9 @@ function renderFbDynamic(subject) {
     lbl.textContent = subject === 'اقتراح' ? 'اقتراحك *' : 'التفاصيل *';
     wrap.innerHTML = '';
   }
+  // «إضافة مولود» تكتفي بحقول المولود — أخفِ مربّع التفاصيل العام.
+  const det = document.getElementById('fb_details');
+  if (det) { const fld = det.closest('.field'); if (fld) fld.style.display = (subject === 'إضافة مولود') ? 'none' : ''; }
 }
 async function sendFeedback() {
   const who = currentUserName() || (document.getElementById('fb_name') ? val('fb_name').trim() : '');
@@ -1834,8 +1841,15 @@ async function sendFeedback() {
   let branch_id = null, error_desc = '', fullDetails = details;
   if (subject === 'إضافة مولود') {
     if (!fbFather) { toast('اختر والد المولود من البحث'); return; }
+    const bname = document.getElementById('fb_baby_name') ? val('fb_baby_name').trim() : '';
+    if (!bname) { toast('اكتب اسم المولود (إجباري)'); return; }
     branch_id = fbFather.branch_id || null;
-    fullDetails = 'والد المولود: ' + lineageShort(fbFather.id, 12) + (details ? '\n' + details : '');
+    // بيانات مهيكلة ليوافق عليها المدير/مسؤول الفرع لاحقاً
+    fullDetails = JSON.stringify({
+      kind: 'newborn', father_id: fbFather.id, father: lineageShort(fbFather.id, 12), name: bname,
+      birth: document.getElementById('fb_baby_birth') ? val('fb_baby_birth').trim() : '',
+      city: document.getElementById('fb_baby_city') ? val('fb_baby_city').trim() : '', by: who,
+    });
   } else if (subject === 'ملاحظة') {
     branch_id = val('fb_branch') ? parseInt(val('fb_branch'), 10) : null;
     error_desc = document.getElementById('fb_error') ? val('fb_error').trim() : '';
@@ -1851,8 +1865,14 @@ async function sendFeedback() {
   }
 }
 // عرض الملاحظات للمدير — مرتّب باحترافية: تبويبات (قيد المراجعة/منجزة/الكل) + بطاقات مصنّفة بالنوع.
+// يحلّل طلب «إضافة مولود» المهيكل من حقل التفاصيل (أو null لغير المواليد).
+function parseNewborn(f) {
+  if (!f || f.subject !== 'إضافة مولود') return null;
+  try { const o = JSON.parse(f.details); if (o && o.kind === 'newborn') return o; } catch (e) {}
+  return null;
+}
 async function screenFeedbacks() {
-  if (!isAdmin()) { view().innerHTML = noPerm(); return; }
+  if (!isAdmin() && !isManager()) { view().innerHTML = noPerm(); return; }
   showLoading(true);
   let list = [];
   try {
@@ -1868,25 +1888,61 @@ async function screenFeedbacks() {
   view().innerHTML = `
     <div class="muted" style="margin-bottom:6px">ملاحظات الزوار — الإجمالي ${list.length} • قيد المراجعة ${newCount} • منجزة ${doneCount}</div>
     <div style="margin-bottom:10px">${tab('new', '🔵 قيد المراجعة (' + newCount + ')')}${tab('done', '✓ منجزة (' + doneCount + ')')}${tab('all', 'الكل (' + list.length + ')')}</div>
-    ${shown.length ? shown.map(f => `
+    ${shown.length ? shown.map(f => {
+      const nb = parseNewborn(f);
+      const body = nb
+        ? `<div class="li-sub" style="margin-top:4px">👶 المولود: <b>${esc(nb.name)}</b></div>
+           <div class="li-sub">الأب: ${esc(nb.father || '')}</div>
+           ${nb.birth ? `<div class="li-sub">سنة الولادة: ${esc(nb.birth)}</div>` : ''}
+           ${nb.city ? `<div class="li-sub">المدينة: ${esc(nb.city)}</div>` : ''}`
+        : `${f.details ? `<div class="li-sub" style="margin-top:4px;white-space:pre-wrap">${esc(f.details)}</div>` : ''}`;
+      const actions = nb
+        ? (f.status !== 'done'
+            ? `<button class="btn sm" data-nbok="${f.id}">✅ موافقة وإضافة</button><button class="btn sm danger" data-nbno="${f.id}">❌ رفض وحذف</button>`
+            : `<span class="badge add">✓ أُضيف للشجرة</span> <button class="btn sm danger" data-fbdel="${f.id}">حذف السجل</button>`)
+        : `${f.status !== 'done' ? `<button class="btn sm" data-fbdone="${f.id}">✓ تم</button>` : `<button class="btn sm outline" data-fbreopen="${f.id}">↩ إعادة فتح</button>`}<button class="btn sm danger" data-fbdel="${f.id}">حذف</button>`;
+      return `
       <div class="card" style="padding:12px;${f.status !== 'done' ? 'border-right:4px solid var(--brand)' : 'opacity:.72'}">
         <div class="row" style="border:0;padding:0;align-items:center">
           <span class="li-title">${icon[f.subject] || '•'} ${esc(f.subject)}</span>
           <span>${f.status === 'done' ? '<span class="badge add">✓ تم</span>' : '<span class="badge off">جديد</span>'}</span>
         </div>
         ${f.branch_id ? `<div class="li-sub" style="margin-top:4px">🗂️ الفرع: <b>${esc(branchName(f.branch_id))}</b></div>` : ''}
-        ${f.details ? `<div class="li-sub" style="margin-top:4px;white-space:pre-wrap">${esc(f.details)}</div>` : ''}
+        ${body}
         ${f.error_desc ? `<div class="li-sub" style="margin-top:4px;white-space:pre-wrap">⚠️ ${esc(f.error_desc)}</div>` : ''}
-        <div class="muted" style="margin-top:6px;font-size:.74rem">👤 ${esc(f.created_by_name || 'زائر')} • ${fmtDateTime(f.created_at)}${f.status === 'done' && f.done_by_name ? ' • أنجزها ' + esc(f.done_by_name) : ''}</div>
-        <div class="btn-row" style="margin-top:8px">
-          ${f.status !== 'done' ? `<button class="btn sm" data-fbdone="${f.id}">✓ تم</button>` : `<button class="btn sm outline" data-fbreopen="${f.id}">↩ إعادة فتح</button>`}
-          <button class="btn sm danger" data-fbdel="${f.id}">حذف</button>
-        </div>
-      </div>`).join('') : '<div class="center-empty">لا توجد عناصر في هذا التبويب.</div>'}`;
+        <div class="muted" style="margin-top:6px;font-size:.74rem">👤 ${esc(f.created_by_name || 'زائر')} • ${fmtDateTime(f.created_at)}${f.status === 'done' && f.done_by_name ? ' • ' + esc(f.done_by_name) : ''}</div>
+        <div class="btn-row" style="margin-top:8px">${actions}</div>
+      </div>`; }).join('') : '<div class="center-empty">لا توجد عناصر في هذا التبويب.</div>'}`;
   view().querySelectorAll('[data-fbfilter]').forEach(b => b.addEventListener('click', () => { fbFilter = b.dataset.fbfilter; screenFeedbacks(); }));
   view().querySelectorAll('[data-fbdone]').forEach(b => b.addEventListener('click', () => markFeedback(b.dataset.fbdone, 'done')));
   view().querySelectorAll('[data-fbreopen]').forEach(b => b.addEventListener('click', () => markFeedback(b.dataset.fbreopen, 'new')));
   view().querySelectorAll('[data-fbdel]').forEach(b => b.addEventListener('click', () => delFeedback(b.dataset.fbdel)));
+  view().querySelectorAll('[data-nbok]').forEach(b => b.addEventListener('click', () => approveNewborn(list.find(x => String(x.id) === b.dataset.nbok))));
+  view().querySelectorAll('[data-nbno]').forEach(b => b.addEventListener('click', () => rejectNewborn(list.find(x => String(x.id) === b.dataset.nbno))));
+}
+// موافقة المدير/مسؤول الفرع على طلب إضافة مولود → يُضاف فعلياً للشجرة.
+async function approveNewborn(f) {
+  const o = parseNewborn(f); if (!o) { toast('بيانات الطلب غير صالحة'); return; }
+  const father = byId.get(o.father_id);
+  if (!father) { toast('لم يُعثر على والد المولود في الشجرة'); return; }
+  if (!isAdmin() && !(isManager() && inMyBranch(father))) { toast('ليست لديك صلاحية على هذا الفرع'); return; }
+  if (sameNameSiblings(father, o.name).some(c => c.status !== 'dead')) { toast('يوجد ابن حيّ بنفس الاسم لنفس الأب — راجِع الطلب'); return; }
+  if (!(await confirm2(`الموافقة على إضافة «${o.name}» بن ${father.name}؟ سيُضاف إلى الشجرة.`, { title: 'تأكيد الموافقة', okText: 'موافقة وإضافة', danger: false }))) return;
+  const who = (me && (me.full_name || me.username)) || '';
+  const obj = { name: o.name, father_id: father.id, branch_id: father.branch_id, generation: father.generation + 1, status: 'alive', birth: o.birth || '', city: o.city || '', created_by_name: who };
+  const ok = await guard(async () => {
+    const { data: ins, error } = await sb.from('almfrje_persons').insert(obj).select('id').single(); if (error) throw error;
+    await auditLog('add', ins && ins.id, o.name);
+    const { error: e2 } = await sb.from('almfrje_feedback').update({ status: 'done', done_by_name: who, done_at: new Date().toISOString() }).eq('id', f.id); if (e2) throw e2;
+  });
+  if (ok) { toast('تمت الموافقة وأُضيف «' + o.name + '» للشجرة'); await loadAll(); screenFeedbacks(); }
+}
+// رفض طلب إضافة مولود وحذفه نهائياً.
+async function rejectNewborn(f) {
+  if (!f) return;
+  if (!(await confirm2('رفض هذا الطلب وحذفه نهائياً؟ لن يُضاف المولود إلى الشجرة.', { title: 'تأكيد الرفض', okText: 'رفض وحذف نهائي', danger: true }))) return;
+  const ok = await guard(async () => { const { error } = await sb.from('almfrje_feedback').delete().eq('id', f.id); if (error) throw error; });
+  if (ok) { toast('رُفض الطلب وحُذف'); screenFeedbacks(); }
 }
 async function markFeedback(id, status) {
   const upd = status === 'done'
@@ -1919,6 +1975,7 @@ function screenMore() {
   if (!isGuestUser()) data.push(['👁️ مراجعة البيانات (الأحياء)', '#/review', 'review']);
   if (isAdmin() || isManager()) data.push(['🔁 كشف الأسماء المكرّرة لنفس الأب', '#/dups', 'dups']);
   if (isAdmin()) data.push(['📨 ملاحظات الزوار الواردة', '#/feedbacks', 'feedbacks']);
+  else if (isManager()) data.push(['👶 طلبات إضافة المواليد', '#/feedbacks', 'feedbacks']);
   if (isManager() && !isAdmin()) data.push(['📋 سجل تعديلاتي (تراجع)', '#/audit', 'audit']);
   if (canExport() && !isAdmin()) data.push(['💾 النسخ والتصدير', '#/backups', 'backups']);   // للمدير ضمن لوحة التحكم
   if (data.length) groups.push(['🗂️ البيانات', data]);

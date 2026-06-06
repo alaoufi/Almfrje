@@ -344,9 +344,10 @@ export const ALMFRJE_SCHEMA_SQL = `
       );
       ALTER TABLE public.almfrje_feedback ENABLE ROW LEVEL SECURITY;
       DROP POLICY IF EXISTS feedback_ins ON public.almfrje_feedback; CREATE POLICY feedback_ins ON public.almfrje_feedback FOR INSERT WITH CHECK (true);
-      DROP POLICY IF EXISTS feedback_sel ON public.almfrje_feedback; CREATE POLICY feedback_sel ON public.almfrje_feedback FOR SELECT USING (public.almfrje_is_admin());
-      DROP POLICY IF EXISTS feedback_upd ON public.almfrje_feedback; CREATE POLICY feedback_upd ON public.almfrje_feedback FOR UPDATE USING (public.almfrje_is_admin()) WITH CHECK (public.almfrje_is_admin());
-      DROP POLICY IF EXISTS feedback_del ON public.almfrje_feedback; CREATE POLICY feedback_del ON public.almfrje_feedback FOR DELETE USING (public.almfrje_is_admin());
+      -- المدير يرى كل الملاحظات؛ ومسؤول الفرع يرى/يعالج طلبات «إضافة مولود» ضمن فروعه فقط (للموافقة/الرفض).
+      DROP POLICY IF EXISTS feedback_sel ON public.almfrje_feedback; CREATE POLICY feedback_sel ON public.almfrje_feedback FOR SELECT USING (public.almfrje_is_admin() OR (subject = 'إضافة مولود' AND public.almfrje_role() = 'branch_manager' AND public.almfrje_manages_branch(branch_id)));
+      DROP POLICY IF EXISTS feedback_upd ON public.almfrje_feedback; CREATE POLICY feedback_upd ON public.almfrje_feedback FOR UPDATE USING (public.almfrje_is_admin() OR (subject = 'إضافة مولود' AND public.almfrje_role() = 'branch_manager' AND public.almfrje_manages_branch(branch_id))) WITH CHECK (public.almfrje_is_admin() OR (subject = 'إضافة مولود' AND public.almfrje_role() = 'branch_manager' AND public.almfrje_manages_branch(branch_id)));
+      DROP POLICY IF EXISTS feedback_del ON public.almfrje_feedback; CREATE POLICY feedback_del ON public.almfrje_feedback FOR DELETE USING (public.almfrje_is_admin() OR (subject = 'إضافة مولود' AND public.almfrje_role() = 'branch_manager' AND public.almfrje_manages_branch(branch_id)));
       GRANT INSERT ON public.almfrje_feedback TO anon, authenticated;
       GRANT SELECT, UPDATE, DELETE ON public.almfrje_feedback TO authenticated;
 `;
