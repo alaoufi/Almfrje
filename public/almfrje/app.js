@@ -462,6 +462,7 @@ const ROUTES = {
   outline: { t: 'نموذج الأعمدة', back: true, fn: screenOutline },
   import: { t: 'استيراد Excel', back: true, fn: screenImport },
   members: { t: 'المستخدمون والصلاحيات', back: true, fn: screenMembers },
+  branchadmin: { t: 'الفروع والمشرفون', back: true, fn: screenBranchAdmin },
   bulk: { t: 'تعديل جماعي', back: true, fn: screenBulkEdit },
   grid: { t: 'تعديل البيانات بالقائمة', back: true, fn: screenGridEdit },
   review: { t: 'مراجعة البيانات', back: true, fn: screenGridReview },
@@ -496,6 +497,7 @@ function addFab(label, onClick) { const f = document.createElement('button'); f.
 // شريط تبويبات لوحة التحكم (للمدير) — كل شاشة إدارية تعرضه أعلاها.
 const ADMIN_TABS = [
   ['members', '👥 المستخدمون', '#/members'],
+  ['branchadmin', '🗂️ الفروع والمشرفون', '#/branchadmin'],
   ['texts', '📝 النصوص', '#/texts'],
   ['hints', '💡 التعليمات', '#/hints'],
   ['audit', '📋 سجل التعديلات', '#/audit'],
@@ -1579,22 +1581,39 @@ async function savePerson(id, existing) {
 // حذف الأسماء غير متاح لأي مستخدم (قرار نهائي) — يبقى التعديل + التراجع من سلة المحذوفات.
 
 /* ===== الفروع ===== */
-function screenBranches() {
+function branchCardsHtml() {
   const list = C.branches.slice().sort((a, b) => branchCount(b.id) - branchCount(a.id));
-  // عدّ المشرفين لكل فرع (الأعضاء الذين يضمّون هذا الفرع في فروعهم)
   const supCount = (bid) => C.members.filter(m => m.is_active && memberBranchSet(m).has(Number(bid))).length;
-  view().innerHTML = `
-    ${isAdmin() ? '<div class="muted" style="margin-bottom:8px">الفرع = جدّ وذريّته، له مشرف أو أكثر. عيّن أي جدّ كفرع وحدّد مشرفيه. كل مشرف يرى ويضيف في فرعه فقط.</div>' : ''}
-    ${(list.length ? list.map(b => {
+  return list.length ? list.map(b => {
     const n = branchCount(b.id);
     const sc = supCount(b.id);
     const sups = C.members.filter(m => m.is_active && memberBranchSet(m).has(Number(b.id))).map(m => m.full_name || m.username || '—');
     return `<div class="card click" data-go="#/branch/${b.id}">
       <div class="li-title">🗂️ ${esc(b.name)}</div>
       <div class="li-sub">عدد الأفراد: ${n} • المشرفون: ${sc ? esc(sups.join('، ')) : '—'}</div></div>`;
-  }).join('') : '<div class="center-empty">لا توجد فروع بعد.</div>')}`;
+  }).join('') : '<div class="center-empty">لا توجد فروع بعد.</div>';
+}
+// تبويب «الفروع» السفلي — للعرض/التصفّح فقط للجميع (الإدارة انتقلت للوحة التحكم).
+function screenBranches() {
+  view().innerHTML = branchCardsHtml();
   bindGo();
-  if (isAdmin()) addFab('+ تعيين فرع', () => branchModal(null));
+}
+// إدارة الفروع والمشرفين — داخل لوحة التحكم (للمدير فقط).
+function screenBranchAdmin() {
+  if (!isAdmin()) { view().innerHTML = noPerm(); return; }
+  const list = C.branches.slice().sort((a, b) => branchCount(b.id) - branchCount(a.id));
+  const supCount = (bid) => C.members.filter(m => m.is_active && memberBranchSet(m).has(Number(bid))).length;
+  view().innerHTML = adminTabBar('branchadmin') + `
+    <div class="muted" style="margin-bottom:8px">الفرع = جدّ وذريّته، له مشرف أو أكثر. عيّن أي جدّ كفرع وحدّد مشرفيه. كل مشرف يرى ويضيف في فرعه فقط.</div>
+    ${list.length ? list.map(b => {
+      const n = branchCount(b.id); const sc = supCount(b.id);
+      const sups = C.members.filter(m => m.is_active && memberBranchSet(m).has(Number(b.id))).map(m => m.full_name || m.username || '—');
+      return `<div class="card click" data-bedit="${b.id}">
+        <div class="li-title">🗂️ ${esc(b.name)} <span class="muted" style="font-weight:normal;font-size:.78rem">✎ تعديل</span></div>
+        <div class="li-sub">عدد الأفراد: ${n} • المشرفون: ${sc ? esc(sups.join('، ')) : '—'}</div></div>`;
+    }).join('') : '<div class="center-empty">لا توجد فروع بعد.</div>'}`;
+  view().querySelectorAll('[data-bedit]').forEach(c => c.addEventListener('click', () => branchModal(C.branches.find(x => String(x.id) === c.dataset.bedit))));
+  addFab('+ تعيين فرع', () => branchModal(null));
 }
 let branchRootPick = null;   // الجذر المختار في نافذة الفرع
 function branchModal(b) {
