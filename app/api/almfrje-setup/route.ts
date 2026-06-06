@@ -53,7 +53,8 @@ async function runSql(pat: string, ref: string, query: string) {
 
 async function handle() {
   const pat = process.env.ALMFRJE_SUPABASE_PAT || process.env.SUPABASE_PAT;
-  const supaUrl = process.env.ALMFRJE_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+  // ترقية المفارجة تستهدف قاعدتها وحدها فقط (لا رجوع للقاعدة المشتركة) — عزل تام عن مراحي/الاستشارات.
+  const supaUrl = process.env.ALMFRJE_SUPABASE_URL || '';
   const m = supaUrl.match(/https:\/\/([a-z0-9]+)\.supabase\.co/i);
 
   if (!pat || !m) {
