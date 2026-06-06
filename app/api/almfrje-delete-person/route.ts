@@ -8,9 +8,9 @@ export const runtime = 'nodejs';
 // يُنفَّذ على الخادم بصلاحية service_role (يتجاوز RLS) بعد التحقّق من أن
 // المُستدعي مديرٌ مفعّل عبر رمز جلسته. يحفظ نسخة في سلة المحذوفات قبل الحذف.
 export async function POST(request: NextRequest) {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  const service = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const url = process.env.ALMFRJE_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const anon = process.env.ALMFRJE_SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const service = process.env.ALMFRJE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !anon || !service) {
     return NextResponse.json({ ok: false, error: 'إعداد الخادم ناقص (SUPABASE_SERVICE_ROLE_KEY)' }, { status: 500 });
   }

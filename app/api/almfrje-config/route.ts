@@ -3,8 +3,8 @@ export const dynamic = 'force-dynamic';
 // يقدّم إعدادات Supabase لتطبيق المفارجة (almfrje) من نفس متغيّرات بيئة alaoufi.me.
 // مفتاح anon علني بطبيعته (الحماية عبر RLS)، لذا تقديمه للمتصفّح آمن.
 export async function GET() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-  const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+  const url = process.env.ALMFRJE_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+  const anon = process.env.ALMFRJE_SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
   // Only override when env vars are configured. Otherwise emit a no-op so the
   // static values from /almfrje/config.js (loaded just before this) survive —
   // this keeps the app working on deployments where env vars aren't set.
