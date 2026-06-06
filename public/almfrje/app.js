@@ -222,6 +222,11 @@ const isManager = () => !!(me && me.role === 'branch_manager' && me.is_active);
 const isViewer = () => !!(me && me.role === 'viewer');
 // حساب الزائر المدمج المشترك (للتصفّح بلا تسجيل) — يُميَّز باسم المستخدم 'guest'.
 const isGuestUser = () => !!(me && me.username === 'guest');
+// اسم المستخدم الحالي للعرض/التوثيق: للعضو اسمه، وللزائر النسب الذي تحقّق به عند الدخول.
+function currentUserName() {
+  if (isGuestUser()) { try { return (sessionStorage.getItem('almfrje_guest_name') || '').trim(); } catch (e) { return ''; } }
+  return (me && (me.full_name || me.username || me.phone)) || '';
+}
 // هل يُخفى عن الزائر (دور viewer) هذا الصنف من البيانات؟ what: phone | media | notes
 const hideForGuest = (what) => isViewer() && !!guestHide[what];
 // فروع المستخدم التي يُشرف عليها (يدعم القديم branch_id + الجديد branch_ids[])
@@ -1744,18 +1749,15 @@ function screenFeedback() {
     <div class="card" style="text-align:center;border:2px solid var(--brand)">
       <div style="font-size:2rem;line-height:1">✉️</div>
       <h3 style="margin:.3rem 0 .15rem">إرسال ملاحظة للإدارة</h3>
-      <div class="muted" style="font-size:.84rem;line-height:1.7">عرّف بنفسك، اختر نوع الملاحظة وأكملها — وستصل للإدارة لمراجعتها واتخاذ الإجراء.</div>
+      <div class="muted" style="font-size:.84rem;line-height:1.7">اختر نوع الملاحظة وأكملها — وستصل للإدارة لمراجعتها واتخاذ الإجراء.</div>
     </div>
+    ${currentUserName() ? `<div class="card"><div class="li-title" style="margin-bottom:6px">المُرسِل</div>
+      <div style="padding:8px 10px;border:1px solid var(--brand);border-radius:8px;font-size:.95rem;font-weight:700">👤 ${esc(currentUserName())}</div>
+      <div class="muted" style="font-size:.78rem;margin-top:6px">يُؤخذ تلقائياً من حسابك الذي دخلت به.</div></div>`
+      : `<div class="card"><div class="li-title" style="margin-bottom:6px">اسمك</div>
+      <div class="field"><input id="fb_name" type="text" placeholder="اكتب اسمك"></div></div>`}
     <div class="card">
-      <div class="li-title" style="margin-bottom:10px">١) من أنت؟ <span class="muted" style="font-weight:normal;font-size:.8rem">(للأحياء فقط)</span></div>
-      <div class="field"><label>اكتب اسمك ثم اسم أبيك لتقليص القائمة</label>
-        <input id="fb_msearch" type="text" placeholder="مثال: محمد سالم">
-        <div id="fb_mresults" style="max-height:200px;overflow:auto;margin-top:4px"></div>
-        <div id="fb_mselected" style="margin-top:8px"></div>
-      </div>
-    </div>
-    <div class="card">
-      <div class="li-title" style="margin-bottom:10px">٢) نوع الملاحظة</div>
+      <div class="li-title" style="margin-bottom:10px">نوع الملاحظة</div>
       <div class="field"><select id="fb_subject">
         <option value="">— اختر الموضوع —</option>
         <option value="إضافة مولود">👶 إضافة مولود</option>
@@ -1767,12 +1769,6 @@ function screenFeedback() {
     </div>
     <button class="btn btn-lg" id="fb_send" style="width:100%">✉️ إرسال للإدارة</button>
     </div>`;
-  const ms = document.getElementById('fb_msearch');
-  ms.addEventListener('input', () => fbPickerSearch(ms.value, document.getElementById('fb_mresults'), true, (p) => {
-    fbSender = p;
-    document.getElementById('fb_mselected').innerHTML = p ? '<div style="padding:8px 10px;border:1px solid var(--brand);border-radius:8px;font-size:.9rem">✅ أنت: <b>' + esc(lineageShort(p.id, 10)) + '</b></div>' : '';
-    ms.value = p ? p.name : '';
-  }));
   const sub = document.getElementById('fb_subject');
   sub.addEventListener('change', () => renderFbDynamic(sub.value));
   document.getElementById('fb_send').addEventListener('click', sendFeedback);
@@ -1830,7 +1826,8 @@ function renderFbDynamic(subject) {
   }
 }
 async function sendFeedback() {
-  if (!fbSender) { toast('عرّف بنفسك أولاً — اختر اسمك من الشجرة'); return; }
+  const who = currentUserName() || (document.getElementById('fb_name') ? val('fb_name').trim() : '');
+  if (!who) { toast('اكتب اسمك أولاً'); return; }
   const subject = val('fb_subject').trim();
   if (!subject) { toast('اختر الموضوع'); return; }
   const details = val('fb_details').trim();
@@ -1844,7 +1841,6 @@ async function sendFeedback() {
     error_desc = document.getElementById('fb_error') ? val('fb_error').trim() : '';
   }
   if (!fullDetails && !error_desc) { toast('اكتب التفاصيل'); return; }
-  const who = lineageShort(fbSender.id, 10);
   const ok = await guard(async () => {
     const { error } = await sb.from('almfrje_feedback').insert({ subject, branch_id, details: fullDetails, error_desc, created_by_name: who });
     if (error) throw error;
@@ -3364,6 +3360,7 @@ async function guestGateEnter() {
     const res = await fetch('/api/almfrje-guest-verify', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ input: inp }) });
     const j = await res.json().catch(() => ({}));
     if (res.ok && j.ok) {
+      try { sessionStorage.setItem('almfrje_guest_name', inp); } catch (e) { /* */ }
       location.hash = '#/home';
       const entered = await browseAsGuest(m);
       if (entered) {
