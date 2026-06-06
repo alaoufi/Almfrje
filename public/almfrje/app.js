@@ -2521,24 +2521,25 @@ function gridPool() {
 }
 function gridCard(p, fields, review) {
   const sub = `${esc(lineageShort(p.id, 4))} • جيل ${p.generation}`;
-  if (review) {
-    const rows = fields.map(k => {
-      const f = GRID_FIELDS.find(x => x.k === k);
-      const v = f.type === 'select' ? arOf(f.opts, p[k]) : (p[k] ? esc(p[k]) : '—');
-      const by = fieldEditorNote(p, k);
-      return `<div class="grid-rev"><span class="grid-rev-l">${f.ar}</span><span class="grid-rev-v">${v}</span><span class="grid-rev-by">${by ? '✎ ' + by : ''}</span></div>`;
-    }).join('');
-    return `<div class="grid-card"><div class="grid-head"><b>${esc(p.name)}</b> <span class="muted">${sub}</span></div>${rows}</div>`;
-  }
-  const inputs = fields.map(k => {
+  const rows = fields.map(k => {
+    const f = GRID_FIELDS.find(x => x.k === k);
+    const v = f.type === 'select' ? arOf(f.opts, p[k]) : (p[k] ? esc(p[k]) : '—');
+    const by = fieldEditorNote(p, k);
+    return `<div class="grid-rev"><span class="grid-rev-l">${f.ar}</span><span class="grid-rev-v">${v}</span><span class="grid-rev-by">${by ? '✎ ' + by : ''}</span></div>`;
+  }).join('');
+  return `<div class="grid-card"><div class="grid-head"><b>${esc(p.name)}</b> <span class="muted">${sub}</span></div>${rows}</div>`;
+}
+// صفّ تعديل: الاسم ثم حقوله بجانبه (تخطيط جدولي — الاسم يمين والحقول تليه).
+function gridRow(p, fields) {
+  const cells = fields.map(k => {
     const f = GRID_FIELDS.find(x => x.k === k);
     const cur = p[k] == null ? (k === 'status' ? 'alive' : '') : String(p[k]);
     const ctrl = f.type === 'select'
       ? `<select data-gfld="${k}">${f.opts.map(o => `<option value="${o.k}" ${cur === o.k ? 'selected' : ''}>${o.ar}</option>`).join('')}</select>`
-      : `<input type="${f.type === 'tel' ? 'tel' : 'text'}" ${f.type === 'tel' ? 'inputmode="tel"' : ''} data-gfld="${k}" value="${esc(cur)}" placeholder="${f.ph || ''}">`;
-    return `<div class="grid-f"><label>${f.ar}</label>${ctrl}</div>`;
+      : `<input type="${f.type === 'tel' ? 'tel' : 'text'}" ${f.type === 'tel' ? 'inputmode="tel"' : ''} data-gfld="${k}" value="${esc(cur)}" placeholder="${esc(f.ar)}">`;
+    return `<div class="grid-tc">${ctrl}</div>`;
   }).join('');
-  return `<div class="grid-card" data-grow="${p.id}"><div class="grid-head"><b>${esc(p.name)}</b> <span class="muted">${sub}</span></div>${inputs}</div>`;
+  return `<div class="grid-trow" data-grow="${p.id}"><div class="grid-tc grid-tc-name"><b>${esc(p.name)}</b><span class="muted">${esc(lineageShort(p.id, 3))}</span></div>${cells}</div>`;
 }
 function screenGridEdit() { screenGrid('edit'); }
 function screenGridReview() { screenGrid('review'); }
@@ -2579,9 +2580,16 @@ function screenGrid(mode) {
     if (!gridAncestor) { cnt.textContent = 'اختر الجدّ أولاً لعرض القائمة'; box.innerHTML = ''; if (sv) sv.disabled = true; return; }
     const fields = selFields();
     if (!review && !fields.length) { cnt.textContent = 'اختر حقلاً واحداً على الأقل'; box.innerHTML = ''; if (sv) sv.disabled = true; return; }
-    const pool = gridPool();
+    const pool = gridPool();   // الأحياء فقط (المتوفّى لا يُعرض)
     cnt.innerHTML = `الأحياء في ذرّية «${esc(gridAncestor.name)}»: <b>${pool.length}</b>`;
-    box.innerHTML = pool.length ? pool.map(p => gridCard(p, fields, review)).join('') : '<div class="muted" style="padding:8px">لا أحياء ضمن نطاقك في ذرّية هذا الجدّ.</div>';
+    if (!pool.length) { box.innerHTML = '<div class="muted" style="padding:8px">لا أحياء ضمن نطاقك في ذرّية هذا الجدّ.</div>'; if (sv) sv.disabled = true; return; }
+    if (review) {
+      box.innerHTML = pool.map(p => gridCard(p, fields, true)).join('');
+    } else {
+      // جدول: الاسم يمين وحقوله بجانبه، مع صفّ عناوين للحقول.
+      const head = `<div class="grid-trow grid-thead"><div class="grid-tc grid-tc-name">الاسم</div>${fields.map(k => `<div class="grid-tc">${GRID_FIELDS.find(x => x.k === k).ar}</div>`).join('')}</div>`;
+      box.innerHTML = `<div class="grid-table" style="--cols:${fields.length}">${head}${pool.map(p => gridRow(p, fields)).join('')}</div>`;
+    }
     if (sv) sv.disabled = !pool.length;
   };
   const setAnc = (fp) => { gridAncestor = fp; const el = document.getElementById('g_ancLabel'); el.textContent = fp ? '👤 ' + fp.name + ' (جيل ' + fp.generation + ')' : '— اختر الجدّ —'; el.classList.toggle('empty', !fp); renderList(); };
