@@ -374,6 +374,22 @@ ul.hier ul.hier > .hier-li::before {
 .bk-item.bk-blocked input { cursor: not-allowed; }
 .bk-dead-tag { font-size: .68rem; font-weight: 600; color: #9ca3af; border: 1px solid var(--line); border-radius: 999px; padding: 1px 7px; margin-inline-start: 6px; }
 
+/* ===== قائمة تعديل/مراجعة البيانات (لكل فرد) ===== */
+.grid-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 2px 14px; }
+.grid-list { display: flex; flex-direction: column; gap: 10px; margin-top: 6px; }
+.grid-card { border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; background: var(--bg); }
+.grid-head { font-size: 1rem; margin-bottom: 8px; padding-bottom: 6px; border-bottom: 1px dashed var(--line); }
+.grid-head .muted { font-size: .78rem; }
+.grid-f { display: flex; align-items: center; gap: 10px; margin: 6px 0; }
+.grid-f label { flex: 0 0 92px; font-size: .85rem; color: var(--muted); }
+.grid-f input, .grid-f select { flex: 1; padding: 9px 10px; border: 1px solid var(--line); border-radius: 9px; font: inherit; background: var(--card); color: var(--text); }
+.grid-f input:focus, .grid-f select:focus { outline: none; border-color: var(--brand); box-shadow: 0 0 0 2px var(--brand-l); }
+.grid-rev { display: grid; grid-template-columns: 92px 1fr auto; gap: 8px; align-items: baseline; padding: 4px 0; border-bottom: 1px solid var(--line); }
+.grid-rev:last-child { border-bottom: 0; }
+.grid-rev-l { font-size: .82rem; color: var(--muted); }
+.grid-rev-v { font-weight: 700; }
+.grid-rev-by { font-size: .72rem; color: var(--brand); white-space: nowrap; }
+
 /* ===== زر التعليمات (i) ===== */
 .hint-i {
   display: inline-flex; align-items: center; justify-content: center;

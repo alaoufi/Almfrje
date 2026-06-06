@@ -113,6 +113,8 @@ const HINTS = {
   edit_lock: ['تعديل البيانات', 'يمكنك تعديل بيانات الشخص.\nحذف الأسماء متاح لمدير النظام فقط (مع تأكيد)، وتُحفظ نسخة في سلة المحذوفات للتراجع.'],
   // ——— الأدوات ———
   bulk: ['التعديل الجماعي', 'لتعديل عدّة أشخاص دفعة واحدة:\n١) حدّد المجموعة (الجيل أو ضمن جدّ).\n٢) اختر الحقل (الحالة/المدينة…) وقيمته.\n٣) تظهر الأسماء كلها مؤشّرة — أزل تأشير من لا تريد.\n٤) طبّق على المحدّدين.\n\nملاحظة: عند تعديل الجوال أو الحالة الوظيفية أو المدينة أو سنة الميلاد، تظهر أسماء المتوفّين بلا إمكان اختيار لأنها لا تخصّهم.'],
+  grid: ['تعديل البيانات بالقائمة', 'لتعديل بيانات كل فرد على حدة ضمن جدٍّ واحد:\n١) اختر الجدّ — تظهر ذرّيته من الأحياء فقط.\n٢) أشّر الحقول التي تريد تعديلها (الحالة/المدينة/الجوال…).\n٣) عدّل قيمة كل فرد في القائمة، ثم «حفظ التعديلات».\n\nيُسجَّل من قام بالتعديل، ويمكن التراجع من سجل التعديلات. مسؤول الفرع يعدّل ضمن فرعه فقط.'],
+  review: ['مراجعة البيانات', 'عرض للمراجعة فقط (دون تعديل) لبيانات الأحياء ضمن جدٍّ تختاره، مع إظهار آخر من عدّل كل حقل ومتى — لمراجعة دقّة البيانات.'],
   import: ['استيراد Excel', 'لإدخال الشجرة كاملة من ملف Excel مرة واحدة:\nكل عمود = جيل (العمود الأقصى يميناً = الأصل).\nالأسماء المتتالية في نفس العمود = إخوة.\n\nيتجاهل جدول الإحصائيات في نهاية الملف تلقائياً. راجع المعاينة قبل التنفيذ.'],
   branches: ['الفروع', 'الفرع = جدّ معيّن وكل ذريّته، له مشرف أو أكثر.\nالمدير يعيّن أي جدّ كفرع ويحدّد مشرفيه.\nكل مشرف يرى ويضيف في فرعه فقط.'],
   branch_root: ['جذر الفرع (الجدّ)', 'الجدّ الذي يبدأ منه الفرع.\nعند الحفظ يُضمّ هو وكل ذريّته إلى هذا الفرع تلقائياً.'],
@@ -456,6 +458,8 @@ const ROUTES = {
   import: { t: 'استيراد Excel', back: true, fn: screenImport },
   members: { t: 'المستخدمون والصلاحيات', back: true, fn: screenMembers },
   bulk: { t: 'تعديل جماعي', back: true, fn: screenBulkEdit },
+  grid: { t: 'تعديل البيانات بالقائمة', back: true, fn: screenGridEdit },
+  review: { t: 'مراجعة البيانات', back: true, fn: screenGridReview },
   audit: { t: 'سجل التعديلات', back: true, fn: screenAudit },
   hints: { t: 'تعديل التعليمات', back: true, fn: screenHints },
   texts: { t: 'النصوص', back: true, fn: screenTexts },
@@ -1915,6 +1919,8 @@ function screenMore() {
   const data = [];
   if (isAdmin()) data.push(['📥 استيراد ملف Excel', '#/import', 'import']);
   if (isAdmin() || isManager()) data.push(['✏️ تعديل جماعي', '#/bulk', 'bulk']);
+  if (isAdmin() || isManager()) data.push(['📝 تعديل البيانات بالقائمة', '#/grid', 'grid']);
+  if (!isGuestUser()) data.push(['👁️ مراجعة البيانات (الأحياء)', '#/review', 'review']);
   if (isAdmin() || isManager()) data.push(['🔁 كشف الأسماء المكرّرة لنفس الأب', '#/dups', 'dups']);
   if (isAdmin()) data.push(['📨 ملاحظات الزوار الواردة', '#/feedbacks', 'feedbacks']);
   if (isManager() && !isAdmin()) data.push(['📋 سجل تعديلاتي (تراجع)', '#/audit', 'audit']);
@@ -2482,6 +2488,161 @@ async function undoFromAudit(row) {
   });
   showLoading(false);
   if (ok) { toast('تم التراجع'); await loadAll(); screenAudit(); }
+}
+
+/* ===== قائمة تعديل/مراجعة بيانات الأفراد (لكل فرد على حدة) — الأحياء فقط ===== */
+let gridAncestor = null;   // الجدّ المختار لحصر النطاق في قائمة التعديل/المراجعة
+// الحقول القابلة للتعديل بالقائمة (بيانات لا بنية — لا الاسم ولا الأب)
+const GRID_FIELDS = [
+  { k: 'status', ar: 'الحالة', type: 'select', opts: STATUS },
+  { k: 'work', ar: 'الحالة الوظيفية', type: 'select', opts: WORK },
+  { k: 'nickname', ar: 'اللقب', type: 'text', ph: 'اختياري' },
+  { k: 'birth', ar: 'سنة الميلاد', type: 'text', ph: 'مثال: 1440هـ' },
+  { k: 'birthplace', ar: 'مكان الميلاد', type: 'text', ph: 'اختياري' },
+  { k: 'city', ar: 'المدينة', type: 'text', ph: 'اختياري' },
+  { k: 'phone', ar: 'الجوال', type: 'tel', ph: 'اختياري' },
+  { k: 'death', ar: 'سنة الوفاة', type: 'text', ph: 'إن وُجدت' },
+];
+// هل عمود تتبّع الحقول متاح في القاعدة؟ (يُحمَّل تلقائياً مع select('*') إن وُجد)
+const fieldAuditOn = () => !!(C.persons.length && C.persons[0].field_audit !== undefined);
+// نصّ «آخر من عدّل» لحقل بعينه: من تتبّع الحقول إن وُجد، وإلا من تتبّع السجل العام.
+function fieldEditorNote(p, k) {
+  const fa = (p.field_audit && typeof p.field_audit === 'object') ? p.field_audit[k] : null;
+  if (fa && fa.by) return esc(fa.by) + (fa.at ? ' • ' + fmtDate(fa.at) : '');
+  if (p.updated_by_name) return esc(p.updated_by_name) + (p.updated_at ? ' • ' + fmtDate(p.updated_at) : '');
+  return '';
+}
+function gridPool() {
+  if (!gridAncestor) return [];
+  let pool = descendants(gridAncestor.id).filter(p => p.status !== 'dead');   // الأحياء فقط
+  if (!isAdmin() && isManager()) pool = pool.filter(p => inMyBranch(p));        // مسؤول الفرع: نطاقه
+  pool.sort((a, b) => (a.generation - b.generation) || (a.sort - b.sort) || (a.id - b.id));
+  return pool;
+}
+function gridCard(p, fields, review) {
+  const sub = `${esc(lineageShort(p.id, 4))} • جيل ${p.generation}`;
+  if (review) {
+    const rows = fields.map(k => {
+      const f = GRID_FIELDS.find(x => x.k === k);
+      const v = f.type === 'select' ? arOf(f.opts, p[k]) : (p[k] ? esc(p[k]) : '—');
+      const by = fieldEditorNote(p, k);
+      return `<div class="grid-rev"><span class="grid-rev-l">${f.ar}</span><span class="grid-rev-v">${v}</span><span class="grid-rev-by">${by ? '✎ ' + by : ''}</span></div>`;
+    }).join('');
+    return `<div class="grid-card"><div class="grid-head"><b>${esc(p.name)}</b> <span class="muted">${sub}</span></div>${rows}</div>`;
+  }
+  const inputs = fields.map(k => {
+    const f = GRID_FIELDS.find(x => x.k === k);
+    const cur = p[k] == null ? (k === 'status' ? 'alive' : '') : String(p[k]);
+    const ctrl = f.type === 'select'
+      ? `<select data-gfld="${k}">${f.opts.map(o => `<option value="${o.k}" ${cur === o.k ? 'selected' : ''}>${o.ar}</option>`).join('')}</select>`
+      : `<input type="${f.type === 'tel' ? 'tel' : 'text'}" ${f.type === 'tel' ? 'inputmode="tel"' : ''} data-gfld="${k}" value="${esc(cur)}" placeholder="${f.ph || ''}">`;
+    return `<div class="grid-f"><label>${f.ar}</label>${ctrl}</div>`;
+  }).join('');
+  return `<div class="grid-card" data-grow="${p.id}"><div class="grid-head"><b>${esc(p.name)}</b> <span class="muted">${sub}</span></div>${inputs}</div>`;
+}
+function screenGridEdit() { screenGrid('edit'); }
+function screenGridReview() { screenGrid('review'); }
+function screenGrid(mode) {
+  const review = mode === 'review';
+  if (!review && !isAdmin() && !isManager()) { view().innerHTML = noPerm(); return; }
+  if (review && (!me || isGuestUser())) { view().innerHTML = noPerm(); return; }
+  const scopeNote = (!review && isManager() && !isAdmin())
+    ? `<div class="add-ctx" style="margin-bottom:10px"><div class="add-ctx-ico">🔒</div><div><div class="add-ctx-title">ضمن صلاحيتك فقط</div><div class="add-ctx-sub">يشمل التعديل فرعك المصرّح به: <b>${esc(myBranches().map(b => branchName(b)).join('، ') || '—')}</b></div></div></div>`
+    : '';
+  const faNote = (!review && !fieldAuditOn())
+    ? `<div class="muted" style="font-size:.8rem;margin:-4px 0 8px">ملاحظة: تتبّع «من عدّل كل حقل» يحتاج ترقية القاعدة؛ حتى ذلك الحين يُسجَّل آخر من عدّل الفرد.</div>` : '';
+  view().innerHTML = `
+    ${scopeNote}
+    <div class="card"><h3>① اختر الجدّ</h3>
+      <p class="muted" style="font-size:.85rem;margin-top:-4px">يُعرض <b>الأحياء</b> من ذرّيته فقط${review ? ' — للمراجعة دون تعديل.' : ' لتعديل بياناتهم.'}</p>
+      <div class="field"><label>الجدّ</label>
+        <div class="father-pick">
+          <div id="g_ancLabel" class="father-name empty">— اختر الجدّ —</div>
+          <div class="btn-row"><button class="btn sm" id="g_pickAnc" style="margin:0">🔍 اختيار الجدّ</button><button class="btn sm outline" id="g_clrAnc" style="margin:0">إلغاء</button></div>
+        </div>
+      </div>
+    </div>
+    ${review ? '' : `<div class="card"><h3>② اختر الحقول المراد تعديلها</h3>
+      <p class="muted" style="font-size:.85rem;margin-top:-4px">تظهر الحقول المختارة فقط في القائمة لتعديل كل فرد على حدة.</p>
+      ${faNote}
+      <div class="grid-fields">${GRID_FIELDS.map(f => `<label class="perm-chk"><input type="checkbox" data-gf="${f.k}"><span>${f.ar}</span></label>`).join('')}</div></div>`}
+    <div class="card"><h3>${review ? '② بيانات الأحياء' : '③ عدّل ثم احفظ'}</h3>
+      <div id="g_count" class="search-count"></div>
+      <div id="g_list" class="grid-list"></div>
+      ${review ? '' : `<button class="btn btn-lg" id="g_save" style="margin-top:12px" disabled>💾 حفظ التعديلات</button>`}
+    </div>`;
+  const selFields = () => review ? GRID_FIELDS.map(f => f.k) : [...view().querySelectorAll('input[data-gf]:checked')].map(c => c.dataset.gf);
+  const renderList = () => {
+    const cnt = document.getElementById('g_count');
+    const box = document.getElementById('g_list');
+    const sv = document.getElementById('g_save');
+    if (!gridAncestor) { cnt.textContent = 'اختر الجدّ أولاً لعرض القائمة'; box.innerHTML = ''; if (sv) sv.disabled = true; return; }
+    const fields = selFields();
+    if (!review && !fields.length) { cnt.textContent = 'اختر حقلاً واحداً على الأقل'; box.innerHTML = ''; if (sv) sv.disabled = true; return; }
+    const pool = gridPool();
+    cnt.innerHTML = `الأحياء في ذرّية «${esc(gridAncestor.name)}»: <b>${pool.length}</b>`;
+    box.innerHTML = pool.length ? pool.map(p => gridCard(p, fields, review)).join('') : '<div class="muted" style="padding:8px">لا أحياء ضمن نطاقك في ذرّية هذا الجدّ.</div>';
+    if (sv) sv.disabled = !pool.length;
+  };
+  const setAnc = (fp) => { gridAncestor = fp; const el = document.getElementById('g_ancLabel'); el.textContent = fp ? '👤 ' + fp.name + ' (جيل ' + fp.generation + ')' : '— اختر الجدّ —'; el.classList.toggle('empty', !fp); renderList(); };
+  document.getElementById('g_pickAnc').addEventListener('click', () => pickAncestorModal(setAnc));
+  document.getElementById('g_clrAnc').addEventListener('click', () => setAnc(null));
+  if (!review) view().querySelectorAll('input[data-gf]').forEach(cb => cb.addEventListener('change', renderList));
+  if (!review) document.getElementById('g_save').addEventListener('click', () => gridSave(selFields()));
+  if (gridAncestor) { const el = document.getElementById('g_ancLabel'); el.textContent = '👤 ' + gridAncestor.name + ' (جيل ' + gridAncestor.generation + ')'; el.classList.remove('empty'); }
+  renderList();
+}
+async function gridSave(fields) {
+  if (!isAdmin() && !isManager()) return;
+  if (!fields.length) { toast('اختر حقلاً أولاً'); return; }
+  const who = (me && (me.full_name || me.username)) || '';
+  const nowIso = new Date().toISOString();
+  const useFA = fieldAuditOn();
+  const changes = [];
+  view().querySelectorAll('[data-grow]').forEach(row => {
+    const id = parseInt(row.dataset.grow, 10);
+    const p = byId.get(id); if (!p) return;
+    if (!isAdmin() && !inMyBranch(p)) return;   // حماية إضافية
+    const patch = {};
+    fields.forEach(k => {
+      const el = row.querySelector(`[data-gfld="${k}"]`); if (!el) return;
+      const v = (el.value || '').trim();
+      const cur = (p[k] == null ? (k === 'status' ? 'alive' : '') : String(p[k]));
+      if (v !== cur) patch[k] = v;
+    });
+    if (Object.keys(patch).length) changes.push({ id, patch, p });
+  });
+  if (!changes.length) { toast('لا توجد تغييرات لحفظها'); return; }
+  const totalFields = changes.reduce((n, c) => n + Object.keys(c.patch).length, 0);
+  if (!(await confirm2(`سيُحفظ ${totalFields} تعديل على ${changes.length} فرد، ويُسجَّل من قام بالتعديل. متابعة؟`, { title: 'تأكيد حفظ التعديلات', okText: 'حفظ', danger: false }))) return;
+  const snapshots = [];
+  showLoading(true);
+  let okCount = 0;
+  let auditId = null;
+  const ok = await guard(async () => {
+    for (const c of changes) {
+      const prev = {};
+      Object.keys(c.patch).forEach(k => prev[k] = c.p[k] ?? null);
+      prev.updated_by_name = c.p.updated_by_name ?? null; prev.updated_at = c.p.updated_at ?? null;
+      const upd = { ...c.patch, updated_by_name: who, updated_at: nowIso };
+      if (useFA) {
+        const fa = (c.p.field_audit && typeof c.p.field_audit === 'object') ? { ...c.p.field_audit } : {};
+        Object.keys(c.patch).forEach(k => { fa[k] = { by: who, at: nowIso }; });
+        upd.field_audit = fa; prev.field_audit = c.p.field_audit ?? null;
+      }
+      const { error } = await sb.from('almfrje_persons').update(upd).eq('id', c.id);
+      if (error) throw error;
+      snapshots.push({ id: c.id, prev });
+      okCount++;
+    }
+    auditId = await auditLog('edit', null, `تعديل بالقائمة لـ ${changes.length} فرد (${totalFields} حقل)`, { kind: 'persons', items: snapshots, label: 'تعديل بالقائمة' });
+  });
+  showLoading(false);
+  if (ok) {
+    await loadAll();
+    screenGrid('edit');
+    showUndoToast(`تم حفظ ${okCount} فرد`, () => undoBulk(snapshots, ['تعديل بالقائمة'], auditId));
+  }
 }
 
 /* ===== تعديل نصوص التعليمات (i) — للمدير ===== */
