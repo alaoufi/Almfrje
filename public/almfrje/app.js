@@ -1736,6 +1736,7 @@ let fbFilter = 'new';    // تبويب شاشة المدير: new | done | all
 function screenFeedback() {
   fbFather = null; fbSender = null;
   view().innerHTML = `
+    <div class="fb-screen">
     <div class="card" style="text-align:center;border:2px solid var(--brand)">
       <div style="font-size:2rem;line-height:1">✉️</div>
       <h3 style="margin:.3rem 0 .15rem">إرسال ملاحظة للإدارة</h3>
@@ -1760,7 +1761,8 @@ function screenFeedback() {
       <div id="fb_dynamic"></div>
       <div class="field"><label id="fb_details_lbl">التفاصيل *</label><textarea id="fb_details" rows="4" placeholder="اكتب التفاصيل…"></textarea></div>
     </div>
-    <button class="btn btn-lg" id="fb_send" style="width:100%">✉️ إرسال للإدارة</button>`;
+    <button class="btn btn-lg" id="fb_send" style="width:100%">✉️ إرسال للإدارة</button>
+    </div>`;
   const ms = document.getElementById('fb_msearch');
   ms.addEventListener('input', () => fbPickerSearch(ms.value, document.getElementById('fb_mresults'), true, (p) => {
     fbSender = p;
@@ -3067,11 +3069,13 @@ async function restoreTrash(t) {
 }
 
 /* ===== المودال ===== */
-function openModal(title, body, onMount) {
+function openModal(title, body, onMount, opts) {
+  opts = opts || {};
   const root = document.getElementById('modalRoot');
-  root.innerHTML = `<div class="modal-bg"><div class="modal"><h3>${esc(title)}</h3>${body}<button class="btn outline" id="modalClose" style="margin-top:10px">إلغاء</button></div></div>`;
+  const closeBtn = opts.noClose ? '' : `<button class="btn outline" id="modalClose" style="margin-top:10px">إلغاء</button>`;
+  root.innerHTML = `<div class="modal-bg"><div class="modal"><h3>${esc(title)}</h3>${body}${closeBtn}</div></div>`;
   root.querySelector('.modal-bg').addEventListener('click', e => { if (e.target.classList.contains('modal-bg')) closeModal(); });
-  document.getElementById('modalClose').addEventListener('click', closeModal);
+  { const cb = document.getElementById('modalClose'); if (cb) cb.addEventListener('click', closeModal); }
   bindHints(root);
   if (onMount) onMount();
   bindEyes(root);   // فعّل أزرار العين بعد بناء محتوى النافذة
@@ -3195,7 +3199,7 @@ async function guestGateEnter() {
       const entered = await browseAsGuest(m);
       if (entered) {
         const msg = (guestWelcomeOk || DEFAULT_GUEST_OK).replace(/\{name\}/g, firstName);
-        openModal('🌿 أهلاً وسهلاً', `<div style="text-align:center;white-space:pre-wrap;font-size:1.1rem;line-height:1.95;padding:8px 2px">${esc(msg)}</div><button class="btn btn-lg" id="welcomeOk" style="margin-top:16px;width:100%">🌳 ابدأ التصفّح</button>`);
+        openModal('🌿 أهلاً وسهلاً', `<div style="text-align:center;white-space:pre-wrap;font-size:1.1rem;line-height:1.95;padding:8px 2px">${esc(msg)}</div><button class="btn btn-lg" id="welcomeOk" style="margin-top:16px;width:100%">🌳 ابدأ التصفّح</button>`, null, { noClose: true });
         const wb = document.getElementById('welcomeOk'); if (wb) wb.addEventListener('click', closeModal);
       }
     } else if (j.error) {
