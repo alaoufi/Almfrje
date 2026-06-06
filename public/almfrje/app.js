@@ -3184,7 +3184,7 @@ async function guestGateEnter() {
   const inp = (val('g_lineage') || '').trim();
   const names = inp.split(/\s+/).filter(w => w && w !== 'بن' && w !== 'ابن');
   m.className = 'auth-msg';
-  if (names.length < 2) { m.textContent = names.length ? 'تابع: اكتب اسم أبيك بعد اسمك…' : 'اكتب اسمك ثم اسم أبيك…'; return; }
+  if (names.length < 3) { m.textContent = names.length === 0 ? 'اكتب اسمك ثم أباك ثم جدّك…' : names.length === 1 ? 'تابع: اكتب اسم أبيك…' : 'تابع: اكتب اسم جدّك…'; return; }
   const firstName = names[0];
   _gateBusy = true; m.textContent = '… جارٍ التحقق';
   try {
@@ -3229,7 +3229,7 @@ function renderAuth() {
       <div class="logo" style="font-size:3.2rem">🌳</div>
       <h2 style="margin:.2rem 0 .1rem">المفارجة</h2>
       <div style="font-size:.95rem;line-height:1.85;margin-bottom:16px;font-weight:700">${esc(bannerText || 'شجرة أنساب العائلة')}</div>
-      <div style="font-size:1.1rem;font-weight:800;margin-bottom:6px">اكتب اسمك ثم آباءك للدخول</div>
+      <div style="font-size:1.1rem;font-weight:800;margin-bottom:6px">اكتب اسمك ثم أباك ثم جدّك للدخول</div>
       <div style="font-size:.92rem;font-weight:700;margin-bottom:12px">تدخل تلقائياً بمجرد أن يتميّز اسمك — مثال: <span style="color:var(--brand)">${esc(gensExample(3))}</span></div>
       ${fInput('اكتب اسمك بالتسلسل هنا', 'g_lineage', '')}
       <div class="auth-msg" id="a_msg"></div>

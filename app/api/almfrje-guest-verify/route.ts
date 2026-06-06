@@ -35,8 +35,8 @@ export async function POST(request: NextRequest) {
   if (gens <= 0) return NextResponse.json({ ok: true });   // التحقّق غير مفعّل → دخول مباشر
 
   const names = input.split(/\s+/).map((w) => w.trim()).filter((w) => w && w !== 'بن' && w !== 'ابن');
-  // الحد الأدنى ثابت = اسمان (اسمك + أحد آبائك)، بصرف النظر عن أي قيمة قديمة مخزّنة.
-  if (names.length < 2) return NextResponse.json({ ok: false, error: 'اكتب اسمك ثم أحد آبائك (اسمين على الأقل بالترتيب)' });
+  // الحد الأدنى = ثلاثة أسماء (أنت + أبوك + جدّك) لتقليل الالتباس واحتمال الانتحال.
+  if (names.length < 3) return NextResponse.json({ ok: false, error: 'اكتب اسمك ثم أباك ثم جدّك (٣ أسماء على الأقل بالترتيب)' });
 
   // تحميل الأشخاص (صفحات)
   type P = { id: number; name: string; father_id: number | null; status: string };
@@ -70,11 +70,14 @@ export async function POST(request: NextRequest) {
     while (i < toks.length && j < ln.length) { if (ln[j].includes(toks[i])) i++; j++; }
     return i === toks.length;
   };
-  // مجرد التطابق مع شخص حيّ → يدخل (بلا اشتراط تفرّد).
-  if (persons.some((p) => p.status !== 'dead' && matchSubseq(lineageWords(p.id)))) {
-    return NextResponse.json({ ok: true });
+  // المطابقون الأحياء فقط (الاسم الأول شرط أن يكون من الأحياء — المتوفّى مستثنى).
+  const liveMatches = persons.filter((p) => p.status !== 'dead' && matchSubseq(lineageWords(p.id)));
+  // التفرّد: يدخل فقط إن طابق شخصاً حيّاً واحداً تماماً.
+  if (liveMatches.length === 1) return NextResponse.json({ ok: true });
+  if (liveMatches.length > 1) {
+    return NextResponse.json({ ok: false, error: 'اسمك يطابق أكثر من شخص حيّ — أضِف اسم جدٍّ آخر للتمييز.' });
   }
-  // تشخيص الفشل لرسالة أوضح:
+  // لا مطابق حيّ — رسائل تشخيصية أوضح:
   if (persons.some((p) => p.status === 'dead' && matchSubseq(lineageWords(p.id)))) {
     return NextResponse.json({ ok: false, error: 'هذا الاسم مُسجّل في الشجرة كمتوفّى — الدخول للأحياء فقط.' });
   }
