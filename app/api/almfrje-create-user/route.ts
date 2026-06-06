@@ -1,0 +1,64 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
+
+export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
+
+// إنشاء مستخدم (مدير/مسؤول فرع/مطّلع) من جهة الخادم عبر المفتاح الخدمي مع تأكيد
+// البريد تلقائياً — فلا يُرسل أي بريد ولا يتأثّر بإعداد «تأكيد البريد» أو حدّ الإرسال.
+// يتحقّق أولاً أن المُنادي مديرٌ مفعّل عبر رمز جلسته.
+export async function POST(request: NextRequest) {
+  const url = process.env.ALMFRJE_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const anon = process.env.ALMFRJE_SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const service = process.env.ALMFRJE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !anon || !service) return NextResponse.json({ ok: false, error: 'إعداد الخادم ناقص' }, { status: 500 });
+
+  const token = (request.headers.get('authorization') || '').replace(/^Bearer\s+/i, '').trim();
+  if (!token) return NextResponse.json({ ok: false, error: 'غير مصرّح' }, { status: 401 });
+
+  // تحقّق هوية المُنادي
+  const caller = createClient(url, anon, { global: { headers: { Authorization: `Bearer ${token}` } }, auth: { persistSession: false, autoRefreshToken: false } });
+  const { data: who } = await caller.auth.getUser();
+  if (!who || !who.user) return NextResponse.json({ ok: false, error: 'جلسة غير صالحة' }, { status: 401 });
+
+  const admin = createClient(url, service, { auth: { persistSession: false, autoRefreshToken: false } });
+  const { data: mem } = await admin.from('almfrje_members').select('role,is_active').eq('user_id', who.user.id).maybeSingle();
+  if (!mem || !mem.is_active || mem.role !== 'admin') return NextResponse.json({ ok: false, error: 'للمدير فقط' }, { status: 403 });
+
+  let b: { full_name?: string; username?: string; phone?: string; pin?: string; role?: string; branch_ids?: unknown; perms?: unknown };
+  try { b = await request.json(); } catch { return NextResponse.json({ ok: false, error: 'طلب غير صالح' }, { status: 400 }); }
+
+  const full_name = String(b.full_name || '').trim();
+  const phone = String(b.phone || '').replace(/\D/g, '');
+  const username = b.username ? String(b.username).trim() : '';
+  const pin = String(b.pin || '').trim();
+  const role = ['admin', 'branch_manager', 'viewer'].includes(String(b.role)) ? String(b.role) : 'viewer';
+  const branch_ids = Array.isArray(b.branch_ids) ? (b.branch_ids as unknown[]).map((x) => Number(x)).filter((x) => Number.isFinite(x) && x > 0) : [];
+  const perms = (b.perms && typeof b.perms === 'object') ? b.perms : {};
+  if (!full_name) return NextResponse.json({ ok: false, error: 'أدخل الاسم' }, { status: 400 });
+  if (phone.length < 7) return NextResponse.json({ ok: false, error: 'أدخل رقم جوال صحيح' }, { status: 400 });
+  if (!/^\d{4,}$/.test(pin)) return NextResponse.json({ ok: false, error: 'الرقم السري ٤ أرقام على الأقل' }, { status: 400 });
+
+  const email = `${phone}@almfrje.app`;
+  const password = `${pin}@Almfrje`;
+
+  // أنشئ حساب المصادقة مؤكَّداً (بلا إرسال بريد)
+  const { data: created, error: ce } = await admin.auth.admin.createUser({
+    email, password, email_confirm: true, user_metadata: { full_name, username: username || null, phone },
+  });
+  if (ce || !created || !created.user) {
+    const m = (ce && ce.message) || 'تعذّر إنشاء الحساب';
+    if (/already|exists|registered|duplicate/i.test(m)) return NextResponse.json({ ok: false, error: 'الجوال مسجّل مسبقاً' }, { status: 409 });
+    return NextResponse.json({ ok: false, error: m }, { status: 400 });
+  }
+  const uid = created.user.id;
+
+  // فعّل صفّ العضو بالدور المطلوب (المُشغّل قد ينشئ الصف؛ نضمن قيمه بـ upsert)
+  const { error: ue } = await admin.from('almfrje_members').upsert({
+    user_id: uid, full_name, username: username || null, phone, role, is_active: true,
+    branch_ids, branch_id: branch_ids[0] || null, perms,
+  }, { onConflict: 'user_id' });
+  if (ue) return NextResponse.json({ ok: false, error: ue.message }, { status: 400 });
+
+  return NextResponse.json({ ok: true, user_id: uid });
+}

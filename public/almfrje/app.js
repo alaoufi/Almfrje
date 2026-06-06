@@ -3263,24 +3263,17 @@ function addUserModal() {
       const perms = {};
       if (role === 'admin' && !(await confirm2('إنشاء مستخدم بصلاحية مدير نظام كاملة؟'))) return;
       const ok = await guard(async () => {
-        // أنشئ حساب المصادقة عبر عميل مؤقّت كي لا يبدّل جلسة المدير
-        const tmp = window.supabase.createClient(window.ALMFRJE_CONFIG.SUPABASE_URL, window.ALMFRJE_CONFIG.SUPABASE_ANON_KEY,
-          { auth: { persistSession: false, autoRefreshToken: false, storageKey: 'almfrje_admin_tmp' } });
-        const { data, error } = await tmp.auth.signUp({ email: phoneToEmail(phone), password: pinToPass(pin), options: { data: { full_name, username, phone } } });
-        if (error) throw error;
-        try { await tmp.auth.signOut(); } catch (e) { /* تجاهل */ }
-        const uid = data && data.user && data.user.id;
-        if (uid) {
-          // فعّله مباشرةً بالدور المحدّد (المُشغّل ينشئ الصف، نحدّثه)
-          await new Promise(r => setTimeout(r, 600));
-          await sb.from('almfrje_members').update({
-            full_name, username: username || null, phone,
-            role, is_active: true,
-            branch_ids: isMgr ? branch_ids : [],
-            branch_id: isMgr && branch_ids.length ? branch_ids[0] : null,
-            perms,
-          }).eq('user_id', uid);
-        }
+        // الإنشاء من جهة الخادم (مفتاح خدمي، بريد مؤكَّد تلقائياً) — لا يتأثّر بإعداد «تأكيد البريد».
+        const { data: { session } } = await sb.auth.getSession();
+        const token = session && session.access_token;
+        if (!token) throw new Error('انتهت الجلسة — أعد تسجيل الدخول');
+        const res = await fetch('/api/almfrje-create-user', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+          body: JSON.stringify({ full_name, username, phone, pin, role, branch_ids: isMgr ? branch_ids : [], perms }),
+        });
+        const j = await res.json().catch(() => ({}));
+        if (!res.ok || !j.ok) throw new Error(j.error || 'تعذّر إنشاء الحساب');
       });
       if (ok) { closeModal(); toast('تم إنشاء الحساب وتفعيله'); await loadAll(); screenMembers(); }
     });
