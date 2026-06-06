@@ -1433,8 +1433,8 @@ function renderAddBirth() {
         </div>
         <div class="field"><label>اسم المولود *</label><input id="p_name" type="text" placeholder="اكتب الاسم"></div>
         <div class="grid2">
-          <div class="field"><label>سنة الميلاد</label><input id="p_birth" type="text" placeholder="مثال: 1440هـ"></div>
-          <div class="field"><label>مكان الميلاد (اختياري)</label><input id="p_birthplace" type="text" placeholder="اختياري"></div>
+          <div class="field"><label>سنة الولادة</label><input id="p_birth" type="text" placeholder="مثال: 1440هـ"></div>
+          <div class="field"><label>المدينة (اختياري)</label><input id="p_city" type="text" placeholder="اختياري"></div>
         </div>
         <div class="abw-chain"><div class="abw-chain-t">سلسلة النسب (للمراجعة):</div><div id="abw_chain">${chainPreview}</div></div>
         <button class="btn btn-lg" id="abw_save">✅ مراجعة وحفظ</button>
@@ -1517,7 +1517,7 @@ async function saveBirth(name) {
   const who = (me && (me.full_name || me.username || me.phone)) || '';
   const obj = {
     name, father_id: father ? father.id : null, branch_id, generation,
-    status: 'alive', birth: val('p_birth').trim(), birthplace: val('p_birthplace').trim(),
+    status: 'alive', birth: val('p_birth').trim(), city: val('p_city').trim(),
     created_by_name: who,
   };
   const ok = await guard(async () => {
