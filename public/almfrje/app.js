@@ -2045,7 +2045,7 @@ function screenMore() {
       <div class="more-group-title">${title}</div>
       ${items.map(([l, h, hint]) => `<div class="card click more-card" data-act="${h}"><div class="li-title">${l}</div>${hint ? hintBtn(hint) : ''}</div>`).join('')}
     </div>`).join('')
-    + `<div class="muted" style="text-align:center;margin-top:14px;font-size:.85rem">المفارجة — شجرة الأنساب</div>`;
+    + `<div class="muted" style="text-align:center;margin-top:14px;font-size:.85rem">قاعدة بيانات قبيلة المفارجة<br><span style="font-size:.78rem;opacity:.85">powered by Mohamad Shaman almfrji</span></div>`;
   view().querySelectorAll('[data-act]').forEach(c => c.addEventListener('click', (e) => {
     if (e.target.closest('[data-hint]')) return;   // لا تتنقّل عند الضغط على (i)
     if (c.dataset.act === '#pickdesc') pickDescendantStart();
@@ -3588,7 +3588,8 @@ function renderAuth() {
     // ===== واجهة الزائر: حقل واحد فقط (الاسم بالتسلسل) =====
     box.innerHTML = `<div class="auth-box">
       <div class="logo" style="font-size:3.2rem">🌳</div>
-      <h2 style="margin:.2rem 0 .1rem">المفارجة</h2>
+      <h2 style="margin:.2rem 0 0">قاعدة بيانات قبيلة المفارجة</h2>
+      <div style="font-size:.72rem;opacity:.8;margin-bottom:.4rem">powered by Mohamad Shaman almfrji</div>
       <div style="font-size:.95rem;line-height:1.85;margin-bottom:16px;font-weight:700">${esc(bannerText || 'شجرة أنساب العائلة')}</div>
       <div style="font-size:1.1rem;font-weight:800;margin-bottom:6px">اكتب اسمك ثم أباك ثم جدّك للدخول</div>
       <div style="font-size:.92rem;font-weight:700;margin-bottom:12px">تدخل تلقائياً بمجرد أن يتميّز اسمك — مثال: <span style="color:var(--brand)">${esc(gensExample(3))}</span></div>
@@ -3606,7 +3607,8 @@ function renderAuth() {
   }
   // ===== واجهة المسؤول/المشرف =====
   box.innerHTML = `<div class="auth-box">
-    <div class="logo">🌳</div><h2>المفارجة</h2><div class="sub">دخول المسؤول / مشرف الفرع</div>
+    <div class="logo">🌳</div><h2 style="margin-bottom:0">قاعدة بيانات قبيلة المفارجة</h2>
+    <div style="font-size:.72rem;opacity:.8;margin-bottom:.4rem">powered by Mohamad Shaman almfrji</div><div class="sub">دخول المسؤول / مشرف الفرع</div>
     ${fInput('الجوال أو اسم المستخدم', 'a_id', '')}
     ${pinField('الرقم السري', 'a_pin')}
     <button class="btn" id="a_submit">تسجيل الدخول</button>

@@ -1,7 +1,7 @@
 {
-  "name": "المفارجة — شجرة الأنساب",
+  "name": "قاعدة بيانات قبيلة المفارجة",
   "short_name": "المفارجة",
-  "description": "شجرة أنساب عائلة المفارجة",
+  "description": "قاعدة بيانات قبيلة المفارجة — powered by Mohamad Shaman almfrji",
   "start_url": "/almfrje",
   "scope": "/almfrje",
   "display": "browser",
