@@ -199,6 +199,7 @@ let guestGens = 0;        // عدد الأجيال المطلوبة للتحقق
 const GUEST_HIDE_DEFAULT = { phone: true, media: true, notes: true };  // ما يُخفى عن الزائر افتراضياً
 let guestHide = { ...GUEST_HIDE_DEFAULT };
 let recentSince = '';      // تاريخ تصفير «آخر الإضافات» (ISO) — يُحدّده المدير
+let visitStats = { total: 0, byBranch: {}, byCity: {} };   // إحصاء زيارات الزوّار (من الإعدادات)
 const DEFAULT_BANNER = 'المفرجي قبيلة من ولد حسين من الصواعد من عوف من حرب';
 let bannerText = DEFAULT_BANNER;
 const DEFAULT_FB_THANKS = 'شكراً لك 🌿\nتم إرسال ملاحظتك، وهي محل اهتمامنا.';
@@ -326,6 +327,7 @@ async function loadSettings() {
     const { data } = await sb.from('almfrje_settings').select('key,value');
     const map = {}; (data || []).forEach(r => map[r.key] = r.value);
     imported = map.imported === true;
+    visitStats = (map.visit_stats && typeof map.visit_stats === 'object') ? map.visit_stats : { total: 0, byBranch: {}, byCity: {} };
     guestOpen = map.guest_open === true;
     guestGens = Number.isFinite(+map.guest_verify_gens) ? Math.max(0, parseInt(map.guest_verify_gens, 10) || 0) : 0;
     guestHide = Object.assign({ ...GUEST_HIDE_DEFAULT }, (map.guest_hide && typeof map.guest_hide === 'object') ? map.guest_hide : {});
@@ -539,7 +541,7 @@ function avatar(p, lg) {
 }
 function personCard(p) {
   const f = p.father_id ? byId.get(p.father_id) : null;
-  return `<div class="card" style="padding:12px">
+  return `<div class="card pc" style="padding:12px">
     <div style="display:flex;gap:10px;align-items:center">
       ${avatar(p)}
       <div style="flex:1;min-width:0">
@@ -656,7 +658,7 @@ function screenHome() {
       <div class="stat"><div class="n">${total}</div><div class="l">إجمالي الأفراد</div></div>
       <div class="stat a"><div class="n">${C.branches.length}</div><div class="l">الفروع</div></div>
       <div class="stat g"><div class="n">${maxGen()}</div><div class="l">الأجيال</div></div>
-      <div class="stat"><div class="n">${sinceMs ? newCount : (recent.length ? '#' + recent[0].id : '—')}</div><div class="l">${sinceMs ? 'إضافات جديدة' : 'آخر إضافة'}</div></div>
+      <div class="stat k"><div class="n">${visitStats.total || 0}</div><div class="l">الزوّار</div></div>
     </div>
     ${branchGroupsHtml()}
     <div class="card"><div class="recent-head"><h3 style="margin:0">آخر الإضافات${sinceMs ? ` (${newCount})` : ''} ${hintBtn('recent')}</h3>${isAdmin() ? '<button class="btn sm outline" id="resetRecent">↺ تصفير</button>' : ''}</div>
@@ -2800,7 +2802,20 @@ async function resetHint(key) {
 /* ===== النصوص: نص الرئيسية + تعريف ألوان الحالة (للمدير) ===== */
 function screenTexts() {
   if (!isAdmin()) { view().innerHTML = noPerm(); return; }
+  const vb = visitStats.byBranch || {}, vc = visitStats.byCity || {};
+  const branchRows = Object.keys(vb).length
+    ? Object.entries(vb).sort((a, b) => b[1] - a[1]).map(([bid, n]) => `<div class="row"><span class="k">🗂️ ${esc(branchName(Number(bid)))}</span><span class="v">${n}</span></div>`).join('')
+    : '<div class="muted" style="font-size:.85rem;padding:4px 0">لا زيارات مسجّلة بعد.</div>';
+  const cityRows = Object.keys(vc).length
+    ? Object.entries(vc).sort((a, b) => b[1] - a[1]).map(([c, n]) => `<div class="row"><span class="k">📍 ${esc(c)}</span><span class="v">${n}</span></div>`).join('')
+    : '<div class="muted" style="font-size:.85rem;padding:4px 0">لا مناطق مسجّلة بعد.</div>';
   view().innerHTML = adminTabBar('texts') + `
+    <div class="card"><h3>📊 إحصائيات الزيارات</h3>
+      <div class="row"><span class="k">إجمالي زيارات الزوّار</span><span class="v" style="font-size:1.2rem;color:var(--brand)">${visitStats.total || 0}</span></div>
+      <div class="li-sub" style="margin-top:10px;font-weight:800;color:var(--text)">حسب الفرع</div>${branchRows}
+      <div class="li-sub" style="margin-top:10px;font-weight:800;color:var(--text)">حسب المنطقة (المدينة)</div>${cityRows}
+      <button class="btn sm danger" id="visits_reset" style="margin-top:10px">↺ تصفير إحصاء الزيارات</button>
+      <p class="muted" style="font-size:.78rem;margin-top:6px">تُحتسب الزيارة عند دخول زائر مُتحقَّق باسمه (يُنسب لفرعه ومدينته).</p></div>
     <div class="card"><h3>📝 نص الرئيسية ${hintBtn('banner')}</h3>
       <p class="muted" style="font-size:.85rem;margin-top:-2px">يظهر أعلى الصفحة الرئيسية للجميع.</p>
       ${fTextarea('النص', 'tx_banner', bannerText)}
@@ -2828,6 +2843,11 @@ function screenTexts() {
         <span class="n-died">${esc(statLabels.dead)}</span>
         <span class="n-noissue">${esc(statLabels.noissue)}</span>
       </div></div>`;
+  { const rb = document.getElementById('visits_reset'); if (rb) rb.addEventListener('click', async () => {
+    if (!(await confirm2('تصفير إحصاء الزيارات بالكامل؟ يبدأ العدّ من جديد.', { title: 'تصفير الزيارات', okText: 'تصفير', danger: true }))) return;
+    const ok = await guard(async () => { const { error } = await sb.from('almfrje_settings').upsert({ key: 'visit_stats', value: { total: 0, byBranch: {}, byCity: {}, updated_at: new Date().toISOString() }, updated_at: new Date().toISOString() }, { onConflict: 'key' }); if (error) throw error; });
+    if (ok) { visitStats = { total: 0, byBranch: {}, byCity: {} }; toast('تم تصفير الزيارات'); screenTexts(); }
+  }); }
   document.getElementById('tx_bannerSave').addEventListener('click', async () => {
     const txt = val('tx_banner').trim();
     const ok = await guard(async () => { const { error } = await sb.from('almfrje_settings').upsert({ key: 'banner_text', value: txt, updated_at: new Date().toISOString() }, { onConflict: 'key' }); if (error) throw error; });

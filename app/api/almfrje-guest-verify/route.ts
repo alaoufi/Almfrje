@@ -15,6 +15,23 @@ function normGen(s: string): string {
   return parts.join('').replace(/ال/g, '').toLowerCase();
 }
 
+// تسجيل زيارة زائر مُتحقَّق: عدّاد إجمالي + تفصيل حسب الفرع والمنطقة (المدينة) — في الإعدادات.
+async function bumpVisit(admin: ReturnType<typeof createClient>, branchId: number | null, city: string | null) {
+  try {
+    const { data } = await admin.from('almfrje_settings').select('value').eq('key', 'visit_stats').maybeSingle();
+    const v: { total: number; byBranch: Record<string, number>; byCity: Record<string, number>; updated_at?: string } =
+      (data && data.value && typeof data.value === 'object') ? data.value as never : { total: 0, byBranch: {}, byCity: {} };
+    v.total = (v.total || 0) + 1;
+    v.byBranch = v.byBranch || {};
+    if (branchId != null) v.byBranch[String(branchId)] = (v.byBranch[String(branchId)] || 0) + 1;
+    v.byCity = v.byCity || {};
+    const c = (city || '').trim();
+    if (c) v.byCity[c] = (v.byCity[c] || 0) + 1;
+    v.updated_at = new Date().toISOString();
+    await admin.from('almfrje_settings').upsert({ key: 'visit_stats', value: v, updated_at: new Date().toISOString() }, { onConflict: 'key' });
+  } catch { /* أفضل جهد */ }
+}
+
 export async function POST(request: NextRequest) {
   const url = process.env.ALMFRJE_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
   const service = process.env.ALMFRJE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -39,10 +56,10 @@ export async function POST(request: NextRequest) {
   if (names.length < 3) return NextResponse.json({ ok: false, error: 'اكتب اسمك ثم أباك ثم جدّك (٣ أسماء على الأقل بالترتيب)' });
 
   // تحميل الأشخاص (صفحات)
-  type P = { id: number; name: string; father_id: number | null; status: string };
+  type P = { id: number; name: string; father_id: number | null; status: string; branch_id: number | null; city: string | null };
   const persons: P[] = [];
   for (let from = 0; from < 50000; from += 1000) {
-    const { data, error } = await admin.from('almfrje_persons').select('id,name,father_id,status').range(from, from + 999);
+    const { data, error } = await admin.from('almfrje_persons').select('id,name,father_id,status,branch_id,city').range(from, from + 999);
     if (error) break;
     persons.push(...((data || []) as P[]));
     if (!data || data.length < 1000) break;
@@ -72,7 +89,10 @@ export async function POST(request: NextRequest) {
   // المطابقون الأحياء فقط (الاسم الأول شرط أن يكون من الأحياء — المتوفّى مستثنى).
   const liveMatches = persons.filter((p) => p.status !== 'dead' && matchSubseq(lineageWords(p.id)));
   // التفرّد: يدخل فقط إن طابق شخصاً حيّاً واحداً تماماً.
-  if (liveMatches.length === 1) return NextResponse.json({ ok: true });
+  if (liveMatches.length === 1) {
+    await bumpVisit(admin, liveMatches[0].branch_id, liveMatches[0].city);
+    return NextResponse.json({ ok: true });
+  }
   if (liveMatches.length > 1) {
     return NextResponse.json({ ok: false, error: 'اسمك يطابق أكثر من شخص حيّ — أضِف اسم جدٍّ آخر للتمييز.' });
   }
