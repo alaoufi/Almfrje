@@ -26,7 +26,7 @@ function legendHtml() {
     </div></div>`;
 }
 const WORK = [{ k: '', ar: 'لم تحدد' }, { k: 'employee', ar: 'موظف' }, { k: 'retired', ar: 'متقاعد' }];
-const ROLES = [{ k: 'admin', ar: 'مدير النظام' }, { k: 'branch_manager', ar: 'مسؤول فرع' }, { k: 'viewer', ar: 'زائر' }];
+const ROLES = [{ k: 'admin', ar: 'مدير النظام' }, { k: 'branch_manager', ar: 'مشرف فرع' }, { k: 'viewer', ar: 'زائر' }];
 // مسمّيات الحالة (تظهر في تعريف الألوان أسفل الرئيسية) — قابلة للتعديل من لوحة التحكم ← النصوص.
 const LABELS_DEFAULT = { alive: 'موجود', dead: 'متوفّى', noissue: 'توفي ولم يعقب' };
 let statLabels = { ...LABELS_DEFAULT };
@@ -107,13 +107,13 @@ const HINTS = {
   descendants: ['فهرس الذرية', 'قائمة مرقّمة بكل ذرية الشخص (نظام أنساب: ١، ١-١، ١-١-١…).\nمنها تصدّر Excel ملوّن أو PDF أو نص.'],
   // ——— إضافة وتعديل ———
   add_person: ['إضافة مولود', 'الخطوات:\n١) اختر الأب من الشجرة.\n٢) اكتب اسم المولود.\n٣) (اختياري) أضف بقية البيانات.\n٤) اضغط «إضافة المولود».\n\nيُحدَّد الفرع تلقائياً من فرع الأب.'],
-  add_father: ['الأب المباشر', 'اضغط «اختيار الأب» وابحث عن والد المولود.\nيُحدَّد فرع المولود تلقائياً من فرع أبيه.\n\nمسؤول الفرع يختار أباً ضمن فرعه فقط.'],
+  add_father: ['الأب المباشر', 'اضغط «اختيار الأب» وابحث عن والد المولود.\nيُحدَّد فرع المولود تلقائياً من فرع أبيه.\n\nمشرف الفرع يختار أباً ضمن فرعه فقط.'],
   add_status: ['الحالة', 'حي أو متوفى.\nتظهر شارة «متوفى» فقط لمن حالته متوفى.'],
   add_work: ['الحالة الوظيفية', 'اختياري:\nلم تحدد (الافتراضي) / موظف / متقاعد.'],
   edit_lock: ['تعديل البيانات', 'يمكنك تعديل بيانات الشخص.\nحذف الأسماء متاح لمدير النظام فقط (مع تأكيد)، وتُحفظ نسخة في سلة المحذوفات للتراجع.'],
   // ——— الأدوات ———
   bulk: ['التعديل الجماعي', 'لتعديل عدّة أشخاص دفعة واحدة:\n١) حدّد المجموعة (الجيل أو ضمن جدّ).\n٢) اختر الحقل (الحالة/المدينة…) وقيمته.\n٣) تظهر الأسماء كلها مؤشّرة — أزل تأشير من لا تريد.\n٤) طبّق على المحدّدين.\n\nملاحظة: عند تعديل الجوال أو الحالة الوظيفية أو المدينة أو سنة الميلاد، تظهر أسماء المتوفّين بلا إمكان اختيار لأنها لا تخصّهم.'],
-  grid: ['تعديل البيانات بالقائمة', 'لتعديل بيانات كل فرد على حدة ضمن جدٍّ واحد:\n١) اختر الجدّ — تظهر ذرّيته من الأحياء فقط.\n٢) أشّر الحقول التي تريد تعديلها (الحالة/المدينة/الجوال…).\n٣) عدّل قيمة كل فرد في القائمة، ثم «حفظ التعديلات».\n\nيُسجَّل من قام بالتعديل، ويمكن التراجع من سجل التعديلات. مسؤول الفرع يعدّل ضمن فرعه فقط.'],
+  grid: ['تعديل البيانات بالقائمة', 'لتعديل بيانات كل فرد على حدة ضمن جدٍّ واحد:\n١) اختر الجدّ — تظهر ذرّيته من الأحياء فقط.\n٢) أشّر الحقول التي تريد تعديلها (الحالة/المدينة/الجوال…).\n٣) عدّل قيمة كل فرد في القائمة، ثم «حفظ التعديلات».\n\nيُسجَّل من قام بالتعديل، ويمكن التراجع من سجل التعديلات. مشرف الفرع يعدّل ضمن فرعه فقط.'],
   review: ['مراجعة البيانات', 'عرض للمراجعة فقط (دون تعديل) لبيانات الأحياء ضمن جدٍّ تختاره، مع إظهار آخر من عدّل كل حقل ومتى — لمراجعة دقّة البيانات.'],
   import: ['استيراد Excel', 'لإدخال الشجرة كاملة من ملف Excel مرة واحدة:\nكل عمود = جيل (العمود الأقصى يميناً = الأصل).\nالأسماء المتتالية في نفس العمود = إخوة.\n\nيتجاهل جدول الإحصائيات في نهاية الملف تلقائياً. راجع المعاينة قبل التنفيذ.'],
   branches: ['الفروع', 'الفرع = جدّ معيّن وكل ذريّته، له مشرف أو أكثر.\nالمدير يعيّن أي جدّ كفرع ويحدّد مشرفيه.\nكل مشرف يرى ويضيف في فرعه فقط.'],
@@ -125,10 +125,10 @@ const HINTS = {
   export: ['التصدير', 'نزّل البيانات كملف:\n• Excel ملوّن منسّق.\n• CSV للجداول.\n• PDF للطباعة.'],
   // ——— المستخدمون والصلاحيات ———
   members: ['المستخدمون والصلاحيات', 'إدارة الحسابات: تفعيل/إيقاف، تحديد الدور والفروع، وتعديل البيانات.\nمن هنا أيضاً تتحكّم في فتح الموقع للعموم ونص الرئيسية.'],
-  add_user: ['إضافة مستخدم', 'أنشئ حساباً جديداً:\nالاسم + الجوال + رقم سري.\nثم اختر الدور (مدير/مسؤول فرع/زائر) والفروع.\nيُفعّل مباشرةً.'],
+  add_user: ['إضافة مستخدم', 'أنشئ حساباً جديداً:\nالاسم + الجوال + رقم سري.\nثم اختر الدور (مدير/مشرف فرع/زائر) والفروع.\nيُفعّل مباشرةً.'],
   control_panel: ['لوحة التحكم', 'كل وظائف مدير النظام في مكان واحد بتبويبات:\nالمستخدمون والصلاحيات • النصوص (نص الرئيسية وتعريف الألوان) • التعليمات • سجل التعديلات • سلة المحذوفات • النسخ والتصدير.'],
   guest_browse: ['فتح الموقع للزوّار', 'مفتوح = يدخل أي زائر مباشرةً للتصفّح (قراءة فقط) دون شاشة دخول.\nمغلق = تظهر شاشة الدخول للجميع.\n\nالزائر لا يضيف ولا يعدّل ولا يحذف، وتقدر تحدّد ما يُخفى عنه (الجوال، الصور والمستندات، الملاحظات والحالة الوظيفية).\n\nدخول المدير/المشرف دائماً عبر الرابط: #login'],
-  member_role: ['الأدوار', 'مدير النظام: صلاحية كاملة على كل شيء.\nمسؤول فرع: يضيف ويعدّل في فروعه فقط.\nزائر: يتصفّح ويبحث فقط.'],
+  member_role: ['الأدوار', 'مدير النظام: صلاحية كاملة على كل شيء.\nمشرف فرع: يضيف ويعدّل في فروعه فقط.\nزائر: يتصفّح ويبحث فقط.'],
   member_edit: ['تعديل بيانات المستخدم', 'عدّل اسم المستخدم أو جواله أو كلمة مروره.\nيعمل لأي حساب بما فيهم المدير.'],
   profile: ['ملفي الشخصي', 'عدّل اسمك وجوالك وكلمة مرورك.\n⚠️ تغيير الجوال يعني الدخول لاحقاً بالرقم الجديد — احفظه.'],
   banner: ['نص الرئيسية', 'النص الذي يظهر أعلى الصفحة الرئيسية لكل المستخدمين (مثل تعريف القبيلة).'],
@@ -269,10 +269,10 @@ function sameNameSiblings(father, name, excludeId) {
 }
 // الأدوار:
 //  • مدير النظام: صلاحيات مفتوحة كاملة (بلا تحديد).
-//  • مسؤول فرع: الإضافة والتعديل ضمن فروعه/جدّه المصرّح له بها فقط (لا يتجاوزها).
+//  • مشرف فرع: الإضافة والتعديل ضمن فروعه/جدّه المصرّح له بها فقط (لا يتجاوزها).
 //  • زائر: تصفّح فقط.
-function canAddBirth() { return isAdmin() || isManager(); }   // مسؤول الفرع يضيف في فروعه
-// هل يجوز إضافة ابن لهذا الشخص تحديداً؟ لا للمتوفى، ولمسؤول الفرع ضمن فرعه فقط.
+function canAddBirth() { return isAdmin() || isManager(); }   // مشرف الفرع يضيف في فروعه
+// هل يجوز إضافة ابن لهذا الشخص تحديداً؟ لا للمتوفى، ولمشرف الفرع ضمن فرعه فقط.
 function canAddChildTo(p) {
   if (!p) return false;
   if (p.status === 'dead') return false;       // المتوفى لا يُضاف له أبناء
@@ -1521,7 +1521,7 @@ async function abwConfirmSave() {
 }
 async function saveBirth(name) {
   const father = editFather;
-  // حارس صلاحية صارم لمسؤول الفرع: يجب وجود أب ضمن فرعه المصرّح به فقط
+  // حارس صلاحية صارم لمشرف الفرع: يجب وجود أب ضمن فرعه المصرّح به فقط
   if (!isAdmin()) {
     if (!isManager()) { toast('ليست لديك صلاحية الإضافة'); return; }
     if (!father) { toast('اختر الأب أولاً'); return; }
@@ -1548,7 +1548,7 @@ async function savePerson(id, existing) {
   const name = val('p_name').trim();
   if (!name) { toast('أدخل اسم المولود'); return; }
   const father = editFather;
-  // مسؤول الفرع لا ينشئ أصلاً بلا أب — يجب اختيار والد ضمن فرعه
+  // مشرف الفرع لا ينشئ أصلاً بلا أب — يجب اختيار والد ضمن فرعه
   if (!existing && !father && !isAdmin()) { toast('اختر الأب أولاً (يجب أن يكون ضمن فرعك)'); return; }
   if (!existing && father && isManager() && !inMyBranch(father)) { toast('الأب المختار خارج فرعك المصرّح به'); return; }
   // تكرار الاسم لنفس الأب: يُمنع فقط إن غيّرت الاسم وتعارض مع أخٍ **حيّ**.
@@ -1557,7 +1557,7 @@ async function savePerson(id, existing) {
   if (nameChanged && sameNameSiblings(father, name, existing ? existing.id : undefined).some(c => c.status !== 'dead')) { toast('يوجد ابن حيّ بنفس الاسم لنفس الأب — اختر اسماً مختلفاً'); return; }
   const generation = father ? (father.generation + 1) : 1;
   // الفرع: يرث فرع الأب؛ إن كان الأب هو الأصل (جيل 1) فالفرع يُحدَّد لاحقاً من الإدارة.
-  // مسؤول الفرع يضيف ضمن فروعه فقط — يرث الفرع من الأب (المقيَّد أصلاً باختيار أب من فرعه).
+  // مشرف الفرع يضيف ضمن فروعه فقط — يرث الفرع من الأب (المقيَّد أصلاً باختيار أب من فرعه).
   let branch_id = father ? (father.generation === 1 ? (father.branch_id || null) : father.branch_id) : null;
   if (isManager() && branch_id == null) branch_id = myBranch();
   const photofile = document.getElementById('p_photofile').files[0];
@@ -1877,7 +1877,7 @@ async function sendFeedback() {
     const bname = document.getElementById('fb_baby_name') ? val('fb_baby_name').trim() : '';
     if (!bname) { toast('اكتب اسم المولود (إجباري)'); return; }
     branch_id = fbFather.branch_id || null;
-    // بيانات مهيكلة ليوافق عليها المدير/مسؤول الفرع لاحقاً
+    // بيانات مهيكلة ليوافق عليها المدير/مشرف الفرع لاحقاً
     fullDetails = JSON.stringify({
       kind: 'newborn', father_id: fbFather.id, father: lineageShort(fbFather.id, 12), name: bname,
       birth: document.getElementById('fb_baby_birth') ? val('fb_baby_birth').trim() : '',
@@ -1962,7 +1962,7 @@ async function screenFeedbacks() {
   view().querySelectorAll('[data-nbok]').forEach(b => b.addEventListener('click', () => approveNewborn(list.find(x => String(x.id) === b.dataset.nbok))));
   view().querySelectorAll('[data-nbno]').forEach(b => b.addEventListener('click', () => rejectNewborn(list.find(x => String(x.id) === b.dataset.nbno))));
 }
-// موافقة المدير/مسؤول الفرع على طلب إضافة مولود → يُضاف فعلياً للشجرة.
+// موافقة المدير/مشرف الفرع على طلب إضافة مولود → يُضاف فعلياً للشجرة.
 async function approveNewborn(f) {
   const o = parseNewborn(f); if (!o) { toast('بيانات الطلب غير صالحة'); return; }
   const father = byId.get(o.father_id);
@@ -2021,7 +2021,7 @@ function screenMore() {
   const acct = [];
   if (!isGuestUser()) acct.push(['👤 ملفي الشخصي (الجوال/كلمة المرور)', '#/profile', 'profile']);
   if (!alreadyInstalled()) acct.push(['📌 إضافة اختصار الموقع إلى الشاشة', '#install']);
-  if (isGuestUser()) acct.push(['🔐 دخول المسؤول / مسؤول الفرع', '#adminlogin']);
+  if (isGuestUser()) acct.push(['🔐 دخول المسؤول / مشرف الفرع', '#adminlogin']);
   if (acct.length) groups.push(['👤 حسابي', acct]);
 
   view().innerHTML = groups.map(([title, items]) => `
@@ -2441,7 +2441,7 @@ function screenBulkEdit() {
   }
   refresh();
 }
-// نافذة اختيار جدّ هرمية: المدير يبدأ من الأصول (فراج/مفرج)، ومسؤول الفرع من فرعه
+// نافذة اختيار جدّ هرمية: المدير يبدأ من الأصول (فراج/مفرج)، ومشرف الفرع من فرعه
 // (الجيل الثاني). تتنقّل بالضغط على الاسم للدخول لأبنائه، مع زر «اختيار» لكل اسم.
 let _ancNav = null;   // الشخص المعروض حالياً (null = القمة)
 function pickAncestorModal(onPick) {
@@ -2604,7 +2604,7 @@ function fieldEditorNote(p, k) {
 function gridPool() {
   if (!gridAncestor) return [];
   let pool = descendants(gridAncestor.id).filter(p => p.status !== 'dead');   // الأحياء فقط
-  if (!isAdmin() && isManager()) pool = pool.filter(p => inMyBranch(p));        // مسؤول الفرع: نطاقه
+  if (!isAdmin() && isManager()) pool = pool.filter(p => inMyBranch(p));        // مشرف الفرع: نطاقه
   pool.sort((a, b) => (a.generation - b.generation) || (a.sort - b.sort) || (a.id - b.id));
   return pool;
 }
@@ -2849,7 +2849,7 @@ function screenTexts() {
 /* ===== سجل التعديلات (من أضاف/عدّل/حذف الأسماء) ===== */
 async function screenAudit() {
   if (!isAdmin() && !isManager()) { view().innerHTML = noPerm(); return; }
-  const mine = !isAdmin();   // مسؤول الفرع يرى أفعاله فقط (تقييد على الخادم أيضاً)
+  const mine = !isAdmin();   // مشرف الفرع يرى أفعاله فقط (تقييد على الخادم أيضاً)
   showLoading(true);
   let list = [];
   try {
@@ -3151,7 +3151,7 @@ function memberCardBody(m) {
     <div class="field" style="margin-top:8px"><label>الدور</label><select data-role="${m.user_id}">${roleOpts}</select></div>
     <div class="perm-note" data-rolehint="${m.user_id}" style="margin:-4px 0 8px">${ROLE_HINT[m.role] || ''}</div>
     <div class="perm-box" data-branchbox="${m.user_id}" style="${showBranches ? '' : 'display:none'}">
-      <div class="perm-title">الفروع المسؤول عنها:</div>
+      <div class="perm-title">الفروع التي يشرف عليها:</div>
       ${branchChks}
     </div>
     <div class="btn-row">
@@ -3243,7 +3243,7 @@ function addUserModal() {
     ${pinField('الرقم السري (٤ أرقام فأكثر)', 'nu_pin')}
     <div class="field"><label>الدور</label><select id="nu_role">${roleOpts}</select></div>
     <div id="nu_mgrbox">
-      <div class="perm-box"><div class="perm-title">الفروع المسؤول عنها (يضيف فيها فقط):</div>${branchChks}</div>
+      <div class="perm-box"><div class="perm-title">الفروع التي يشرف عليها (يضيف فيها فقط):</div>${branchChks}</div>
     </div>
     <div id="nu_rolenote" class="muted" style="font-size:.85rem;margin:6px 0"></div>
     <button class="btn" id="nu_save">إنشاء الحساب وتفعيله</button>`, () => {
@@ -3501,7 +3501,7 @@ function renderAuth() {
   }
   // ===== واجهة المسؤول/المشرف =====
   box.innerHTML = `<div class="auth-box">
-    <div class="logo">🌳</div><h2>المفارجة</h2><div class="sub">دخول المسؤول / مسؤول الفرع</div>
+    <div class="logo">🌳</div><h2>المفارجة</h2><div class="sub">دخول المسؤول / مشرف الفرع</div>
     ${fInput('الجوال أو اسم المستخدم', 'a_id', '')}
     ${pinField('الرقم السري', 'a_pin')}
     <button class="btn" id="a_submit">تسجيل الدخول</button>
