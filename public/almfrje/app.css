@@ -209,7 +209,7 @@ html[data-theme="dark"] .badge.off { background:#333; color:#aaa; }
 .auth { min-height:100vh; display:flex; align-items:center; justify-content:center; padding:20px; background:linear-gradient(160deg,var(--brand),var(--brand-d)); }
 .auth-box { background:var(--card); color:var(--text); border-radius:20px; box-shadow:0 8px 30px rgba(0,0,0,.3); padding:26px; width:100%; max-width:380px; }
 .auth-box .logo { text-align:center; font-size:2.2rem; }
-.auth-box h2 { text-align:center; color:var(--brand); margin:6px 0 2px; }
+.auth-box h2 { text-align:center; color:var(--brand); margin:6px 0 2px; white-space:nowrap; font-size:clamp(.95rem, 4.6vw, 1.3rem); }
 .auth-box .sub { text-align:center; color:var(--muted); margin-bottom:16px; font-size:.9rem; }
 .auth-msg { text-align:center; font-size:.9rem; margin-top:10px; min-height:1.2em; }
 .auth-guest-link { display:block; width:100%; margin-top:14px; background:none; border:0; color:var(--brand); font:inherit; font-weight:700; font-size:.9rem; cursor:pointer; text-align:center; }
