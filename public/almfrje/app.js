@@ -3657,10 +3657,34 @@ function clientId() {
   try { let c = localStorage.getItem('almfrje_cid'); if (!c) { c = Math.random().toString(36).slice(2) + Date.now().toString(36); localStorage.setItem('almfrje_cid', c); } return c; }
   catch (e) { return 'anon' + Math.random().toString(36).slice(2); }
 }
+// كل من يدخل يُنسب لفرعه (مدير/مشرف/زائر) — الأصل ألّا يتواجد أحد بلا فرع.
+let _myBranchCache;
 function myPresenceBranch() {
-  if (isAdmin()) return null;                       // المدير لا يُنسب لفرع
-  if (isManager()) { const b = myBranches(); return b.length ? b[0] : null; }
-  try { const v = parseInt(sessionStorage.getItem('almfrje_guest_branch') || '0', 10); return v || null; } catch (e) { return null; }
+  // الزائر: فرعه المُتحقَّق عند الدخول (الأدقّ والأسرع).
+  try { const v = parseInt(sessionStorage.getItem('almfrje_guest_branch') || '0', 10); if (v) return v; } catch (e) { /* */ }
+  if (_myBranchCache !== undefined) return _myBranchCache;
+  let b = null;
+  try {
+    // ١) شخص مرتبط يدوياً (ملفي الشخصي ← بياناتي في الشجرة).
+    if (me && me.user_id) {
+      const pid = parseInt(localStorage.getItem('almfrje_me_person_' + me.user_id) || '0', 10);
+      if (pid) { const p = byId.get(pid); if (p && p.branch_id != null) b = p.branch_id; }
+    }
+    // ٢) مطابقة بالجوال (جوال الحساب = جوال شخصه في الشجرة).
+    if (b == null && me && me.phone) {
+      const mp = normPhone(me.phone);
+      if (mp) { const hit = C.persons.find(p => p.phone && normPhone(p.phone) === mp); if (hit && hit.branch_id != null) b = hit.branch_id; }
+    }
+    // ٣) مطابقة باسمه الكامل (نسبه) عند التفرّد.
+    if (b == null && me && me.full_name) {
+      const matches = C.persons.filter(p => nameMatch(p, me.full_name));
+      if (matches.length === 1 && matches[0].branch_id != null) b = matches[0].branch_id;
+    }
+    // ٤) المشرف: أول فرع يُشرف عليه.
+    if (b == null && isManager()) { const mb = myBranches(); if (mb.length) b = mb[0]; }
+  } catch (e) { /* أفضل جهد */ }
+  _myBranchCache = b;
+  return b;
 }
 // مربّع «المتواجدون الآن» (الرئيسية): عريض، يحتوي على المتواجدين حسب الفروع.
 function onlineHomeHtml() {
@@ -3696,10 +3720,11 @@ async function pingPresence(first) {
 }
 function startPresence() {
   if (_presenceTimer) clearInterval(_presenceTimer);
+  _myBranchCache = undefined;   // أعِد حساب فرع المستخدم الحالي
   pingPresence(true);
   _presenceTimer = setInterval(() => { if (document.visibilityState !== 'hidden') pingPresence(false); }, 60000);
 }
-function stopPresence() { if (_presenceTimer) { clearInterval(_presenceTimer); _presenceTimer = null; } }
+function stopPresence() { if (_presenceTimer) { clearInterval(_presenceTimer); _presenceTimer = null; } _myBranchCache = undefined; }
 async function enterApp(session) {
   document.getElementById('auth').classList.add('hidden');
   document.getElementById('app').classList.remove('hidden');
