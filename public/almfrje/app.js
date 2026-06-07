@@ -3611,6 +3611,9 @@ async function init() {
   // TOKEN_REFRESHED تتكرر (خصوصاً على الجوال عند فتح منتقي الملفات والرجوع)،
   // وإعادة الرسم معها كانت تمسح حقل الملف المختار. نتجاهلها هنا.
   sb.auth.onAuthStateChange((event, session) => {
+    // الحدث الأولي يُعالَج لاحقاً بعد تحميل الإعدادات (getSession أدناه) — تجاهله هنا
+    // لتفادي رسمٍ مبكّر بحالةٍ افتراضية (وميض شاشة دخول الإدارة/صلاحيات قبل ضبط الدور).
+    if (event === 'INITIAL_SESSION') return;
     const uid = session && session.user ? session.user.id : null;
     if (uid) {
       if (uid !== _authUid) { _authUid = uid; enterApp(session); }
