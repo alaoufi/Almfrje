@@ -91,12 +91,13 @@ export async function POST(request: NextRequest) {
   // التفرّد: يدخل فقط إن طابق شخصاً حيّاً واحداً تماماً.
   if (liveMatches.length === 1) {
     await bumpVisit(admin, liveMatches[0].branch_id, liveMatches[0].city);
-    // الاسم الكامل (رباعي) من قاعدة البيانات: هو ثم آباؤه حتى أربعة أسماء — لأنه معروف وغير مكرّر.
+    // الاسم الكامل (رباعي) من قاعدة البيانات: هو ثم آباؤه حتى أربعة أسماء، مفصولة بـ«بن» —
+    // لأنه معروفٌ وغير مكرّر. مثال: «محمد بن شامان بن الحميدي بن محمد».
     const fullName = (() => {
       const out: string[] = [];
       let cur: number | null = liveMatches[0].id; let guard = 0;
       while (cur != null && out.length < 4 && guard++ < 20) { const p = byId.get(cur); if (!p) break; out.push(p.name); cur = p.father_id; }
-      return out.join(' ');
+      return out.join(' بن ');
     })();
     return NextResponse.json({ ok: true, branch: liveMatches[0].branch_id, name: fullName });
   }
