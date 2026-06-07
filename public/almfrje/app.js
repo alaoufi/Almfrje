@@ -1924,7 +1924,8 @@ async function screenFeedbacks() {
         ? `<div class="li-sub" style="margin-top:4px">👶 المولود: <b>${esc(nb.name)}</b></div>
            <div class="li-sub">الأب: ${esc(nb.father || '')}</div>
            ${nb.birth ? `<div class="li-sub">سنة الولادة: ${esc(nb.birth)}</div>` : ''}
-           ${nb.city ? `<div class="li-sub">المدينة: ${esc(nb.city)}</div>` : ''}`
+           ${nb.city ? `<div class="li-sub">المدينة: ${esc(nb.city)}</div>` : ''}
+           ${f.status !== 'done' ? `<div style="margin-top:8px;padding:8px 10px;border:1px solid var(--danger);border-radius:8px;color:var(--danger);font-weight:700;font-size:.85rem;line-height:1.7">⚠️ تأكّد من الاسم وأبيه وجدّه — اسأل وتأكّد قبل الإضافة.</div>` : ''}`
         : `${f.details ? `<div class="li-sub" style="margin-top:4px;white-space:pre-wrap">${esc(f.details)}</div>` : ''}`;
       const actions = nb
         ? (f.status !== 'done'
