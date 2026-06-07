@@ -646,7 +646,7 @@ function branchGroupsHtml() {
   return arr.map(g => {
     const head = g.root ? esc(g.root.name) : 'فروع';
     const items = g.items.sort((x, y) => y.n - x.n)
-      .map(x => row(`<a href="#/branch/${x.b.id}" style="color:var(--brand);text-decoration:none">${esc(x.b.name)}</a>`, x.n + ' فرد')).join('');
+      .map(x => row(`<a href="#/branch/${x.b.id}" style="color:var(--brand);text-decoration:none">${esc(x.b.name)}</a><span class="br-online" data-bid="${x.b.id}"></span>`, x.n + ' فرد')).join('');
     return `<div class="card"><h3>${head} <span class="muted" style="font-weight:normal;font-size:.8rem">(${g.items.length} فروع • ${g.total} فرد)</span></h3>${items}</div>`;
   }).join('');
 }
@@ -3764,6 +3764,11 @@ function updateOnlineDom() {
   const tl = document.getElementById('visitsTotal'); if (tl) tl.textContent = visitStats.total || 0;
   // الرئيسية: المتواجدون الآن حسب الفرع (يظهر الموجود فقط)
   const oh = document.getElementById('onlineHome'); if (oh) oh.innerHTML = onlineHomeHtml();
+  // شارة المتواجدين أمام كل فرع في قائمة الفروع بالرئيسية
+  document.querySelectorAll('.br-online[data-bid]').forEach(el => {
+    const n = (onlineByBranch && onlineByBranch[el.dataset.bid]) || 0;
+    el.textContent = n > 0 ? '🟢 ' + n : '';
+  });
   // بطاقة الإحصائيات في الإعدادات (إن كانت معروضة)
   const els = document.getElementById('onlineNowSt'); if (els) els.textContent = onlineNow;
   const tls = document.getElementById('visitsTotalSt'); if (tls) tls.textContent = visitStats.total || 0;
