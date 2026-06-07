@@ -1002,8 +1002,10 @@ function screenDescendants(arg) {
     const kidsN = childCount.get(x.id) || 0;
     const descN = descCount.get(x.id) || 0;
     const isRoot = depth === 0;
-    return `<div class="idx-row${isRoot ? ' idx-root' : ''}" style="padding-right:${depth * 16}px">
-      <span class="idx-num">${numStr(num)}</span>
+    const isParent = kidsN > 0;
+    const pad = Math.min(depth, 8) * 14;   // إزاحة متدرّجة بحدّ أقصى تمنع التداخل في الأجيال العميقة
+    return `<div class="idx-row${isRoot ? ' idx-root' : ''}${isParent ? ' idx-parent' : ''}" style="padding-inline-start:${pad}px">
+      <span class="idx-num" dir="ltr">${numStr(num)}</span>
       <a href="#/person/${x.id}" class="idx-name ${nameCls(x)}"${nameTitle(x)}>${esc(x.name)}</a>${statusTag(x)}
       ${kidsN ? `<span class="idx-meta">${kidsN} ابن • ${descN} ذرية</span>` : ''}
     </div>`;

@@ -190,20 +190,25 @@ html[data-theme="dark"] .badge.off { background:#333; color:#aaa; }
 /* ===== الفهرس النَّسَبي الاحترافي ===== */
 .idx-card .idx-list { margin-top: 4px; }
 .idx-row {
-  display: flex; align-items: center; gap: 8px;
-  padding: 5px 0; border-bottom: 1px dotted var(--line, #e3e3ef);
+  display: flex; align-items: center; flex-wrap: wrap; gap: 3px 8px;
+  padding: 6px 0; border-bottom: 1px dotted var(--line, #e3e3ef);
   font-size: .95rem;
+  border-inline-start: 3px solid transparent;
 }
-.idx-row.idx-root { font-weight: 700; font-size: 1.05rem; border-bottom: 2px solid var(--brand); padding-bottom: 7px; }
+/* صفوف الآباء (لها ذرية) تُبرز بخلفية خفيفة وحدّ ملوّن لتوضيح التسلسل */
+.idx-row.idx-parent { background: color-mix(in srgb, var(--brand) 5%, transparent); border-inline-start-color: color-mix(in srgb, var(--brand) 35%, transparent); border-radius: 0 6px 6px 0; }
+.idx-row.idx-root { font-weight: 700; font-size: 1.05rem; border-bottom: 2px solid var(--brand); padding-bottom: 7px; background: none; border-inline-start-color: transparent; }
 .idx-num {
+  flex: 0 0 auto;
+  direction: ltr; unicode-bidi: isolate;            /* يمنع تداخل الأرقام مع الاسم في RTL */
   font-family: ui-monospace, monospace; color: var(--brand);
   background: var(--brand-soft, #eef0ff); border-radius: 6px;
-  padding: 1px 7px; font-size: .8rem; white-space: nowrap; min-width: 34px; text-align: center;
+  padding: 1px 7px; font-size: .78rem; white-space: nowrap; text-align: center;
 }
-.idx-name { color: inherit; text-decoration: none; font-weight: 600; }
+.idx-name { flex: 0 1 auto; min-width: 0; color: inherit; text-decoration: none; font-weight: 700; word-break: break-word; }
 .idx-name:hover { color: var(--brand); text-decoration: underline; }
 .idx-tag { color: #888; font-size: .85em; }
-.idx-meta { color: #999; font-size: .78rem; margin-right: auto; white-space: nowrap; }
+.idx-meta { flex: 0 0 auto; margin-inline-start: auto; color: #888; font-size: .76rem; white-space: nowrap; }
 [data-theme="dark"] .idx-num { background: #2a2c44; }
 [data-theme="dark"] .idx-row { border-color: #333; }
 
