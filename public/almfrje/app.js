@@ -3041,7 +3041,8 @@ function screenProfile() {
       ${pinField('الرقم السري الجديد', 'pf_pin')}
       ${pinField('تأكيد الرقم السري', 'pf_pin2')}
       <button class="btn" id="pf_savePin">تغيير كلمة المرور</button>
-    </div>`;
+    </div>
+    ${(isAdmin() || isManager()) ? `<div class="card"><h3>بياناتي في الشجرة</h3><div id="pf_person"></div></div>` : ''}`;
   // إظهار/إخفاء حقول الـ PIN
   view().querySelectorAll('.eye').forEach(b => b.addEventListener('click', () => { const inp = document.getElementById(b.dataset.eye); const show = inp.type === 'password'; inp.type = show ? 'text' : 'password'; b.textContent = show ? '🙈' : '👁'; }));
 
@@ -3076,6 +3077,48 @@ function screenProfile() {
     });
     if (ok) { toast('تم تغيير كلمة المرور'); document.getElementById('pf_pin').value = ''; document.getElementById('pf_pin2').value = ''; markPwChanged(); }
   });
+
+  // ===== بياناتي في الشجرة: ربط الحساب بشخصه ثم تعديل (المدينة/الوظيفة/الجوال/سنة الميلاد) =====
+  const myPersonKey = 'almfrje_me_person_' + me.user_id;
+  const pickMine = () => pickPerson('اختر شخصك في الشجرة', (sel) => {
+    if (!sel) return;
+    if (!canEditPerson(sel)) { toast('اختر شخصاً ضمن صلاحيتك'); return; }
+    try { localStorage.setItem(myPersonKey, String(sel.id)); } catch (e) { /* */ }
+    renderMyPerson();
+  }, (x) => canEditPerson(x));
+  function renderMyPerson() {
+    const box = document.getElementById('pf_person'); if (!box) return;
+    let pid = 0; try { pid = parseInt(localStorage.getItem(myPersonKey) || '0', 10) || 0; } catch (e) { }
+    const p = pid && byId.get(pid);
+    if (!p) {
+      box.innerHTML = `<p class="muted" style="font-size:.85rem">اربط حسابك بشخصك في الشجرة لتعديل بياناتك (المدينة، الحالة الوظيفية، الجوال، سنة الميلاد).</p><button class="btn outline" id="mp_pick">🔍 اختر شخصك في الشجرة</button>`;
+      document.getElementById('mp_pick').addEventListener('click', pickMine);
+      return;
+    }
+    box.innerHTML = `
+      <div class="li-sub" style="margin-bottom:8px">👤 <b>${esc(p.name)}</b> — ${esc(lineageShort(p.id, 6))} <button class="btn sm outline" id="mp_change" style="margin-top:0;margin-inline-start:8px">تغيير الشخص</button></div>
+      <div class="grid2">
+        ${fInput('المدينة', 'mp_city', p.city || '')}
+        ${fSelect('الحالة الوظيفية', 'mp_work', WORK, p.work || '')}
+        ${fInput('الجوال', 'mp_phone', p.phone || '', 'tel', 'inputmode="tel"')}
+        ${fInput('سنة الميلاد', 'mp_birth', p.birth || '')}
+      </div>
+      <button class="btn" id="mp_save">حفظ بياناتي</button>`;
+    document.getElementById('mp_change').addEventListener('click', pickMine);
+    document.getElementById('mp_save').addEventListener('click', () => saveMyPerson(p.id));
+  }
+  async function saveMyPerson(pid) {
+    const p = byId.get(pid); if (!p) return;
+    if (!canEditPerson(p)) { toast('لا تملك صلاحية تعديل هذا الشخص'); return; }
+    const patch = { city: val('mp_city').trim(), work: val('mp_work'), phone: val('mp_phone').trim(), birth: val('mp_birth').trim(), updated_by_name: (me.full_name || me.username || ''), updated_at: new Date().toISOString() };
+    const prev = { city: p.city ?? null, work: p.work ?? null, phone: p.phone ?? null, birth: p.birth ?? null, updated_by_name: p.updated_by_name ?? null, updated_at: p.updated_at ?? null };
+    const ok = await guard(async () => {
+      const { error } = await sb.from('almfrje_persons').update(patch).eq('id', pid); if (error) throw error;
+      await auditLog('edit', pid, p.name, { kind: 'persons', items: [{ id: pid, prev }], label: p.name });
+    });
+    if (ok) { toast('تم حفظ بياناتك'); await loadAll(); screenProfile(); }
+  }
+  renderMyPerson();
 }
 
 /* ===== المستخدمون والصلاحيات ===== */
