@@ -1548,8 +1548,10 @@ async function savePerson(id, existing) {
   // مسؤول الفرع لا ينشئ أصلاً بلا أب — يجب اختيار والد ضمن فرعه
   if (!existing && !father && !isAdmin()) { toast('اختر الأب أولاً (يجب أن يكون ضمن فرعك)'); return; }
   if (!existing && father && isManager() && !inMyBranch(father)) { toast('الأب المختار خارج فرعك المصرّح به'); return; }
-  // لا اسمان متطابقان لنفس الأب (عند الإضافة أو إعادة التسمية) — نستثني الشخص نفسه
-  if (siblingNameExists(father, name, existing ? existing.id : undefined)) { toast('يوجد ابن بنفس الاسم لنفس الأب — اختر اسماً مختلفاً'); return; }
+  // تكرار الاسم لنفس الأب: يُمنع فقط إن غيّرت الاسم وتعارض مع أخٍ **حيّ**.
+  // (تغيير الحالة لمتوفّى دون تغيير الاسم لا يُفحص؛ والمتوفّى لا يُحسب تكراراً — يجوز تكرار اسم متوفّى.)
+  const nameChanged = !existing || normalizeAr(existing.name) !== normalizeAr(name);
+  if (nameChanged && sameNameSiblings(father, name, existing ? existing.id : undefined).some(c => c.status !== 'dead')) { toast('يوجد ابن حيّ بنفس الاسم لنفس الأب — اختر اسماً مختلفاً'); return; }
   const generation = father ? (father.generation + 1) : 1;
   // الفرع: يرث فرع الأب؛ إن كان الأب هو الأصل (جيل 1) فالفرع يُحدَّد لاحقاً من الإدارة.
   // مسؤول الفرع يضيف ضمن فروعه فقط — يرث الفرع من الأب (المقيَّد أصلاً باختيار أب من فرعه).
