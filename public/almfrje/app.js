@@ -2862,7 +2862,7 @@ async function screenAudit() {
   const actCls = { add: 'add', edit: '', delete: 'off' };
   view().innerHTML = adminTabBar('audit') + `
     <div class="muted" style="margin-bottom:8px">${mine ? 'سجلّ تعديلاتك أنت (ضمن فرعك)' : 'كل إضافة/تعديل/حذف على الأسماء مع من قام به'} (${list.length}). التعديلات قابلة للتراجع في أي وقت.</div>
-    ${isAdmin() && list.length ? `<button class="btn sm danger" id="audit_clear" style="margin-bottom:10px">🗑️ حذف كل السجل نهائياً</button>` : ''}
+    ${isAdmin() && list.length ? `<button class="btn sm danger" id="audit_clear" style="margin-bottom:10px">🧹 تصفير سجل التعديلات</button>` : ''}
     ${list.length ? list.map(a => {
       const canUndo = a.action === 'edit' && a.undo_data && a.undo_data.items && a.undo_data.items.length && !a.undone;
       return `<div class="card" style="padding:10px">
@@ -3308,16 +3308,27 @@ async function screenTrash() {
   try { const { data } = await sb.from('almfrje_trash').select('*').order('created_at', { ascending: false }); list = data || []; } catch (e) { toast('خطأ تحميل'); }
   showLoading(false);
   const actionAr = { delete: 'محذوف', edit: 'نسخة قبل تعديل' };
-  view().innerHTML = adminTabBar('trash') + `<div class="muted" style="margin-bottom:8px">العناصر المحذوفة والنُّسخ السابقة قابلة للاستعادة.</div>`
+  view().innerHTML = adminTabBar('trash') + `<div class="muted" style="margin-bottom:8px">نُسخ محفوظة قبل التعديل/الحذف — يمكن استعادتها. «حذف من السلة» يزيل النسخة المحفوظة فقط، ولا يحذف الاسم من الشجرة.</div>`
+    + (list.length ? `<button class="btn sm danger" id="trash_clear" style="margin-bottom:10px">🧹 تصفير سلة المحذوفات</button>` : '')
     + (list.length ? list.map(t => `<div class="card"><div class="li-title">${esc(t.label || t.tbl)}</div>
         <div class="li-sub"><span class="badge ${t.action === 'delete' ? 'off' : ''}">${actionAr[t.action] || t.action}</span> ${fmtDateTime(t.created_at)} • ${esc(t.actor_name || '')}</div>
-        <div class="btn-row" style="margin-top:6px"><button class="btn sm" data-rest="${t.id}">استعادة</button><button class="btn sm danger" data-perm="${t.id}">حذف نهائي</button></div></div>`).join('') : '<div class="center-empty">السلة فارغة.</div>');
+        <div class="btn-row" style="margin-top:6px"><button class="btn sm" data-rest="${t.id}">استعادة</button><button class="btn sm danger" data-perm="${t.id}">🗑️ حذف من السلة</button></div></div>`).join('') : '<div class="center-empty">السلة فارغة.</div>');
   view().querySelectorAll('[data-rest]').forEach(b => b.addEventListener('click', () => restoreTrash(list.find(x => String(x.id) === b.dataset.rest))));
   view().querySelectorAll('[data-perm]').forEach(b => b.addEventListener('click', async () => {
-    if (!(await confirm2('حذف نهائي لا تراجع عنه. متأكّد؟'))) return;
+    if (!(await confirm2('حذف هذه النسخة من السلة نهائياً؟ لن تتمكّن من استعادتها لاحقاً. (لا يحذف الاسم من الشجرة.)', { title: 'حذف من السلة', okText: 'حذف', danger: true }))) return;
     const ok = await guard(async () => { const { error } = await sb.from('almfrje_trash').delete().eq('id', b.dataset.perm); if (error) throw error; });
-    if (ok) { toast('تم الحذف النهائي'); screenTrash(); }
+    if (ok) { toast('حُذفت النسخة من السلة'); screenTrash(); }
   }));
+  { const cb = document.getElementById('trash_clear'); if (cb) cb.addEventListener('click', clearTrash); }
+}
+// تصفير سلة المحذوفات بالكامل (للمدير) — يحذف كل النُّسخ المحفوظة، ولا يمسّ أسماء الشجرة.
+async function clearTrash() {
+  if (!isAdmin()) return;
+  if (!(await confirm2('تصفير سلة المحذوفات بالكامل؟ تُحذف كل النُّسخ المحفوظة نهائياً ولا يمكن استعادتها. (لا يؤثّر على أسماء الشجرة.)', { title: 'تصفير السلة', okText: 'تصفير', danger: true }))) return;
+  const typed = await uiPrompt('للتأكيد النهائي اكتب كلمة: حذف', { title: 'تأكيد نهائي', placeholder: 'حذف', okText: 'تصفير' });
+  if ((typed || '').trim() !== 'حذف') { toast('أُلغي التصفير'); return; }
+  const ok = await guard(async () => { const { error } = await sb.from('almfrje_trash').delete().neq('id', -1); if (error) throw error; });
+  if (ok) { toast('تم تصفير سلة المحذوفات'); screenTrash(); }
 }
 async function restoreTrash(t) {
   if (!t) return;
