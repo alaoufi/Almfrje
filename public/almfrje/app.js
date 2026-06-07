@@ -1957,7 +1957,10 @@ async function approveNewborn(f) {
   if (!father) { toast('لم يُعثر على والد المولود في الشجرة'); return; }
   if (!isAdmin() && !(isManager() && inMyBranch(father))) { toast('ليست لديك صلاحية على هذا الفرع'); return; }
   if (sameNameSiblings(father, o.name).some(c => c.status !== 'dead')) { toast('يوجد ابن حيّ بنفس الاسم لنفس الأب — راجِع الطلب'); return; }
-  if (!(await confirm2(`الموافقة على إضافة «${o.name}» بن ${father.name}؟ سيُضاف إلى الشجرة.`, { title: 'تأكيد الموافقة', okText: 'موافقة وإضافة', danger: false }))) return;
+  const chain = [o.name].concat(lineage(father.id).map(x => x.name)).join(' بن ');
+  if (!(await confirm2(`⚠️ سيُضاف «${o.name}» إلى الشجرة نهائياً تحت:\n${chain}\nتأكّد أنه ليس مكرّراً قبل المتابعة.`, { title: 'مراجعة قبل الإضافة', okText: 'متابعة', danger: false }))) return;
+  const typed = await uiPrompt('للتأكيد النهائي اكتب كلمة: اضافة', { title: 'تأكيد نهائي', placeholder: 'اضافة', okText: 'إضافة' });
+  if ((typed || '').trim() !== 'اضافة') { toast('أُلغيت الإضافة'); return; }
   const who = (me && (me.full_name || me.username)) || '';
   const obj = { name: o.name, father_id: father.id, branch_id: father.branch_id, generation: father.generation + 1, status: 'alive', birth: o.birth || '', city: o.city || '', created_by_name: who };
   const ok = await guard(async () => {
@@ -1975,8 +1978,9 @@ async function rejectNewborn(f) {
   if (ok) { toast('رُفض الطلب وحُذف'); screenFeedbacks(); }
 }
 async function markFeedback(id, status) {
+  if (status === 'done' && !(await confirm2('تأكيد: تم اتخاذ الإجراء على هذه الملاحظة ووضع علامة «تم»؟', { title: 'تأكيد الإجراء', okText: 'تم', danger: false }))) return;
   const upd = status === 'done'
-    ? { status: 'done', done_by_name: (me && me.full_name) || '', done_at: new Date().toISOString() }
+    ? { status: 'done', done_by_name: (me && (me.full_name || me.username)) || '', done_at: new Date().toISOString() }
     : { status: 'new', done_at: null, done_by_name: '' };
   const ok = await guard(async () => { const { error } = await sb.from('almfrje_feedback').update(upd).eq('id', id); if (error) throw error; });
   if (ok) { toast(status === 'done' ? 'تم وضع علامة «تم» ✓' : 'أُعيد فتح الملاحظة'); screenFeedbacks(); }
@@ -2005,7 +2009,7 @@ function screenMore() {
   if (!isGuestUser()) data.push(['👁️ مراجعة البيانات (الأحياء)', '#/review', 'review']);
   if (isAdmin() || isManager()) data.push(['🔁 كشف الأسماء المكرّرة لنفس الأب', '#/dups', 'dups']);
   if (isAdmin()) data.push(['📨 ملاحظات الزوار الواردة', '#/feedbacks', 'feedbacks']);
-  else if (isManager()) data.push(['👶 طلبات إضافة المواليد', '#/feedbacks', 'feedbacks']);
+  else if (isManager()) data.push(['📨 طلبات وملاحظات فرعك', '#/feedbacks', 'feedbacks']);
   if (isManager() && !isAdmin()) data.push(['📋 سجل تعديلاتي (تراجع)', '#/audit', 'audit']);
   if (canExport() && !isAdmin()) data.push(['💾 النسخ والتصدير', '#/backups', 'backups']);   // للمدير ضمن لوحة التحكم
   if (data.length) groups.push(['🗂️ البيانات', data]);
