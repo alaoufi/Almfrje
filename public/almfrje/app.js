@@ -938,19 +938,17 @@ function addDocModal(p) {
 }
 let _bucketReady = false;
 async function uploadFile(file, folder) {
-  // تأكّد مرة واحدة في الجلسة أن مجلّد التخزين موجود وعام (يعالج المجلّدات القديمة الخاصة).
-  if (!_bucketReady) { try { await fetch('/api/almfrje-setup', { method: 'POST' }); _bucketReady = true; } catch (e) { /* تجاهل */ } }
-  const ext = (file.name.split('.').pop() || 'bin').toLowerCase();
-  const path = `${folder}/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
-  let { error } = await sb.storage.from('almfrje').upload(path, file, { upsert: false, contentType: file.type || undefined });
-  // شفاء ذاتي إضافي: إن لم يكن المجلّد موجوداً بعد، أعد الإعداد ثم المحاولة.
-  if (error && /bucket not found|not found/i.test(error.message || '')) {
-    try { await fetch('/api/almfrje-setup', { method: 'POST' }); } catch (e) { /* تجاهل */ }
-    await new Promise(r => setTimeout(r, 1000));
-    ({ error } = await sb.storage.from('almfrje').upload(path, file, { upsert: false, contentType: file.type || undefined }));
-  }
-  if (error) throw new Error('فشل رفع الصورة: ' + error.message);
-  return sb.storage.from('almfrje').getPublicUrl(path).data.publicUrl;
+  // الرفع عبر الخادم (مفتاح خدمي) — لا يحتاج سياسات تخزين ولا إعداداً يدوياً.
+  const { data: { session } } = await sb.auth.getSession();
+  const token = session && session.access_token;
+  if (!token) throw new Error('انتهت الجلسة — أعد تسجيل الدخول');
+  const fd = new FormData();
+  fd.append('file', file);
+  fd.append('folder', folder || 'misc');
+  const res = await fetch('/api/almfrje-upload', { method: 'POST', headers: { 'Authorization': 'Bearer ' + token }, body: fd });
+  const j = await res.json().catch(() => ({}));
+  if (!res.ok || !j.ok) throw new Error('فشل رفع الصورة: ' + (j.error || res.status));
+  return j.url;
 }
 
 /* ===== فهرسة احترافية للذرية (ترقيم أنساب هرمي) ===== */
