@@ -852,7 +852,7 @@ async function screenPerson(arg) {
       <div class="stat a"><div class="n">${grand.length}</div><div class="l">الأحفاد</div></div>
       <div class="stat g"><div class="n">${descCount.get(id) || 0}</div><div class="l">إجمالي الذرية</div></div>
     </div>
-    <div class="card"><h3>الأبناء (${cs.length})</h3>${cs.length > 1 && canEditPerson(p) ? '<div class="reorder-hint">↕️ لإعادة الترتيب: اضغط مطوّلاً على الابن (ثانية تقريباً) ثم اسحبه لأعلى/أسفل بين إخوته.</div>' : ''}<div id="childList" class="${cs.length > 1 && canEditPerson(p) ? 'reorder-list' : ''}">${cs.length ? cs.map(c => `<div class="row child-row"${cs.length > 1 && canEditPerson(p) ? ` data-reorder-id="${c.id}"` : ''}>${cs.length > 1 && canEditPerson(p) ? '<span class="reorder-grip">⠿</span>' : ''}<span class="k"><a href="#/person/${c.id}" style="color:var(--brand);text-decoration:none">${esc(c.name)}</a></span><span class="v">${descCount.get(c.id) || 0} ذرية</span></div>`).join('') : noItem()}</div></div>
+    <div class="card"><h3>الأبناء (${cs.length})</h3>${cs.length > 1 && canEditPerson(p) ? '<div class="reorder-hint">↕️ لإعادة ترتيب الإخوة: اسحب الابن من المقبض <b>⠿</b> لأعلى/أسفل (أو اضغط مطوّلاً ثم اسحب). الترتيب يبقى بين إخوته فقط ولا يتجاوز الأب.</div>' : ''}<div id="childList" class="${cs.length > 1 && canEditPerson(p) ? 'reorder-list' : ''}">${cs.length ? cs.map(c => `<div class="row child-row"${cs.length > 1 && canEditPerson(p) ? ` data-reorder-id="${c.id}"` : ''}>${cs.length > 1 && canEditPerson(p) ? '<span class="reorder-grip">⠿</span>' : ''}<span class="k"><a href="#/person/${c.id}" style="color:var(--brand);text-decoration:none">${esc(c.name)}</a></span><span class="v">${descCount.get(c.id) || 0} ذرية</span></div>`).join('') : noItem()}</div></div>
     ${showDocs ? `<div class="card"><h3>الوثائق والصور (${docs.length})</h3>
       ${docs.length ? docs.map(d => `<div class="row"><span class="k">${d.kind === 'photo' ? '🖼️' : d.kind === 'pdf' ? '📄' : '📎'} <a href="${esc(d.url)}" target="_blank" rel="noopener" style="color:var(--brand);text-decoration:none">${esc(d.label || 'ملف')}</a></span>${canDelete() ? `<button class="btn sm danger" data-ddel="${d.id}">حذف</button>` : ''}</div>`).join('') : noItem()}
       ${canEditPerson(p) ? `<button class="btn outline" id="addDoc" style="margin-top:8px">➕ إضافة صورة/وثيقة</button>` : ''}
@@ -886,12 +886,15 @@ function enableReorder(listEl, originalIds, fatherId) {
     row.addEventListener('pointerdown', (e) => {
       if (e.button != null && e.button !== 0) return;
       dragEl = row; startY = e.clientY; active = false;
-      timer = setTimeout(() => {
+      const activate = () => {
         active = true;
         row.classList.add('reorder-grab'); listEl.classList.add('reordering');
         try { row.setPointerCapture(e.pointerId); } catch (_) { }
         if (navigator.vibrate) { try { navigator.vibrate(30); } catch (_) { } }
-      }, 550);
+      };
+      // السحب من المقبض «⠿» يبدأ فوراً؛ ومن أي مكان آخر بالضغط المطوّل (احتياط).
+      if (e.target && e.target.closest && e.target.closest('.reorder-grip')) { e.preventDefault(); activate(); }
+      else { timer = setTimeout(activate, 550); }
     });
     row.addEventListener('pointermove', (e) => {
       if (!active) { if (Math.abs(e.clientY - startY) > 14) clearTimeout(timer); return; }
