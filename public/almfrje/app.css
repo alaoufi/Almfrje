@@ -456,8 +456,8 @@ ul.hier ul.hier > .hier-li::before {
 
 /* ===== نموذج الأعمدة (تدرّجات خضراء + فواصل الفروع) ===== */
 .outline-wrap { overflow-x: auto; border-radius: 12px; border: 1px solid var(--line); }
-.outline-tbl { border-collapse: collapse; font-size: .9rem; min-width: 100%; }
-.outline-tbl th, .outline-tbl td { padding: 7px 12px; white-space: nowrap; border: 1px solid #cfe6d4; border-bottom: 1px solid #cfe6d4; text-align: center; }
+.outline-tbl { border-collapse: collapse; font-size: .95rem; min-width: 100%; }
+.outline-tbl th, .outline-tbl td { padding: 8px 12px; white-space: nowrap; border: 1px solid #7bb389; text-align: center; }
 .outline-tbl th.oc { color: #fff; font-weight: 800; position: sticky; top: 0; }
 /* ترويسات خضراء غامقة → فاتحة حسب الجيل */
 .outline-tbl th.oc0 { background: #14532d; } .outline-tbl td.oc0 { background: #cdeccd; }
@@ -466,14 +466,14 @@ ul.hier ul.hier > .hier-li::before {
 .outline-tbl th.oc3 { background: #16a34a; } .outline-tbl td.oc3 { background: #eaf8ea; }
 .outline-tbl th.oc4 { background: #22c55e; } .outline-tbl td.oc4 { background: #f1fbf1; }
 .outline-tbl th.oc5 { background: #4ade80; } .outline-tbl td.oc5 { background: #f8fef8; }
-.outline-tbl td.filled { font-weight: 700; color: #052e16; }
+.outline-tbl td.filled { font-weight: 800; color: #052e16; }
 .outline-tbl td.obranch { font-weight: 800; }
 .outline-tbl td.oroot { font-size: 1.05rem; font-weight: 800; color: #14532d; }
 /* خط سميك أعلى رأس كل فرع (الجيل الثاني) */
 .outline-tbl tr.orow-branch td { border-top: 3px solid #15803d; }
 /* خطّان (سميك مزدوج) أعلى كل أصل: فراج/مفرج */
 .outline-tbl tr.orow-root td { border-top: 6px double #14532d; }
-[data-theme="dark"] .outline-tbl th, [data-theme="dark"] .outline-tbl td { border-color: #1f3a28; }
+[data-theme="dark"] .outline-tbl th, [data-theme="dark"] .outline-tbl td { border-color: #3a6b4d; }
 [data-theme="dark"] .outline-tbl td.oc0 { background: #0c2a18; }
 [data-theme="dark"] .outline-tbl td.oc1 { background: #0e2f1b; }
 [data-theme="dark"] .outline-tbl td.oc2 { background: #10341e; }
