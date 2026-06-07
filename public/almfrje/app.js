@@ -1723,11 +1723,12 @@ function screenDuplicates() {
   if (!isAdmin() && !isManager()) { view().innerHTML = noPerm(); return; }
   const mgr = !isAdmin() && isManager();
   const groups = [];
-  // لكل أب: جمّع أبناءه حسب الاسم المطبّع (يتجاهل التشكيل/الهمزات) — أي مجموعة فيها أكثر من واحد = تكرار
+  // لكل أب: جمّع أبناءه حسب الاسم المطبّع — التكرار يُحسب بين **الأحياء فقط**
+  // (إن كان أحد المتشابهَين متوفّى فلا يُعدّ تكراراً؛ التكرار فقط إذا كان الاثنان حيّين).
   const scan = (father, sibs) => {
     const m = new Map();
     sibs.forEach(c => { const k = normalizeAr(c.name); if (k) { if (!m.has(k)) m.set(k, []); m.get(k).push(c); } });
-    m.forEach(arr => { if (arr.length > 1) groups.push({ father, items: arr }); });
+    m.forEach(arr => { const living = arr.filter(c => c.status !== 'dead'); if (living.length > 1) groups.push({ father, items: living }); });
   };
   kids.forEach((arr, fid) => scan(byId.get(fid) || null, arr));
   scan(null, roots());   // الأصول (فراج/مفرج) كإخوة
