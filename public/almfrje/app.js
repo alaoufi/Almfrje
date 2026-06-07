@@ -3752,13 +3752,9 @@ function myPresenceBranch() {
   _myBranchCache = b;
   return b;
 }
-// مربّع «المتواجدون الآن» (الرئيسية): عريض، يحتوي على المتواجدين حسب الفروع.
+// مربّع «المتواجدون الآن» (الرئيسية): المجموع فقط — التفصيل حسب الفرع يظهر أمام كل فرع.
 function onlineHomeHtml() {
-  const ent = Object.entries(onlineByBranch || {}).filter(([, n]) => n > 0).sort((a, b) => b[1] - a[1]);
-  const chips = ent.length
-    ? ent.map(([bid, n]) => `<span class="oh-chip">${esc(branchName(Number(bid)))} ${n}</span>`).join('')
-    : '<span class="oh-empty">لا أحد متواجد ضمن فرع الآن</span>';
-  return `<div class="oh-title">🟢 المتواجدون الآن (${onlineNow})</div><div class="oh-chips">${chips}</div>`;
+  return `<div class="oh-title">🟢 المتواجدون الآن: ${onlineNow}</div>`;
 }
 function updateOnlineDom() {
   const tl = document.getElementById('visitsTotal'); if (tl) tl.textContent = visitStats.total || 0;
