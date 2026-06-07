@@ -683,9 +683,8 @@ function screenHome() {
     bindGo(); return;
   }
   view().innerHTML = `
-    ${bannerText ? `<div class="banner">${esc(bannerText)}</div>` : ''}
+    ${bannerText ? `<div class="banner"><button class="about-i banner-i" data-go="#/about" title="نبذة تعريفية عن قبيلة المفارجة" aria-label="نبذة تعريفية">ⓘ</button>${esc(bannerText)}</div>` : ''}
     ${!isGuestUser() && !pwChanged() ? `<div class="notice-pw">🔐 ننصحك بتغيير كلمة المرور الآن لحماية حسابك. <button class="btn sm" id="pwGo" style="margin-top:6px">تغيير كلمة المرور</button> <button class="btn sm outline" id="pwSkip" style="margin-top:6px">لاحقاً</button></div>` : ''}
-    <div class="hero-row"><div class="title-lg">${esc(homeHero)}</div><button class="about-i" data-go="#/about" title="نبذة تعريفية عن قبيلة المفارجة" aria-label="نبذة تعريفية">ⓘ</button></div>
     <div class="muted">أهلاً ${esc(me.full_name || '')} • ${arOf(ROLES, me.role)}${isManager() && myBranches().length ? ' (' + myBranches().map(b => esc(branchName(b))).join('، ') + ')' : ''}</div>
     <div class="card" style="border:2px solid var(--brand);background:color-mix(in srgb, var(--brand) 7%, transparent)">
       <h3 style="margin:0 0 4px">📝 ملاحظات الزوار</h3>
@@ -2956,10 +2955,6 @@ function screenTexts() {
       ${fInput('عنوان الموقع', 'tx_title', siteTitle)}
       ${fInput('سطر الإسناد (powered by) — اتركه فارغاً لإخفائه', 'tx_powered', sitePowered)}
       <button class="btn sm" id="tx_titleSave" style="margin-top:6px">حفظ</button></div>
-    <div class="card"><h3>🌳 عنوان الرئيسية</h3>
-      <p class="muted" style="font-size:.85rem;margin-top:-2px">العنوان الكبير أعلى الصفحة الرئيسية بعد الدخول.</p>
-      ${fInput('العنوان', 'tx_hero', homeHero)}
-      <button class="btn sm" id="tx_heroSave" style="margin-top:6px">حفظ</button></div>
     <div class="card"><h3>✉️ نص بطاقة «ملاحظات الزوار»</h3>
       <p class="muted" style="font-size:.85rem;margin-top:-2px">النص التعريفي في بطاقة إرسال الملاحظة بالرئيسية.</p>
       ${fTextarea('النص', 'tx_fbcard', feedbackCardText)}
@@ -3009,11 +3004,6 @@ function screenTexts() {
       ({ error } = await sb.from('almfrje_settings').upsert({ key: 'site_powered', value: pw, updated_at: new Date().toISOString() }, { onConflict: 'key' })); if (error) throw error;
     });
     if (ok) { siteTitle = t; sitePowered = pw; toast('تم حفظ العنوان'); }
-  });
-  document.getElementById('tx_heroSave').addEventListener('click', async () => {
-    const t = val('tx_hero').trim() || DEFAULT_HOME_HERO;
-    const ok = await guard(async () => { const { error } = await sb.from('almfrje_settings').upsert({ key: 'home_hero', value: t, updated_at: new Date().toISOString() }, { onConflict: 'key' }); if (error) throw error; });
-    if (ok) { homeHero = t; toast('تم حفظ العنوان'); }
   });
   document.getElementById('tx_fbcardSave').addEventListener('click', async () => {
     const t = val('tx_fbcard').trim() || DEFAULT_FB_CARD;
