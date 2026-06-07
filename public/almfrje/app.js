@@ -639,6 +639,7 @@ function screenHome() {
       <p class="muted" style="margin:0 0 8px;font-size:.88rem">لاحظت خطأً في اسم أو نسب؟ أو لديك إضافة أو تصحيح؟ أرسل ملاحظتك للإدارة وستُراجَع.</p>
       <button class="btn" data-go="#/feedback">✉️ أرسل ملاحظة للإدارة</button>
       ${isAdmin() ? `<button class="btn outline" data-go="#/feedbacks" style="margin-top:8px">📨 عرض الملاحظات الواردة</button>` : ''}
+      ${!isAdmin() && isManager() ? `<button class="btn outline" data-go="#/feedbacks" style="margin-top:8px">📨 طلبات وملاحظات فرعك</button>` : ''}
     </div>
     <div class="search"><input id="q" placeholder="ابحث بالاسم أو اللقب…"></div><div id="qr"></div>
     <div class="stats">
@@ -2010,7 +2011,6 @@ function screenMore() {
   if (!isGuestUser()) data.push(['👁️ مراجعة البيانات (الأحياء)', '#/review', 'review']);
   if (isAdmin() || isManager()) data.push(['🔁 كشف الأسماء المكرّرة لنفس الأب', '#/dups', 'dups']);
   if (isAdmin()) data.push(['📨 ملاحظات الزوار الواردة', '#/feedbacks', 'feedbacks']);
-  else if (isManager()) data.push(['📨 طلبات وملاحظات فرعك', '#/feedbacks', 'feedbacks']);
   if (isManager() && !isAdmin()) data.push(['📋 سجل تعديلاتي (تراجع)', '#/audit', 'audit']);
   if (canExport() && !isAdmin()) data.push(['💾 النسخ والتصدير', '#/backups', 'backups']);   // للمدير ضمن لوحة التحكم
   if (data.length) groups.push(['🗂️ البيانات', data]);
