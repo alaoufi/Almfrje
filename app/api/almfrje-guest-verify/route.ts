@@ -16,11 +16,11 @@ function normGen(s: string): string {
 }
 
 // تسجيل زيارة زائر مُتحقَّق: عدّاد إجمالي + تفصيل حسب الفرع والمنطقة (المدينة) — في الإعدادات.
-async function bumpVisit(admin: ReturnType<typeof createClient>, branchId: number | null, city: string | null) {
+/* eslint-disable @typescript-eslint/no-explicit-any */
+async function bumpVisit(admin: any, branchId: number | null, city: string | null) {
   try {
     const { data } = await admin.from('almfrje_settings').select('value').eq('key', 'visit_stats').maybeSingle();
-    const v: { total: number; byBranch: Record<string, number>; byCity: Record<string, number>; updated_at?: string } =
-      (data && data.value && typeof data.value === 'object') ? data.value as never : { total: 0, byBranch: {}, byCity: {} };
+    const v: any = (data && data.value && typeof data.value === 'object') ? data.value : { total: 0, byBranch: {}, byCity: {} };
     v.total = (v.total || 0) + 1;
     v.byBranch = v.byBranch || {};
     if (branchId != null) v.byBranch[String(branchId)] = (v.byBranch[String(branchId)] || 0) + 1;
