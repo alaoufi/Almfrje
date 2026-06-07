@@ -607,6 +607,9 @@ function topAncestor(id) { const ln = lineage(id); return ln.length ? ln[ln.leng
 // عرض كل الفروع مجمّعةً تحت كل أصل (جذر جيل-١) مع مجموع كل أصل.
 // عدد أفراد الفرع = الأشخاص المنتمون له فعلاً (دقيق دائماً)
 function branchCount(bid) { return C.persons.filter(p => p.branch_id === bid).length; }
+// الفروع «الحية» = التي أنجب مؤسّسها (لها ذرية)، أي فيها أكثر من الجدّ المؤسّس وحده.
+// مثال: «سفران» لم ينجب فلا يُحتسب فرعاً حيّاً.
+function liveBranchCount() { return C.branches.filter(b => branchCount(b.id) > 1).length; }
 function branchGroupsHtml() {
   if (!C.branches.length) return `<div class="card"><h3>الفروع</h3>${noItem()}</div>`;
   const groups = new Map();   // rootId -> { root, items:[{b,n}] }
@@ -659,7 +662,7 @@ function screenHome() {
     <div class="search"><input id="q" placeholder="ابحث بالاسم أو اللقب…"></div><div id="qr"></div>
     <div class="stats">
       <div class="stat"><div class="n">${total}</div><div class="l">إجمالي الأفراد</div></div>
-      <div class="stat a"><div class="n">${C.branches.length}</div><div class="l">الفروع</div></div>
+      <div class="stat a"><div class="n">${liveBranchCount()}</div><div class="l">الفروع</div></div>
       <div class="stat g"><div class="n">${maxGen()}</div><div class="l">الأجيال</div></div>
       <div class="stat k"><div class="n" id="visitsTotal">${visitStats.total || 0}</div><div class="l">الزوّار</div></div>
     </div>
