@@ -200,6 +200,9 @@ const GUEST_HIDE_DEFAULT = { phone: true, media: true, notes: true };  // ما �
 let guestHide = { ...GUEST_HIDE_DEFAULT };
 let recentSince = '';      // تاريخ تصفير «آخر الإضافات» (ISO) — يُحدّده المدير
 let visitStats = { total: 0, byBranch: {}, byCity: {} };   // إحصاء زيارات الزوّار (من الإعدادات)
+let onlineNow = 0;                 // عدد المتواجدين الآن (من مسار التواجد)
+let onlineByBranch = {};           // تفصيلهم حسب الفرع
+let _presenceTimer = null;
 const DEFAULT_BANNER = 'المفرجي قبيلة من ولد حسين من الصواعد من عوف من حرب';
 let bannerText = DEFAULT_BANNER;
 const DEFAULT_FB_THANKS = 'شكراً لك 🌿\nتم إرسال ملاحظتك، وهي محل اهتمامنا.';
@@ -658,16 +661,16 @@ function screenHome() {
       <div class="stat"><div class="n">${total}</div><div class="l">إجمالي الأفراد</div></div>
       <div class="stat a"><div class="n">${C.branches.length}</div><div class="l">الفروع</div></div>
       <div class="stat g"><div class="n">${maxGen()}</div><div class="l">الأجيال</div></div>
-      <div class="stat k"><div class="n">${visitStats.total || 0}</div><div class="l">الزوّار</div></div>
+      <div class="stat k"><div class="n" id="visitsTotal">${visitStats.total || 0}</div><div class="l">الزوّار</div></div>
+      <div class="stat a"><div class="n" id="onlineNow">${onlineNow}</div><div class="l">🟢 المتواجدون الآن</div></div>
     </div>
     ${branchGroupsHtml()}
-    <div class="card"><div class="recent-head"><h3 style="margin:0">آخر الإضافات${sinceMs ? ` (${newCount})` : ''} ${hintBtn('recent')}</h3>${isAdmin() ? '<button class="btn sm outline" id="resetRecent">↺ تصفير</button>' : ''}</div>
+    <div class="card"><div class="recent-head"><h3 style="margin:0">آخر الإضافات${sinceMs ? ` (${newCount})` : ''} ${hintBtn('recent')}</h3></div>
       ${recent.length ? recent.map(p => `<div class="row click" data-recent="${p.id}"><span class="k">${esc(p.name)}</span><span class="v">${p.created_at ? fmtDate(p.created_at) : esc(branchName(p.branch_id))}</span></div>`).join('') : '<div class="muted" style="padding:6px">لا إضافات جديدة بعد التصفير.</div>'}</div>`;
   const q = document.getElementById('q');
   q.addEventListener('input', () => instantSearch(q.value, document.getElementById('qr')));
   const pwGo = document.getElementById('pwGo'); if (pwGo) pwGo.addEventListener('click', () => setHash('#/profile'));
   const pwSkip = document.getElementById('pwSkip'); if (pwSkip) pwSkip.addEventListener('click', () => { markPwChanged(); screenHome(); });
-  const rr = document.getElementById('resetRecent'); if (rr) rr.addEventListener('click', resetRecent);
   view().querySelectorAll('[data-recent]').forEach(el => el.addEventListener('click', () => recentInfoModal(parseInt(el.dataset.recent, 10))));
   bindGo();
   // إضافة المولود انتقلت إلى قائمة «المزيد» (للمدير ومشرف الفرع) — لا زرّ عائم بالرئيسية.
@@ -690,9 +693,11 @@ async function resetRecent() {
   const now = new Date().toISOString();
   const ok = await guard(async () => { await setRecentSince(now); });
   if (ok) {
-    screenHome();
+    // يُستدعى من لوحة التحكم (النصوص) أو من الرئيسية — أعِد رسم الشاشة الحالية.
+    const rerender = () => { if (location.hash === '#/texts') screenTexts(); else screenHome(); };
+    rerender();
     // إتاحة التراجع لمدة ٨ ثوانٍ
-    showUndoToast('تم التصفير', async () => { await guard(async () => { await setRecentSince(prev); }); toast('تم التراجع'); screenHome(); });
+    showUndoToast('تم التصفير', async () => { await guard(async () => { await setRecentSince(prev); }); toast('تم التراجع'); rerender(); });
   }
 }
 // بطاقة مختصرة عند الضغط على اسم في آخر الإضافات: الأب والجد وتاريخ الإضافة فقط.
@@ -2811,11 +2816,15 @@ function screenTexts() {
     : '<div class="muted" style="font-size:.85rem;padding:4px 0">لا مناطق مسجّلة بعد.</div>';
   view().innerHTML = adminTabBar('texts') + `
     <div class="card"><h3>📊 إحصائيات الزيارات</h3>
-      <div class="row"><span class="k">إجمالي زيارات الزوّار</span><span class="v" style="font-size:1.2rem;color:var(--brand)">${visitStats.total || 0}</span></div>
-      <div class="li-sub" style="margin-top:10px;font-weight:800;color:var(--text)">حسب الفرع</div>${branchRows}
+      <div class="row"><span class="k">إجمالي من دخل الموقع</span><span class="v" style="font-size:1.2rem;color:var(--brand)" id="visitsTotalSt">${visitStats.total || 0}</span></div>
+      <div class="row"><span class="k">🟢 المتواجدون الآن</span><span class="v" style="font-size:1.2rem;color:#1c8b4d" id="onlineNowSt">${onlineNow}</span></div>
+      <div class="li-sub" style="margin-top:6px;font-weight:800;color:var(--text)">المتواجدون الآن حسب الفرع</div>
+      <div id="onlineByBranchSt"><div class="muted" style="font-size:.85rem;padding:4px 0">…</div></div>
+      <div class="li-sub" style="margin-top:10px;font-weight:800;color:var(--text)">إجمالي الزيارات حسب الفرع</div>${branchRows}
       <div class="li-sub" style="margin-top:10px;font-weight:800;color:var(--text)">حسب المنطقة (المدينة)</div>${cityRows}
       <button class="btn sm danger" id="visits_reset" style="margin-top:10px">↺ تصفير إحصاء الزيارات</button>
-      <p class="muted" style="font-size:.78rem;margin-top:6px">تُحتسب الزيارة عند دخول زائر مُتحقَّق باسمه (يُنسب لفرعه ومدينته).</p></div>
+      <button class="btn sm outline" id="recent_reset" style="margin-top:10px">↺ تصفير «آخر الإضافات»</button>
+      <p class="muted" style="font-size:.78rem;margin-top:6px">يُحتسب كل من يدخل الموقع (زائر/مشرف/مدير). «المتواجدون الآن» = نشِطون خلال آخر ٣ دقائق. وتصفير «آخر الإضافات» يبدأ عدّ الإضافات من جديد دون حذف بيانات.</p></div>
     <div class="card"><h3>📝 نص الرئيسية ${hintBtn('banner')}</h3>
       <p class="muted" style="font-size:.85rem;margin-top:-2px">يظهر أعلى الصفحة الرئيسية للجميع.</p>
       ${fTextarea('النص', 'tx_banner', bannerText)}
@@ -2848,6 +2857,8 @@ function screenTexts() {
     const ok = await guard(async () => { const { error } = await sb.from('almfrje_settings').upsert({ key: 'visit_stats', value: { total: 0, byBranch: {}, byCity: {}, updated_at: new Date().toISOString() }, updated_at: new Date().toISOString() }, { onConflict: 'key' }); if (error) throw error; });
     if (ok) { visitStats = { total: 0, byBranch: {}, byCity: {} }; toast('تم تصفير الزيارات'); screenTexts(); }
   }); }
+  pingPresence(false);   // تحديث «المتواجدون الآن» وتفصيلهم حسب الفرع عند فتح البطاقة
+  { const rrc = document.getElementById('recent_reset'); if (rrc) rrc.addEventListener('click', resetRecent); }
   document.getElementById('tx_bannerSave').addEventListener('click', async () => {
     const txt = val('tx_banner').trim();
     const ok = await guard(async () => { const { error } = await sb.from('almfrje_settings').upsert({ key: 'banner_text', value: txt, updated_at: new Date().toISOString() }, { onConflict: 'key' }); if (error) throw error; });
@@ -3509,7 +3520,7 @@ function bumpGuestTs() { try { sessionStorage.setItem('almfrje_guest_ts', String
 function guestSessionFresh() {
   try { const ts = parseInt(sessionStorage.getItem('almfrje_guest_ts') || '0', 10); return !!ts && (Date.now() - ts) < GUEST_IDLE_MS; } catch (e) { return false; }
 }
-async function endGuestSession() { try { sessionStorage.removeItem('almfrje_guest_ts'); } catch (e) { /* */ } _authUid = null; me = null; try { await sb.auth.signOut(); } catch (e) { /* */ } }
+async function endGuestSession() { stopPresence(); try { sessionStorage.removeItem('almfrje_guest_ts'); } catch (e) { /* */ } _authUid = null; me = null; try { await sb.auth.signOut(); } catch (e) { /* */ } }
 async function browseAsGuest(msgEl) {
   try {
     let { error } = await sb.auth.signInWithPassword({ email: GUEST_EMAIL, password: GUEST_PASS });
@@ -3540,7 +3551,7 @@ async function guestGateEnter() {
     const res = await fetch('/api/almfrje-guest-verify', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ input: inp }) });
     const j = await res.json().catch(() => ({}));
     if (res.ok && j.ok) {
-      try { sessionStorage.setItem('almfrje_guest_name', inp); } catch (e) { /* */ }
+      try { sessionStorage.setItem('almfrje_guest_name', inp); if (j.branch != null) sessionStorage.setItem('almfrje_guest_branch', String(j.branch)); } catch (e) { /* */ }
       location.hash = '#/home';
       const entered = await browseAsGuest(m);
       if (entered) {
@@ -3635,6 +3646,45 @@ function translateAuthError(m) {
 }
 
 /* ===== الدخول للتطبيق ===== */
+// ===== التواجد والإحصاء: يُحتسب لكل من يدخل (أي دور) =====
+function clientId() {
+  try { let c = localStorage.getItem('almfrje_cid'); if (!c) { c = Math.random().toString(36).slice(2) + Date.now().toString(36); localStorage.setItem('almfrje_cid', c); } return c; }
+  catch (e) { return 'anon' + Math.random().toString(36).slice(2); }
+}
+function myPresenceBranch() {
+  if (isAdmin()) return null;                       // المدير لا يُنسب لفرع
+  if (isManager()) { const b = myBranches(); return b.length ? b[0] : null; }
+  try { const v = parseInt(sessionStorage.getItem('almfrje_guest_branch') || '0', 10); return v || null; } catch (e) { return null; }
+}
+function updateOnlineDom() {
+  const el = document.getElementById('onlineNow'); if (el) el.textContent = onlineNow;
+  const tl = document.getElementById('visitsTotal'); if (tl) tl.textContent = visitStats.total || 0;
+  // بطاقة الإحصائيات في الإعدادات (إن كانت معروضة)
+  const els = document.getElementById('onlineNowSt'); if (els) els.textContent = onlineNow;
+  const tls = document.getElementById('visitsTotalSt'); if (tls) tls.textContent = visitStats.total || 0;
+  const bb = document.getElementById('onlineByBranchSt');
+  if (bb) {
+    const ent = Object.entries(onlineByBranch || {}).filter(([, n]) => n > 0).sort((a, b) => b[1] - a[1]);
+    bb.innerHTML = ent.length
+      ? ent.map(([bid, n]) => `<div class="row"><span class="k">🗂️ ${esc(branchName(Number(bid)))}</span><span class="v">${n}</span></div>`).join('')
+      : '<div class="muted" style="font-size:.85rem;padding:4px 0">لا أحد متواجد الآن ضمن فرع محدّد.</div>';
+  }
+}
+async function pingPresence(first) {
+  try {
+    const { data: { session } } = await sb.auth.getSession();
+    const token = session && session.access_token; if (!token) return;
+    const res = await fetch('/api/almfrje-presence', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token }, body: JSON.stringify({ clientId: clientId(), first: !!first, branch: myPresenceBranch() }) });
+    const j = await res.json().catch(() => ({}));
+    if (j && j.ok) { onlineNow = j.online || 0; onlineByBranch = j.byBranch || {}; if (typeof j.total === 'number') visitStats.total = j.total; updateOnlineDom(); }
+  } catch (e) { /* أفضل جهد */ }
+}
+function startPresence() {
+  if (_presenceTimer) clearInterval(_presenceTimer);
+  pingPresence(true);
+  _presenceTimer = setInterval(() => { if (document.visibilityState !== 'hidden') pingPresence(false); }, 60000);
+}
+function stopPresence() { if (_presenceTimer) { clearInterval(_presenceTimer); _presenceTimer = null; } }
 async function enterApp(session) {
   document.getElementById('auth').classList.add('hidden');
   document.getElementById('app').classList.remove('hidden');
@@ -3666,6 +3716,7 @@ async function enterApp(session) {
   // الزائر دخل عبر رابط الإدارة سهواً؟ حوّله للرئيسية بدل بقائه على #login
   if (!location.hash || isAdminLoginUrl()) location.hash = '#/home';
   render();
+  startPresence();   // احتساب الزيارة + بدء تتبّع التواجد (لكل من يدخل)
 }
 
 /* ===== التهيئة ===== */
@@ -3692,6 +3743,7 @@ async function init() {
   // الخروج (مسؤولاً كان أو زائراً) → بوابة التحقق من الاسم فقط، لا شاشة دخول إدارة.
   // (الإدارة تعود للدخول عبر الرابط المباشر #login.)
   document.getElementById('signoutBtn').addEventListener('click', async () => {
+    stopPresence();
     try { sessionStorage.removeItem('almfrje_guest_ts'); } catch (e) { /* */ }
     location.hash = '#/home';
     await sb.auth.signOut();

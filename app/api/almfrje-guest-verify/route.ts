@@ -21,7 +21,7 @@ async function bumpVisit(admin: any, branchId: number | null, city: string | nul
   try {
     const { data } = await admin.from('almfrje_settings').select('value').eq('key', 'visit_stats').maybeSingle();
     const v: any = (data && data.value && typeof data.value === 'object') ? data.value : { total: 0, byBranch: {}, byCity: {} };
-    v.total = (v.total || 0) + 1;
+    // الإجمالي يُحتسب في مسار التواجد (لكل من يدخل)؛ هنا نوزّع الزوّار حسب الفرع والمنطقة فقط.
     v.byBranch = v.byBranch || {};
     if (branchId != null) v.byBranch[String(branchId)] = (v.byBranch[String(branchId)] || 0) + 1;
     v.byCity = v.byCity || {};
@@ -91,7 +91,7 @@ export async function POST(request: NextRequest) {
   // التفرّد: يدخل فقط إن طابق شخصاً حيّاً واحداً تماماً.
   if (liveMatches.length === 1) {
     await bumpVisit(admin, liveMatches[0].branch_id, liveMatches[0].city);
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({ ok: true, branch: liveMatches[0].branch_id });
   }
   if (liveMatches.length > 1) {
     return NextResponse.json({ ok: false, error: 'اسمك يطابق أكثر من شخص حيّ — أضِف اسم جدٍّ آخر للتمييز.' });
