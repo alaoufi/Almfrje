@@ -224,6 +224,9 @@ let sitePowered = DEFAULT_SITE_POWERED;
 let homeHero = DEFAULT_HOME_HERO;
 let feedbackCardText = DEFAULT_FB_CARD;
 let guestPrompt = DEFAULT_GUEST_PROMPT;
+// الصفحة التعريفية (HTML منسّق) — يحرّرها المدير من «التحكم ← الصفحة التعريفية».
+const DEFAULT_ABOUT = '<h2>قبيلة المفرجي</h2><p>المفرجي قبيلة من ولد حسين من الصواعد من عوف من حرب.</p><p>هذه صفحة تعريفية — يمكن لمدير النظام تحريرها وتنسيقها من «التحكم ← الصفحة التعريفية».</p>';
+let aboutHtml = DEFAULT_ABOUT;
 const C = { persons: [], branches: [], members: [], documents: [] };
 const TABLES = { persons: 'almfrje_persons', branches: 'almfrje_branches', members: 'almfrje_members', documents: 'almfrje_documents' };
 
@@ -358,6 +361,7 @@ async function loadSettings() {
     homeHero = typeof map.home_hero === 'string' && map.home_hero ? map.home_hero : DEFAULT_HOME_HERO;
     feedbackCardText = typeof map.feedback_card_text === 'string' && map.feedback_card_text ? map.feedback_card_text : DEFAULT_FB_CARD;
     guestPrompt = typeof map.guest_prompt === 'string' && map.guest_prompt ? map.guest_prompt : DEFAULT_GUEST_PROMPT;
+    aboutHtml = typeof map.about_html === 'string' && map.about_html ? map.about_html : DEFAULT_ABOUT;
     // تطبيق نصوص التعليمات المعدّلة من الإعدادات فوق الافتراضية
     applyHintOverrides(map.hints_overrides);
   } catch (e) { /* تجاهل — تبقى القيم الافتراضية */ }
@@ -517,6 +521,8 @@ const ROUTES = {
   feedback: { t: 'إرسال ملاحظة للإدارة', back: true, fn: screenFeedback },
   feedbacks: { t: 'ملاحظات الزوار', back: true, fn: screenFeedbacks },
   trash: { t: 'سلة المحذوفات', back: true, fn: screenTrash },
+  about: { t: 'قبيلة المفرجي', back: true, fn: screenAbout },
+  aboutedit: { t: 'الصفحة التعريفية', back: true, fn: screenAboutEdit },
 };
 function parseHash() { const raw = (location.hash || '#/home').replace(/^#\//, ''); const p = raw.split('/'); return { name: p[0] || 'home', arg: p[1] }; }
 function render() {
@@ -540,6 +546,7 @@ const ADMIN_TABS = [
   ['members', '👥 المستخدمون', '#/members'],
   ['branchadmin', '🗂️ الفروع والمشرفون', '#/branchadmin'],
   ['texts', '📝 النصوص', '#/texts'],
+  ['aboutedit', '📖 الصفحة التعريفية', '#/aboutedit'],
   ['hints', '💡 التعليمات', '#/hints'],
   ['audit', '📋 سجل التعديلات', '#/audit'],
   ['trash', '🗑️ سلة المحذوفات', '#/trash'],
@@ -670,7 +677,7 @@ function screenHome() {
   view().innerHTML = `
     ${bannerText ? `<div class="banner">${esc(bannerText)}</div>` : ''}
     ${!isGuestUser() && !pwChanged() ? `<div class="notice-pw">🔐 ننصحك بتغيير كلمة المرور الآن لحماية حسابك. <button class="btn sm" id="pwGo" style="margin-top:6px">تغيير كلمة المرور</button> <button class="btn sm outline" id="pwSkip" style="margin-top:6px">لاحقاً</button></div>` : ''}
-    <div class="title-lg">${esc(homeHero)}</div>
+    <div class="hero-row"><div class="title-lg">${esc(homeHero)}</div><button class="about-i" data-go="#/about" title="تعريف قبيلة المفرجي" aria-label="تعريف قبيلة المفرجي">ⓘ</button></div>
     <div class="muted">أهلاً ${esc(me.full_name || '')} • ${arOf(ROLES, me.role)}${isManager() && myBranches().length ? ' (' + myBranches().map(b => esc(branchName(b))).join('، ') + ')' : ''}</div>
     <div class="card" style="border:2px solid var(--brand);background:color-mix(in srgb, var(--brand) 7%, transparent)">
       <h3 style="margin:0 0 4px">📝 ملاحظات الزوار</h3>
@@ -2047,6 +2054,7 @@ function screenMore() {
   const browse = [['📊 التقرير الإحصائي', '#/stats']];
   if (r0) { browse.push(['🌳 العرض الهرمي العام', '#/hierarchy/all', 'hierarchy']); browse.push(['🗒️ نموذج الأعمدة', '#/outline/all', 'outline']); }
   browse.push(['📇 فهرس ذرية شخص', '#pickdesc', 'descendants']);
+  browse.push(['ℹ️ تعريف قبيلة المفرجي', '#/about']);
   groups.push(['🔎 العرض والتقارير', browse]);
   // البيانات (إضافة/تعديل/استيراد)
   const data = [];
@@ -2832,6 +2840,84 @@ async function resetHint(key) {
     if (HINTS[key]) HINTS[key][1] = def;
   });
   if (ok) { toast('أُعيد النص الأصلي'); const ta = document.getElementById('ht_' + key); if (ta) ta.value = def; }
+}
+
+/* ===== الصفحة التعريفية (قبيلة المفرجي) ===== */
+// منقٍّ بسيط لِـ HTML المُحرَّر من المدير: يسمح بوسوم التنسيق ويزيل النصوص البرمجية
+// والسمات الخطرة (on*، javascript:) لتفادي أي حقن.
+function sanitizeHtml(html) {
+  const ALLOWED = new Set(['h1', 'h2', 'h3', 'h4', 'p', 'br', 'b', 'strong', 'i', 'em', 'u', 's', 'span', 'div', 'ul', 'ol', 'li', 'a', 'blockquote', 'hr', 'img', 'font', 'center', 'small']);
+  const ATTR = new Set(['style', 'href', 'src', 'color', 'size', 'face', 'align', 'target', 'rel', 'alt', 'title', 'class']);
+  const tpl = document.createElement('template');
+  tpl.innerHTML = String(html || '');
+  const clean = (node) => {
+    [...node.children].forEach(el => {
+      const tag = el.tagName.toLowerCase();
+      if (!ALLOWED.has(tag)) { el.replaceWith(...el.childNodes); return; }
+      [...el.attributes].forEach(a => {
+        const n = a.name.toLowerCase(), v = a.value || '';
+        if (!ATTR.has(n) || n.startsWith('on')) { el.removeAttribute(a.name); return; }
+        if ((n === 'href' || n === 'src') && /^\s*(javascript|data):/i.test(v) && !/^data:image\//i.test(v)) el.removeAttribute(a.name);
+        if (n === 'style' && /url\s*\(|expression|javascript:/i.test(v)) el.removeAttribute('style');
+      });
+      if (tag === 'a') { el.setAttribute('target', '_blank'); el.setAttribute('rel', 'noopener nofollow'); }
+      clean(el);
+    });
+  };
+  clean(tpl.content);
+  return tpl.innerHTML;
+}
+function screenAbout() {
+  view().innerHTML = `<div class="about-wrap"><div class="about-card"><div class="about-body">${sanitizeHtml(aboutHtml)}</div></div></div>`;
+}
+// محرّر الصفحة التعريفية (للمدير) — أدوات تنسيق الخطوط ثم حفظ.
+function screenAboutEdit() {
+  if (!isAdmin()) { view().innerHTML = noPerm(); return; }
+  const sizes = [['3', 'صغير'], ['4', 'عادي'], ['5', 'كبير'], ['6', 'أكبر'], ['7', 'عنوان']];
+  view().innerHTML = adminTabBar('aboutedit') + `
+    <div class="card">
+      <h3>📖 الصفحة التعريفية — قبيلة المفرجي</h3>
+      <p class="muted" style="font-size:.85rem;margin-top:-2px">صمّم الصفحة بأدوات التنسيق ثم احفظ. تُعرض للجميع عبر زر «ⓘ» في الرئيسية وقائمة المزيد.</p>
+      <div class="rte-toolbar">
+        <button type="button" class="rte-b" data-cmd="bold" title="غامق"><b>غ</b></button>
+        <button type="button" class="rte-b" data-cmd="italic" title="مائل"><i>م</i></button>
+        <button type="button" class="rte-b" data-cmd="underline" title="تسطير"><u>ت</u></button>
+        <span class="rte-sep"></span>
+        <select class="rte-sel" id="rte_size" title="حجم الخط"><option value="">حجم</option>${sizes.map(s => `<option value="${s[0]}">${s[1]}</option>`).join('')}</select>
+        <label class="rte-color" title="لون الخط">🎨<input type="color" id="rte_color" value="#1c8b4d"></label>
+        <span class="rte-sep"></span>
+        <button type="button" class="rte-b" data-cmd="justifyright" title="يمين">⟶</button>
+        <button type="button" class="rte-b" data-cmd="justifycenter" title="توسيط">↔</button>
+        <button type="button" class="rte-b" data-cmd="justifyleft" title="يسار">⟵</button>
+        <span class="rte-sep"></span>
+        <button type="button" class="rte-b" data-cmd="insertunorderedlist" title="نقاط">•</button>
+        <button type="button" class="rte-b" data-cmd="formatblock" data-val="H2" title="عنوان">H</button>
+        <button type="button" class="rte-b" data-cmd="removeformat" title="مسح التنسيق">⌫</button>
+      </div>
+      <div id="rte" class="rte-area" contenteditable="true" dir="rtl">${sanitizeHtml(aboutHtml)}</div>
+      <div class="btn-row" style="margin-top:8px">
+        <button class="btn" id="about_save">💾 حفظ الصفحة</button>
+        <button class="btn outline" id="about_preview">👁️ معاينة</button>
+        <button class="btn sm outline" id="about_reset">↺ استرجاع الافتراضي</button>
+      </div>
+    </div>`;
+  const rte = document.getElementById('rte');
+  const exec = (cmd, val) => { rte.focus(); try { document.execCommand(cmd, false, val); } catch (e) { /* */ } };
+  view().querySelectorAll('.rte-b[data-cmd]').forEach(b => b.addEventListener('click', () => exec(b.dataset.cmd, b.dataset.val || null)));
+  document.getElementById('rte_size').addEventListener('change', (e) => { if (e.target.value) exec('fontSize', e.target.value); e.target.value = ''; });
+  document.getElementById('rte_color').addEventListener('input', (e) => exec('foreColor', e.target.value));
+  document.getElementById('about_save').addEventListener('click', async () => {
+    const html = sanitizeHtml(rte.innerHTML);
+    const ok = await guard(async () => { const { error } = await sb.from('almfrje_settings').upsert({ key: 'about_html', value: html, updated_at: new Date().toISOString() }, { onConflict: 'key' }); if (error) throw error; });
+    if (ok) { aboutHtml = html; toast('تم حفظ الصفحة التعريفية'); }
+  });
+  document.getElementById('about_preview').addEventListener('click', () => {
+    openModal('قبيلة المفرجي', `<div class="about-card" style="margin:0"><div class="about-body">${sanitizeHtml(rte.innerHTML)}</div></div>`);
+  });
+  document.getElementById('about_reset').addEventListener('click', async () => {
+    if (!(await confirm2('استرجاع النص الافتراضي للصفحة التعريفية؟', { title: 'استرجاع', okText: 'استرجاع' }))) return;
+    rte.innerHTML = DEFAULT_ABOUT;
+  });
 }
 
 /* ===== النصوص: نص الرئيسية + تعريف ألوان الحالة (للمدير) ===== */
