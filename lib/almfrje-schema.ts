@@ -350,4 +350,32 @@ export const ALMFRJE_SCHEMA_SQL = `
       DROP POLICY IF EXISTS feedback_del ON public.almfrje_feedback; CREATE POLICY feedback_del ON public.almfrje_feedback FOR DELETE USING (public.almfrje_is_admin() OR (subject in ('إضافة مولود','ملاحظة') AND public.almfrje_role() = 'branch_manager' AND public.almfrje_manages_branch(branch_id)));
       GRANT INSERT ON public.almfrje_feedback TO anon, authenticated;
       GRANT SELECT, UPDATE, DELETE ON public.almfrje_feedback TO authenticated;
+
+      -- 10) تحصين الخصوصية والنزاهة (يُطبَّق فوق ما سبق) =================
+      -- منظور منقّى للأشخاص بلا بيانات حسّاسة (جوال/بريد/ملاحظات) — للزائر/المطّلع.
+      CREATE OR REPLACE VIEW public.almfrje_persons_pub AS
+        SELECT id, name, father_id, branch_id, generation, sex, status,
+               birth, death, city, photo_url, nickname, work, sort,
+               created_at, created_by_name, updated_by_name, updated_at, field_audit
+          FROM public.almfrje_persons;
+      GRANT SELECT ON public.almfrje_persons_pub TO authenticated;
+      REVOKE SELECT ON public.almfrje_persons_pub FROM anon;
+
+      -- الجدول الكامل (يحوي الجوال/البريد/الملاحظات) للمدير ومشرف الفرع فقط؛ الزائر يقرأ المنظور.
+      DROP POLICY IF EXISTS persons_sel ON public.almfrje_persons;
+      CREATE POLICY persons_sel ON public.almfrje_persons FOR SELECT
+        USING (public.almfrje_is_admin() OR public.almfrje_role() = 'branch_manager');
+
+      -- الأعضاء: المدير يرى الكل، وغيره صفّه فقط (إخفاء جوالات الآخرين عن الزائر).
+      DROP POLICY IF EXISTS members_select ON public.almfrje_members;
+      CREATE POLICY members_select ON public.almfrje_members FOR SELECT
+        USING (public.almfrje_is_admin() OR user_id = auth.uid());
+
+      -- سجل التعديلات: العضو يكتب/يعدّل صفوفه فقط، والمدير الكل (منع العبث بسجلّ الغير).
+      DROP POLICY IF EXISTS audit_ins ON public.almfrje_audit;
+      CREATE POLICY audit_ins ON public.almfrje_audit FOR INSERT WITH CHECK (actor = auth.uid());
+      DROP POLICY IF EXISTS audit_upd ON public.almfrje_audit;
+      CREATE POLICY audit_upd ON public.almfrje_audit FOR UPDATE
+        USING (public.almfrje_is_admin() OR actor = auth.uid())
+        WITH CHECK (public.almfrje_is_admin() OR actor = auth.uid());
 `;
