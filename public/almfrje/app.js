@@ -2044,7 +2044,7 @@ function screenMore() {
   // العرض والتصفّح (للجميع)
   const browse = [['📊 التقرير الإحصائي', '#/stats']];
   if (r0) { browse.push(['🌳 العرض الهرمي العام', '#/hierarchy/all', 'hierarchy']); browse.push(['🗒️ نموذج الأعمدة', '#/outline/all', 'outline']); }
-  browse.push(['📇 فهرس ذرية شخص', '#pickdesc', 'relations']);
+  browse.push(['📇 فهرس ذرية شخص', '#pickdesc', 'descendants']);
   groups.push(['🔎 العرض والتقارير', browse]);
   // البيانات (إضافة/تعديل/استيراد)
   const data = [];
