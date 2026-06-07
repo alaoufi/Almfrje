@@ -685,7 +685,7 @@ function screenHome() {
   view().innerHTML = `
     ${bannerText ? `<div class="banner"><button class="about-i banner-i" data-go="#/about" title="نبذة تعريفية عن قبيلة المفارجة" aria-label="نبذة تعريفية">ⓘ</button>${esc(bannerText)}</div>` : ''}
     ${!isGuestUser() && !pwChanged() ? `<div class="notice-pw">🔐 ننصحك بتغيير كلمة المرور الآن لحماية حسابك. <button class="btn sm" id="pwGo" style="margin-top:6px">تغيير كلمة المرور</button> <button class="btn sm outline" id="pwSkip" style="margin-top:6px">لاحقاً</button></div>` : ''}
-    <div class="muted">أهلاً ${esc(me.full_name || '')} • ${arOf(ROLES, me.role)}${isManager() && myBranches().length ? ' (' + myBranches().map(b => esc(branchName(b))).join('، ') + ')' : ''}</div>
+    <div class="muted">أهلاً ${esc(currentUserName() || me.full_name || '')}${isGuestUser() ? '' : ' • ' + arOf(ROLES, me.role)}${isManager() && myBranches().length ? ' (' + myBranches().map(b => esc(branchName(b))).join('، ') + ')' : ''}</div>
     <div class="card" style="border:2px solid var(--brand);background:color-mix(in srgb, var(--brand) 7%, transparent)">
       <h3 style="margin:0 0 4px">📝 ملاحظات الزوار</h3>
       <p class="muted" style="margin:0 0 8px;font-size:.88rem">${esc(feedbackCardText)}</p>
