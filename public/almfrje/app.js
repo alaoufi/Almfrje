@@ -2875,7 +2875,10 @@ function sanitizeHtml(html) {
   return tpl.innerHTML;
 }
 function screenAbout() {
-  view().innerHTML = `<div class="about-wrap"><div class="about-card"><div class="about-body">${sanitizeHtml(aboutHtml)}</div></div></div>`;
+  view().innerHTML = `
+    ${isAdmin() ? `<div class="btn-row no-print" style="justify-content:flex-end"><button class="btn sm outline" data-go="#/aboutedit">✎ تعديل الصفحة</button></div>` : ''}
+    <div class="about-wrap"><div class="about-card"><div class="about-body">${sanitizeHtml(aboutHtml)}</div></div></div>`;
+  bindGo();
 }
 // محرّر الصفحة التعريفية (للمدير) — أدوات تنسيق الخطوط ثم حفظ.
 function screenAboutEdit() {
