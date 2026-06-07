@@ -660,8 +660,7 @@ function screenHome() {
     </div>
     ${branchGroupsHtml()}
     <div class="card"><div class="recent-head"><h3 style="margin:0">آخر الإضافات${sinceMs ? ` (${newCount})` : ''} ${hintBtn('recent')}</h3>${isAdmin() ? '<button class="btn sm outline" id="resetRecent">↺ تصفير</button>' : ''}</div>
-      ${recent.length ? recent.map(p => `<div class="row click" data-recent="${p.id}"><span class="k">${esc(p.name)}</span><span class="v">${p.created_at ? fmtDate(p.created_at) : esc(branchName(p.branch_id))}</span></div>`).join('') : '<div class="muted" style="padding:6px">لا إضافات جديدة بعد التصفير.</div>'}</div>
-    ${legendHtml()}`;
+      ${recent.length ? recent.map(p => `<div class="row click" data-recent="${p.id}"><span class="k">${esc(p.name)}</span><span class="v">${p.created_at ? fmtDate(p.created_at) : esc(branchName(p.branch_id))}</span></div>`).join('') : '<div class="muted" style="padding:6px">لا إضافات جديدة بعد التصفير.</div>'}</div>`;
   const q = document.getElementById('q');
   q.addEventListener('input', () => instantSearch(q.value, document.getElementById('qr')));
   const pwGo = document.getElementById('pwGo'); if (pwGo) pwGo.addEventListener('click', () => setHash('#/profile'));
@@ -1144,7 +1143,8 @@ function screenTree(arg) {
     <div class="btn-row"><button class="btn sm outline" id="t_expand">توسيع المستوى الأول</button><button class="btn sm outline" id="t_collapse">طيّ الكل</button>
       <button class="btn sm outline" data-go="#/hierarchy/${rootId}">عرض هرمي</button></div>
     </div>
-    <div class="card tree" id="treeBox"></div>`;
+    <div class="card tree" id="treeBox"></div>
+    ${legendHtml()}`;
   treeOpen.add(rootId);
   renderTree(rootId);
   bindGo();
@@ -2818,7 +2818,7 @@ function screenTexts() {
       ${fTextarea('النص', 'tx_gfail', guestWelcomeFail)}
       <button class="btn sm" id="tx_gfailSave" style="margin-top:6px">حفظ</button></div>
     <div class="card"><h3>🎨 تعريف ألوان الحالة</h3>
-      <p class="muted" style="font-size:.85rem;margin-top:-2px">تظهر دلالة الألوان أسفل الرئيسية. عدّل المسميات كما تريد.</p>
+      <p class="muted" style="font-size:.85rem;margin-top:-2px">تظهر دلالة الألوان أسفل قوائم الشجرة (الشجرة/العرض الهرمي/الأعمدة/الذرية). عدّل المسميات كما تريد.</p>
       ${fInput('الاسم بلون عادي يعني', 'tx_alive', statLabels.alive)}
       ${fInput('الاسم بلون رمادي يعني', 'tx_dead', statLabels.dead)}
       ${fInput('الاسم بلون أحمر يعني', 'tx_noissue', statLabels.noissue)}
