@@ -300,17 +300,16 @@ async function fetchAll(table, pageSize = 1000) {
   return out;
 }
 async function loadAll() {
-  const [pr, br, mr, fb] = await Promise.all([
+  const [pr, br, mr] = await Promise.all([
     fetchAll('almfrje_persons').then(d => ({ data: d }), e => ({ error: e })),
     fetchAll('almfrje_branches').then(d => ({ data: d }), e => ({ error: e })),
     fetchAll('almfrje_members').then(d => ({ data: d }), e => ({ error: e })),
-    sb.from('almfrje_feedback').select('id,status').then(r => ({ data: r.data }), e => ({ error: e })),
   ]);
   C.persons = pr.error ? [] : (pr.data || []);
   C.branches = br.error ? [] : (br.data || []);
   C.members = mr.error ? [] : (mr.data || []);
-  // عدد الطلبات/الملاحظات قيد المراجعة التي يراها هذا المستخدم (RLS يحصر النطاق) — لإظهار زر الرئيسية عند وجودها فقط.
-  C.feedbackPending = (fb && !fb.error && fb.data ? fb.data : []).filter(f => f.status !== 'done').length;
+  // عدد الطلبات/الملاحظات قيد المراجعة التي يخصّ هذا المستخدم (عبر الخادم — يشمل ملاحظات فرعه).
+  try { const j = await fbApi('count'); C.feedbackPending = j.pending || 0; } catch (e) { C.feedbackPending = 0; }
   await loadSettings();
   buildIndex();
 }
@@ -1898,6 +1897,16 @@ async function sendFeedback() {
     setTimeout(() => { closeModal(); location.hash = '#/home'; }, 2800);
   }
 }
+// نداء خادم إدارة الملاحظات (يعمل بمفتاح خدمي بعد التحقق — لا يعتمد على RLS).
+async function fbApi(action, id) {
+  const { data: { session } } = await sb.auth.getSession();
+  const token = session && session.access_token;
+  if (!token) throw new Error('انتهت الجلسة — أعد تسجيل الدخول');
+  const res = await fetch('/api/almfrje-feedback', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token }, body: JSON.stringify({ action, id }) });
+  const j = await res.json().catch(() => ({}));
+  if (!res.ok || !j.ok) throw new Error(j.error || 'تعذّر تنفيذ العملية');
+  return j;
+}
 // عرض الملاحظات للمدير — مرتّب باحترافية: تبويبات (قيد المراجعة/منجزة/الكل) + بطاقات مصنّفة بالنوع.
 // يحلّل طلب «إضافة مولود» المهيكل من حقل التفاصيل (أو null لغير المواليد).
 function parseNewborn(f) {
@@ -1909,10 +1918,8 @@ async function screenFeedbacks() {
   if (!isAdmin() && !isManager()) { view().innerHTML = noPerm(); return; }
   showLoading(true);
   let list = [];
-  try {
-    const { data, error } = await sb.from('almfrje_feedback').select('*').order('created_at', { ascending: false }).limit(2000);
-    if (error) throw error; list = data || [];
-  } catch (e) { showLoading(false); view().innerHTML = '<div class="center-empty">تعذّر تحميل الملاحظات.<br>' + esc(e.message || '') + '</div>'; return; }
+  try { const j = await fbApi('list'); list = j.rows || []; }
+  catch (e) { showLoading(false); view().innerHTML = '<div class="center-empty">تعذّر تحميل الملاحظات.<br>' + esc(e.message || '') + '</div>'; return; }
   showLoading(false);
   const newCount = list.filter(f => f.status !== 'done').length;
   const doneCount = list.length - newCount;
@@ -1966,33 +1973,24 @@ async function approveNewborn(f) {
   if (!(await confirm2(`⚠️ سيُضاف «${o.name}» إلى الشجرة نهائياً تحت:\n${chain}\nتأكّد أنه ليس مكرّراً قبل المتابعة.`, { title: 'مراجعة قبل الإضافة', okText: 'متابعة', danger: false }))) return;
   const typed = await uiPrompt('للتأكيد النهائي اكتب كلمة: اضافة', { title: 'تأكيد نهائي', placeholder: 'اضافة', okText: 'إضافة' });
   if ((typed || '').trim() !== 'اضافة') { toast('أُلغيت الإضافة'); return; }
-  const who = (me && (me.full_name || me.username)) || '';
-  const obj = { name: o.name, father_id: father.id, branch_id: father.branch_id, generation: father.generation + 1, status: 'alive', birth: o.birth || '', city: o.city || '', created_by_name: who };
-  const ok = await guard(async () => {
-    const { data: ins, error } = await sb.from('almfrje_persons').insert(obj).select('id').single(); if (error) throw error;
-    await auditLog('add', ins && ins.id, o.name);
-    const { error: e2 } = await sb.from('almfrje_feedback').update({ status: 'done', done_by_name: who, done_at: new Date().toISOString() }).eq('id', f.id); if (e2) throw e2;
-  });
+  const ok = await guard(async () => { await fbApi('approve', f.id); });   // الخادم يُدرج المولود ويسجّله
   if (ok) { toast('تمت الموافقة وأُضيف «' + o.name + '» للشجرة'); await loadAll(); screenFeedbacks(); }
 }
 // رفض طلب إضافة مولود وحذفه نهائياً.
 async function rejectNewborn(f) {
   if (!f) return;
   if (!(await confirm2('رفض هذا الطلب وحذفه نهائياً؟ لن يُضاف المولود إلى الشجرة.', { title: 'تأكيد الرفض', okText: 'رفض وحذف نهائي', danger: true }))) return;
-  const ok = await guard(async () => { const { error } = await sb.from('almfrje_feedback').delete().eq('id', f.id); if (error) throw error; });
+  const ok = await guard(async () => { await fbApi('reject', f.id); });
   if (ok) { toast('رُفض الطلب وحُذف'); screenFeedbacks(); }
 }
 async function markFeedback(id, status) {
   if (status === 'done' && !(await confirm2('تأكيد: تم اتخاذ الإجراء على هذه الملاحظة ووضع علامة «تم»؟', { title: 'تأكيد الإجراء', okText: 'تم', danger: false }))) return;
-  const upd = status === 'done'
-    ? { status: 'done', done_by_name: (me && (me.full_name || me.username)) || '', done_at: new Date().toISOString() }
-    : { status: 'new', done_at: null, done_by_name: '' };
-  const ok = await guard(async () => { const { error } = await sb.from('almfrje_feedback').update(upd).eq('id', id); if (error) throw error; });
+  const ok = await guard(async () => { await fbApi(status === 'done' ? 'done' : 'reopen', id); });
   if (ok) { toast(status === 'done' ? 'تم وضع علامة «تم» ✓' : 'أُعيد فتح الملاحظة'); screenFeedbacks(); }
 }
 async function delFeedback(id) {
   if (!(await confirm2('حذف هذه الملاحظة نهائياً؟', { title: 'تأكيد الحذف', okText: 'حذف', danger: true }))) return;
-  const ok = await guard(async () => { const { error } = await sb.from('almfrje_feedback').delete().eq('id', id); if (error) throw error; });
+  const ok = await guard(async () => { await fbApi('delete', id); });
   if (ok) { toast('حُذفت الملاحظة'); screenFeedbacks(); }
 }
 
