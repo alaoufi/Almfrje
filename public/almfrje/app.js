@@ -1132,7 +1132,7 @@ function screenTree(arg) {
   if (!rootId) { view().innerHTML = '<div class="center-empty">لا توجد بيانات بعد.</div>'; return; }
   const rootOpts = rs.map(r => ({ k: String(r.id), ar: r.name }));
   view().innerHTML = `
-    <div class="card no-print"><div class="grid2">
+    <div class="card no-print tree-ctl"><div class="grid2">
       ${rootOpts.length > 1 ? fSelect('ابدأ من', 't_root', rootOpts, rootId) : ''}
       <div class="field"><label>اذهب لشخص</label><button class="btn outline" id="t_pick" style="margin-top:0">🔍 اختر شخصاً</button></div>
     </div>
