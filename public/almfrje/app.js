@@ -299,9 +299,17 @@ async function fetchAll(table, pageSize = 1000) {
   }
   return out;
 }
+// مصدر الأشخاص: المدير/المشرف يقرؤون الجدول كاملاً (يحتاجون الجوال للإدارة)،
+// والزائر/المطّلع يقرأ منظوراً منقّى بلا (جوال/بريد/ملاحظات) إن وُجد — مع رجوع آمن للجدول.
+async function fetchPersons() {
+  const full = isAdmin() || isManager();
+  if (full) return fetchAll('almfrje_persons');
+  try { return await fetchAll('almfrje_persons_pub'); }
+  catch (e) { return fetchAll('almfrje_persons'); }   // المنظور غير موجود بعد → رجوع
+}
 async function loadAll() {
   const [pr, br, mr] = await Promise.all([
-    fetchAll('almfrje_persons').then(d => ({ data: d }), e => ({ error: e })),
+    fetchPersons().then(d => ({ data: d }), e => ({ error: e })),
     fetchAll('almfrje_branches').then(d => ({ data: d }), e => ({ error: e })),
     fetchAll('almfrje_members').then(d => ({ data: d }), e => ({ error: e })),
   ]);
