@@ -54,6 +54,13 @@ main { padding: 14px; max-width: 820px; margin: 0 auto; }
 .stat.a .n { color: var(--accent); } .stat.g .n { color: var(--gold); } .stat.d .n { color: var(--danger); } .stat.k .n { color: var(--ok); }
 @media (max-width:520px){ .stats { grid-template-columns: 1fr 1fr; } }
 
+/* المتواجدون الآن حسب الفرع (الرئيسية) — يظهر فقط عند وجود متواجدين */
+.online-home:empty { display: none; }
+.online-home { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin: 0 0 12px; font-size: .9rem; }
+.online-home .oh-lbl { font-weight: 800; color: var(--text); }
+.online-home .oh-chip { background: rgba(28,139,77,.12); color: #1c8b4d; border: 1px solid rgba(28,139,77,.35); border-radius: 999px; padding: 3px 10px; font-weight: 800; }
+html.dark .online-home .oh-chip { background: rgba(40,180,99,.16); color: #4cd07d; border-color: rgba(40,180,99,.4); }
+
 /* Chips */
 .chips { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
 .chip { border: 1px solid var(--brand-l); background: var(--card); color: var(--brand); padding: 6px 12px; border-radius: 999px; font-size: .85rem; cursor: pointer; }

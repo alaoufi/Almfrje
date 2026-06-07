@@ -662,17 +662,18 @@ function screenHome() {
       <div class="stat a"><div class="n">${C.branches.length}</div><div class="l">الفروع</div></div>
       <div class="stat g"><div class="n">${maxGen()}</div><div class="l">الأجيال</div></div>
       <div class="stat k"><div class="n" id="visitsTotal">${visitStats.total || 0}</div><div class="l">الزوّار</div></div>
-      <div class="stat a"><div class="n" id="onlineNow">${onlineNow}</div><div class="l">🟢 المتواجدون الآن</div></div>
     </div>
+    <div class="online-home" id="onlineHome">${onlineHomeHtml()}</div>
     ${branchGroupsHtml()}
     <div class="card"><div class="recent-head"><h3 style="margin:0">آخر الإضافات${sinceMs ? ` (${newCount})` : ''} ${hintBtn('recent')}</h3></div>
-      ${recent.length ? recent.map(p => `<div class="row click" data-recent="${p.id}"><span class="k">${esc(p.name)}</span><span class="v">${p.created_at ? fmtDate(p.created_at) : esc(branchName(p.branch_id))}</span></div>`).join('') : '<div class="muted" style="padding:6px">لا إضافات جديدة بعد التصفير.</div>'}</div>`;
+      ${recent.length ? recent.map(p => `<div class="row click" data-recent="${p.id}"><span class="k">${esc(p.name)}</span><span class="v">${p.created_at ? fmtDate(p.created_at) : esc(branchName(p.branch_id))}</span></div>`).join('') : '<div class="muted" style="padding:6px">لا إضافات جديدة.</div>'}</div>`;
   const q = document.getElementById('q');
   q.addEventListener('input', () => instantSearch(q.value, document.getElementById('qr')));
   const pwGo = document.getElementById('pwGo'); if (pwGo) pwGo.addEventListener('click', () => setHash('#/profile'));
   const pwSkip = document.getElementById('pwSkip'); if (pwSkip) pwSkip.addEventListener('click', () => { markPwChanged(); screenHome(); });
   view().querySelectorAll('[data-recent]').forEach(el => el.addEventListener('click', () => recentInfoModal(parseInt(el.dataset.recent, 10))));
   bindGo();
+  pingPresence(false);   // تحديث «المتواجدون الآن حسب الفرع» عند فتح الرئيسية
   // إضافة المولود انتقلت إلى قائمة «المزيد» (للمدير ومشرف الفرع) — لا زرّ عائم بالرئيسية.
 }
 // تصفير «آخر الإضافات» (للمدير فقط): تأكيدان + كتابة الكلمة + إمكانية تراجع.
@@ -3658,9 +3659,17 @@ function myPresenceBranch() {
   if (isManager()) { const b = myBranches(); return b.length ? b[0] : null; }
   try { const v = parseInt(sessionStorage.getItem('almfrje_guest_branch') || '0', 10); return v || null; } catch (e) { return null; }
 }
+// قائمة المتواجدين الآن حسب الفرع للرئيسية (تظهر فقط من لديه تواجد فعلي).
+function onlineHomeHtml() {
+  const ent = Object.entries(onlineByBranch || {}).filter(([, n]) => n > 0).sort((a, b) => b[1] - a[1]);
+  if (!ent.length) return '';
+  return `<span class="oh-lbl">🟢 المتواجدون الآن:</span> ` +
+    ent.map(([bid, n]) => `<span class="oh-chip">${esc(branchName(Number(bid)))} ${n}</span>`).join('');
+}
 function updateOnlineDom() {
-  const el = document.getElementById('onlineNow'); if (el) el.textContent = onlineNow;
   const tl = document.getElementById('visitsTotal'); if (tl) tl.textContent = visitStats.total || 0;
+  // الرئيسية: المتواجدون الآن حسب الفرع (يظهر الموجود فقط)
+  const oh = document.getElementById('onlineHome'); if (oh) oh.innerHTML = onlineHomeHtml();
   // بطاقة الإحصائيات في الإعدادات (إن كانت معروضة)
   const els = document.getElementById('onlineNowSt'); if (els) els.textContent = onlineNow;
   const tls = document.getElementById('visitsTotalSt'); if (tls) tls.textContent = visitStats.total || 0;
@@ -3736,6 +3745,7 @@ async function init() {
   let t = 'light'; try { t = localStorage.getItem('almfrje_theme') || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'); } catch (e) { }
   applyTheme(t);
   document.getElementById('themeBtn').addEventListener('click', () => applyTheme(document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark'));
+  { const rfb = document.getElementById('refreshBtn'); if (rfb) rfb.addEventListener('click', () => location.reload()); }
   if (configMissing()) { showSetup(); return; }
   sb = window.supabase.createClient(window.ALMFRJE_CONFIG.SUPABASE_URL, window.ALMFRJE_CONFIG.SUPABASE_ANON_KEY);
   // إعداد تلقائي للقاعدة بأسلوب «أفضل جهد» وبلا انتظار — لا يحجب فتح التطبيق.
