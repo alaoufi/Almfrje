@@ -3749,7 +3749,7 @@ function renderAuth() {
       <div style="font-size:.92rem;font-weight:700;margin-bottom:12px">تدخل تلقائياً بمجرد أن يتميّز اسمك — مثال: <span style="color:var(--brand)">${esc(gensExample(3))}</span></div>
       ${fInput('اكتب اسمك بالتسلسل هنا', 'g_lineage', '')}
       <div class="auth-msg" id="a_msg"></div>
-      ${sitePowered ? `<div style="font-size:.68rem;opacity:.7;margin-top:18px">${esc(sitePowered)}</div>` : ''}
+      ${sitePowered ? `<div style="font-size:.68rem;opacity:.7;margin-top:18px;text-align:center;width:100%">${esc(sitePowered)}</div>` : ''}
     </div>`;
     const gi = document.getElementById('g_lineage');
     if (gi) {
