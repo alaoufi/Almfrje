@@ -66,7 +66,7 @@ html.dark .online-home .oh-title { color: #4cd07d; }
 html.dark .online-home .oh-chip { background: rgba(40,180,99,.16); color: #4cd07d; border-color: rgba(40,180,99,.4); }
 /* عدد المتواجدين أمام كل فرع في قائمة الفروع — خط صغير غامق */
 .br-online:empty { display: none; }
-.br-online { font-size: .72rem; font-weight: 800; color: #1c8b4d; margin-inline-start: 6px; white-space: nowrap; }
+.br-online { font-size: .95rem; font-weight: 800; color: #1c8b4d; margin-inline-start: 6px; white-space: nowrap; }
 html.dark .br-online { color: #4cd07d; }
 
 /* Chips */
