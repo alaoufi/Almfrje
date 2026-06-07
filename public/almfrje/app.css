@@ -54,11 +54,15 @@ main { padding: 14px; max-width: 820px; margin: 0 auto; }
 .stat.a .n { color: var(--accent); } .stat.g .n { color: var(--gold); } .stat.d .n { color: var(--danger); } .stat.k .n { color: var(--ok); }
 @media (max-width:520px){ .stats { grid-template-columns: 1fr 1fr; } }
 
-/* المتواجدون الآن حسب الفرع (الرئيسية) — يظهر فقط عند وجود متواجدين */
+/* مربّع «المتواجدون الآن» (الرئيسية) — عريض يحتوي المتواجدين حسب الفروع */
 .online-home:empty { display: none; }
-.online-home { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin: 0 0 12px; font-size: .9rem; }
-.online-home .oh-lbl { font-weight: 800; color: var(--text); }
-.online-home .oh-chip { background: rgba(28,139,77,.12); color: #1c8b4d; border: 1px solid rgba(28,139,77,.35); border-radius: 999px; padding: 3px 10px; font-weight: 800; }
+.online-home { display: block; width: 100%; box-sizing: border-box; margin: 0 0 12px; padding: 12px 14px; border-radius: var(--radius); background: var(--card); box-shadow: var(--shadow); border: 1px solid rgba(28,139,77,.35); }
+.online-home .oh-title { font-weight: 800; color: #1c8b4d; font-size: .95rem; margin-bottom: 8px; }
+.online-home .oh-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.online-home .oh-chip { background: rgba(28,139,77,.12); color: #1c8b4d; border: 1px solid rgba(28,139,77,.35); border-radius: 999px; padding: 3px 12px; font-weight: 800; font-size: .9rem; }
+.online-home .oh-empty { color: var(--muted); font-size: .88rem; }
+html.dark .online-home { border-color: rgba(40,180,99,.4); }
+html.dark .online-home .oh-title { color: #4cd07d; }
 html.dark .online-home .oh-chip { background: rgba(40,180,99,.16); color: #4cd07d; border-color: rgba(40,180,99,.4); }
 
 /* Chips */
