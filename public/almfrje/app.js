@@ -3745,8 +3745,7 @@ function renderAuth() {
     box.innerHTML = `<div class="auth-box">
       <div class="logo" style="font-size:3.2rem">🌳</div>
       <h2 style="margin:.2rem 0 0">${esc(siteTitle)}</h2>
-      ${sitePowered ? `<div style="font-size:.72rem;opacity:.8;margin-bottom:.4rem">${esc(sitePowered)}</div>` : ''}
-      <div style="font-size:.95rem;line-height:1.85;margin-bottom:16px;font-weight:700">${esc(bannerText || 'شجرة أنساب العائلة')}</div>
+      ${sitePowered ? `<div style="font-size:.68rem;opacity:.75;margin-bottom:16px">${esc(sitePowered)}</div>` : ''}
       <div style="font-size:1.1rem;font-weight:800;margin-bottom:6px">${esc(guestPrompt)}</div>
       <div style="font-size:.92rem;font-weight:700;margin-bottom:12px">تدخل تلقائياً بمجرد أن يتميّز اسمك — مثال: <span style="color:var(--brand)">${esc(gensExample(3))}</span></div>
       ${fInput('اكتب اسمك بالتسلسل هنا', 'g_lineage', '')}
