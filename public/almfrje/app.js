@@ -661,8 +661,7 @@ function screenHome() {
   const rr = document.getElementById('resetRecent'); if (rr) rr.addEventListener('click', resetRecent);
   view().querySelectorAll('[data-recent]').forEach(el => el.addEventListener('click', () => recentInfoModal(parseInt(el.dataset.recent, 10))));
   bindGo();
-  // زر عائم لإضافة مولود جديد (لمن يملك صلاحية الإضافة)
-  if (canAdd()) addFab('+ مولود', () => setHash('#/person-edit/0'));
+  // إضافة المولود انتقلت إلى قائمة «المزيد» (للمدير ومشرف الفرع) — لا زرّ عائم بالرئيسية.
 }
 // تصفير «آخر الإضافات» (للمدير فقط): تأكيدان + كتابة الكلمة + إمكانية تراجع.
 async function setRecentSince(value) {
@@ -2006,6 +2005,8 @@ function screenMore() {
   groups.push(['🔎 العرض والتقارير', browse]);
   // البيانات (إضافة/تعديل/استيراد)
   const data = [];
+  // إضافة مولود مباشرة (للمدير ومشرف الفرع فقط — مشرف الفرع ضمن فرعه) — لا تظهر للزوار.
+  if (canAdd()) data.push(['👶 إضافة مولود (مباشرة)', '#/person-edit/0', 'add_person']);
   if (isAdmin()) data.push(['📥 استيراد ملف Excel', '#/import', 'import']);
   if (isAdmin() || isManager()) data.push(['✏️ تعديل جماعي', '#/bulk', 'bulk']);
   if (isAdmin() || isManager()) data.push(['📝 تعديل البيانات بالقائمة', '#/grid', 'grid']);
