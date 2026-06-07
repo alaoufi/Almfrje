@@ -2013,7 +2013,7 @@ function screenMore() {
   if (isAdmin() || isManager()) data.push(['🔁 كشف الأسماء المكرّرة لنفس الأب', '#/dups', 'dups']);
   if (isAdmin()) data.push(['📨 ملاحظات الزوار الواردة', '#/feedbacks', 'feedbacks']);
   if (isManager() && !isAdmin()) data.push(['📋 سجل تعديلاتي (تراجع)', '#/audit', 'audit']);
-  if (canExport() && !isAdmin()) data.push(['💾 النسخ والتصدير', '#/backups', 'backups']);   // للمدير ضمن لوحة التحكم
+  // «النسخ والتصدير» للمدير فقط — ضمن لوحة التحكم (مخفيّ عن مشرف الفرع).
   if (data.length) groups.push(['🗂️ البيانات', data]);
   // لوحة التحكم (للمدير) — مدخل واحد يفتح التبويبات (المستخدمون/النصوص/التعليمات/السجل/السلة/النسخ)
   if (isAdmin()) groups.push(['⚙️ الإدارة', [['⚙️ لوحة التحكم', '#/members', 'control_panel']]]);
@@ -2886,8 +2886,8 @@ async function screenAudit() {
 // تبويب «النسخ والتصدير» الموحّد (يتفرّع داخلياً بتبويبات حسب الدور)
 let dataTab = 'export';
 async function screenBackups() {
-  // المدير: نسخ احتياطية + تصدير + استعادة. غير المدير (مصرّح بالتصدير): تصدير فقط.
-  if (!isAdmin() && !canExport()) { view().innerHTML = noPerm(); return; }
+  // النسخ والتصدير والاستعادة — للمدير فقط (ضمن لوحة التحكم).
+  if (!isAdmin()) { view().innerHTML = noPerm(); return; }
   const tabs = [];
   if (isAdmin()) tabs.push(['backup', '💾 النسخ الاحتياطية']);
   if (canExport()) tabs.push(['export', '📤 التصدير']);
