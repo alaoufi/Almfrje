@@ -34,7 +34,14 @@ export async function POST(request: NextRequest) {
   const pin = String(b.pin || '').trim();
   const role = ['admin', 'branch_manager', 'viewer'].includes(String(b.role)) ? String(b.role) : 'viewer';
   const branch_ids = Array.isArray(b.branch_ids) ? (b.branch_ids as unknown[]).map((x) => Number(x)).filter((x) => Number.isFinite(x) && x > 0) : [];
-  const perms = (b.perms && typeof b.perms === 'object') ? b.perms : {};
+  // تنقية الصلاحيات: قيم منطقية فقط لمفاتيح معروفة الشكل (تُستخدم لاحقاً في almfrje_perm).
+  const perms: Record<string, boolean> = {};
+  if (b.perms && typeof b.perms === 'object') {
+    for (const k of Object.keys(b.perms as Record<string, unknown>)) {
+      const v = (b.perms as Record<string, unknown>)[k];
+      if (typeof v === 'boolean' && /^[a-z_]{1,24}$/.test(k)) perms[k] = v;
+    }
+  }
   if (!full_name) return NextResponse.json({ ok: false, error: 'أدخل الاسم' }, { status: 400 });
   if (phone.length < 7) return NextResponse.json({ ok: false, error: 'أدخل رقم جوال صحيح' }, { status: 400 });
   if (!/^\d{4,}$/.test(pin)) return NextResponse.json({ ok: false, error: 'الرقم السري ٤ أرقام على الأقل' }, { status: 400 });

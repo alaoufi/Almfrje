@@ -1,8 +1,26 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
 import { ALMFRJE_SCHEMA_SQL } from '@/lib/almfrje-schema';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
+
+// التحقّق أن المُنادي مديرٌ مفعّل (يمنع تشغيل ترقية مميّزة بـ PAT من أي زائر).
+async function isAdminCaller(request: NextRequest): Promise<boolean> {
+  const url = process.env.ALMFRJE_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const anon = process.env.ALMFRJE_SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const service = process.env.ALMFRJE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const token = (request.headers.get('authorization') || '').replace(/^Bearer\s+/i, '').trim();
+  if (!url || !anon || !service || !token) return false;
+  try {
+    const caller = createClient(url, anon, { global: { headers: { Authorization: `Bearer ${token}` } }, auth: { persistSession: false, autoRefreshToken: false } });
+    const { data: who } = await caller.auth.getUser();
+    if (!who || !who.user) return false;
+    const admin = createClient(url, service, { auth: { persistSession: false, autoRefreshToken: false } });
+    const { data: mem } = await admin.from('almfrje_members').select('role,is_active').eq('user_id', who.user.id).maybeSingle();
+    return !!(mem && mem.is_active && mem.role === 'admin');
+  } catch { return false; }
+}
 
 // إعداد تلقائي لجداول المفارجة (الأنساب) — يناديه تطبيق /almfrje ذاتياً أول ما يُفتح
 // فلا حاجة لتشغيل /api/migrate يدوياً. كل أوامر المخطط IF NOT EXISTS / OR REPLACE
@@ -85,5 +103,11 @@ async function handle() {
   return NextResponse.json({ ok: true });
 }
 
-export async function GET() { return handle(); }
-export async function POST() { return handle(); }
+export async function GET(request: NextRequest) {
+  if (!(await isAdminCaller(request))) return NextResponse.json({ ok: false, error: 'للمدير فقط' }, { status: 403 });
+  return handle();
+}
+export async function POST(request: NextRequest) {
+  if (!(await isAdminCaller(request))) return NextResponse.json({ ok: false, error: 'للمدير فقط' }, { status: 403 });
+  return handle();
+}
