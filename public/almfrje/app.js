@@ -225,7 +225,15 @@ let homeHero = DEFAULT_HOME_HERO;
 let feedbackCardText = DEFAULT_FB_CARD;
 let guestPrompt = DEFAULT_GUEST_PROMPT;
 // الصفحة التعريفية (HTML منسّق) — يحرّرها المدير من «التحكم ← الصفحة التعريفية».
-const DEFAULT_ABOUT = '<h2>قبيلة المفرجي</h2><p>المفرجي قبيلة من ولد حسين من الصواعد من عوف من حرب.</p><p>هذه صفحة تعريفية — يمكن لمدير النظام تحريرها وتنسيقها من «التحكم ← الصفحة التعريفية».</p>';
+const DEFAULT_ABOUT =
+  '<p class="about-eyebrow">نبذة تعريفية</p>' +
+  '<h2>قبيلة المفارجة من ولد حسين</h2>' +
+  '<hr>' +
+  '<p>المفارجة وواحدهم (مَفْرَجي) — ولا زال المفرجي متمسكاً بالمسمّى القديم — وتنحدر من قبيلة وَلَد حسين (وواحدهم حُسَيني) المنحدرة من الصواعد من عوف من قبيلة حرب.</p>' +
+  '<p>ديارهم الأصلية جنوب المدينة المنورة: الناصبية والمضحاة، وهي أسفل المَلحة والمسيل العائر إلى الحرّة غرب اليتمة، وتواجدهم مع بقية فروع ولد حسين في ديارهم وتداخلهم ينمّ عن وحدةٍ وترابطٍ بينهم.</p>' +
+  '<p>وديار ولد حسين عامةً هي المدينة المنورة، ممتدةً جنوباً بين جبالها وشعابها؛ ومن ديارهم: الناصبية وخُلص واللثامة وجبال الرّاء والعشيرة والملحة وغيرها من جبال جنوب المدينة. أمّا الآن فقد توسّعت ديار ولد حسين غرباً وشرقاً.</p>' +
+  '<p>وقد ذُكِرَ كثيرٌ من فروع ولد حسين باسمها القديم أو باسم لزيمها (أي ضامن جماعته) في وثيقة لزمة ولد حسين في فارع الناصبية سنة ١١٧٣هـ. ولزيم المفارجة من ولد حسين الوارد في الوثيقة هو سفران المفرجي، وكان وقت تسطير هذه الوثيقة (١١٧٣هـ) وجودُ الإخوة وأبناء عمومتهم الثمانية، وهم رؤوس الفروع الحالية التي تصل ما بين الجيل الخامس إلى العاشر عند كتابة هذه السطور في طبعة المشجّرة الثالثة لعام ١٤٤٦هـ. وكان سفران لزيم جماعته (المفارجة من ولد حسين) في ذلك الوقت، وضامناً إلى الجيل الخامس في هذه الوثيقة.</p>' +
+  '<p class="about-sign">،،، والله أعلم ،،،</p>';
 let aboutHtml = DEFAULT_ABOUT;
 const C = { persons: [], branches: [], members: [], documents: [] };
 const TABLES = { persons: 'almfrje_persons', branches: 'almfrje_branches', members: 'almfrje_members', documents: 'almfrje_documents' };
@@ -521,7 +529,7 @@ const ROUTES = {
   feedback: { t: 'إرسال ملاحظة للإدارة', back: true, fn: screenFeedback },
   feedbacks: { t: 'ملاحظات الزوار', back: true, fn: screenFeedbacks },
   trash: { t: 'سلة المحذوفات', back: true, fn: screenTrash },
-  about: { t: 'قبيلة المفرجي', back: true, fn: screenAbout },
+  about: { t: 'نبذة تعريفية', back: true, fn: screenAbout },
   aboutedit: { t: 'الصفحة التعريفية', back: true, fn: screenAboutEdit },
 };
 function parseHash() { const raw = (location.hash || '#/home').replace(/^#\//, ''); const p = raw.split('/'); return { name: p[0] || 'home', arg: p[1] }; }
@@ -677,7 +685,7 @@ function screenHome() {
   view().innerHTML = `
     ${bannerText ? `<div class="banner">${esc(bannerText)}</div>` : ''}
     ${!isGuestUser() && !pwChanged() ? `<div class="notice-pw">🔐 ننصحك بتغيير كلمة المرور الآن لحماية حسابك. <button class="btn sm" id="pwGo" style="margin-top:6px">تغيير كلمة المرور</button> <button class="btn sm outline" id="pwSkip" style="margin-top:6px">لاحقاً</button></div>` : ''}
-    <div class="hero-row"><div class="title-lg">${esc(homeHero)}</div><button class="about-i" data-go="#/about" title="تعريف قبيلة المفرجي" aria-label="تعريف قبيلة المفرجي">ⓘ</button></div>
+    <div class="hero-row"><div class="title-lg">${esc(homeHero)}</div><button class="about-i" data-go="#/about" title="نبذة تعريفية عن قبيلة المفارجة" aria-label="نبذة تعريفية">ⓘ</button></div>
     <div class="muted">أهلاً ${esc(me.full_name || '')} • ${arOf(ROLES, me.role)}${isManager() && myBranches().length ? ' (' + myBranches().map(b => esc(branchName(b))).join('، ') + ')' : ''}</div>
     <div class="card" style="border:2px solid var(--brand);background:color-mix(in srgb, var(--brand) 7%, transparent)">
       <h3 style="margin:0 0 4px">📝 ملاحظات الزوار</h3>
@@ -2054,7 +2062,6 @@ function screenMore() {
   const browse = [['📊 التقرير الإحصائي', '#/stats']];
   if (r0) { browse.push(['🌳 العرض الهرمي العام', '#/hierarchy/all', 'hierarchy']); browse.push(['🗒️ نموذج الأعمدة', '#/outline/all', 'outline']); }
   browse.push(['📇 فهرس ذرية شخص', '#pickdesc', 'descendants']);
-  browse.push(['ℹ️ تعريف قبيلة المفرجي', '#/about']);
   groups.push(['🔎 العرض والتقارير', browse]);
   // البيانات (إضافة/تعديل/استيراد)
   const data = [];
@@ -3631,7 +3638,7 @@ function renderPending() {
 
 /* ===== المصادقة (جوال/اسم مستخدم + رقم سري ٤ أرقام) ===== */
 function buildNav() {
-  const tabs = [['#/home', '🏠', 'الرئيسية'], ['#/search', '🔍', 'البحث'], ['#/tree', '🌳', 'الشجرة'], ['#/branches', '🗂️', 'الفروع'], ['#/more', '☰', 'المزيد']];
+  const tabs = [['#/home', '🏠', 'الرئيسية'], ['#/search', '🔍', 'البحث'], ['#/tree', '🌳', 'الشجرة'], ['#/about', 'ℹ️', 'نبذة تعريفية'], ['#/more', '☰', 'المزيد']];
   const nav = document.getElementById('bottomnav');
   nav.style.gridTemplateColumns = `repeat(${tabs.length},1fr)`;
   nav.innerHTML = tabs.map(([r, i, l]) => `<button class="nav-item" data-route="${r}"><span>${i}</span>${l}</button>`).join('');
