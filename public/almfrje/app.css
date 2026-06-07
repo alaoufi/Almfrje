@@ -185,7 +185,7 @@ html[data-theme="dark"] .badge.off { background:#333; color:#aaa; }
 /* Bottom nav */
 .bottomnav { position:fixed; bottom:0; inset-inline:0; z-index:20; display:grid; background:var(--card); border-top:1px solid var(--line); padding-bottom: env(safe-area-inset-bottom); }
 .nav-item { background:none; border:0; padding:8px 0 10px; cursor:pointer; display:flex; flex-direction:column; align-items:center; gap:2px; font:inherit; font-size:.78rem; color:var(--text); font-weight:700; }
-.nav-item span { font-size:1.35rem; line-height:1; }
+.nav-item span { font-size:1.05rem; line-height:1; }
 .nav-item.active { color:var(--brand); font-weight:800; }
 /* بطاقة تحكّم الشجرة: «ابدأ من» واضحة وغامقة */
 .tree-ctl label { color: var(--text); font-weight: 800; font-size: .92rem; }
@@ -283,7 +283,7 @@ html[data-theme="dark"] .badge.off { background:#333; color:#aaa; }
   box-shadow: var(--shadow);
 }
 /* زر «ⓘ» النبذة التعريفية بزاوية المربع الأزرق */
-.banner-i { position: absolute; top: 8px; inset-inline-start: 8px;
+.banner-i { position: absolute; top: 8px; left: 8px;
   width: 28px; height: 28px; font-size: 1rem;
   background: rgba(255,255,255,.22); box-shadow: inset 0 0 0 1px rgba(255,255,255,.5); }
 /* ===== صندوق صلاحيات العضو ===== */
