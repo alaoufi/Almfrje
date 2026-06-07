@@ -211,6 +211,17 @@ const DEFAULT_GUEST_OK = 'مرحباً بك يا ابن العم {name} 🌿\nد
 const DEFAULT_GUEST_FAIL = 'مرحباً بك يا {name} 🙏\nنأسف، الاسم غير مسجّل — تأكّد من كتابة اسمك الصحيح بالتسلسل.';
 let guestWelcomeOk = DEFAULT_GUEST_OK;
 let guestWelcomeFail = DEFAULT_GUEST_FAIL;
+// نصوص واجهة قابلة للتعديل من «التحكم ← النصوص» (تظهر للزائر والجميع).
+const DEFAULT_SITE_TITLE = 'قاعدة بيانات قبيلة المفارجة';
+const DEFAULT_SITE_POWERED = 'powered by Mohamad Shaman almfrji';
+const DEFAULT_HOME_HERO = 'شجرة المفارجة';
+const DEFAULT_FB_CARD = 'لاحظت خطأً في اسم أو نسب؟ أو لديك إضافة أو تصحيح؟ أرسل ملاحظتك للإدارة وستُراجَع.';
+const DEFAULT_GUEST_PROMPT = 'اكتب اسمك ثم أباك ثم جدّك للدخول';
+let siteTitle = DEFAULT_SITE_TITLE;
+let sitePowered = DEFAULT_SITE_POWERED;
+let homeHero = DEFAULT_HOME_HERO;
+let feedbackCardText = DEFAULT_FB_CARD;
+let guestPrompt = DEFAULT_GUEST_PROMPT;
 const C = { persons: [], branches: [], members: [], documents: [] };
 const TABLES = { persons: 'almfrje_persons', branches: 'almfrje_branches', members: 'almfrje_members', documents: 'almfrje_documents' };
 
@@ -340,6 +351,11 @@ async function loadSettings() {
     feedbackThanks = typeof map.feedback_thanks === 'string' && map.feedback_thanks ? map.feedback_thanks : DEFAULT_FB_THANKS;
     guestWelcomeOk = typeof map.guest_welcome_ok === 'string' && map.guest_welcome_ok ? map.guest_welcome_ok : DEFAULT_GUEST_OK;
     guestWelcomeFail = typeof map.guest_welcome_fail === 'string' && map.guest_welcome_fail ? map.guest_welcome_fail : DEFAULT_GUEST_FAIL;
+    siteTitle = typeof map.site_title === 'string' && map.site_title ? map.site_title : DEFAULT_SITE_TITLE;
+    sitePowered = typeof map.site_powered === 'string' ? map.site_powered : DEFAULT_SITE_POWERED;
+    homeHero = typeof map.home_hero === 'string' && map.home_hero ? map.home_hero : DEFAULT_HOME_HERO;
+    feedbackCardText = typeof map.feedback_card_text === 'string' && map.feedback_card_text ? map.feedback_card_text : DEFAULT_FB_CARD;
+    guestPrompt = typeof map.guest_prompt === 'string' && map.guest_prompt ? map.guest_prompt : DEFAULT_GUEST_PROMPT;
     // تطبيق نصوص التعليمات المعدّلة من الإعدادات فوق الافتراضية
     applyHintOverrides(map.hints_overrides);
   } catch (e) { /* تجاهل — تبقى القيم الافتراضية */ }
@@ -652,11 +668,11 @@ function screenHome() {
   view().innerHTML = `
     ${bannerText ? `<div class="banner">${esc(bannerText)}</div>` : ''}
     ${!isGuestUser() && !pwChanged() ? `<div class="notice-pw">🔐 ننصحك بتغيير كلمة المرور الآن لحماية حسابك. <button class="btn sm" id="pwGo" style="margin-top:6px">تغيير كلمة المرور</button> <button class="btn sm outline" id="pwSkip" style="margin-top:6px">لاحقاً</button></div>` : ''}
-    <div class="title-lg">شجرة المفارجة</div>
+    <div class="title-lg">${esc(homeHero)}</div>
     <div class="muted">أهلاً ${esc(me.full_name || '')} • ${arOf(ROLES, me.role)}${isManager() && myBranches().length ? ' (' + myBranches().map(b => esc(branchName(b))).join('، ') + ')' : ''}</div>
     <div class="card" style="border:2px solid var(--brand);background:color-mix(in srgb, var(--brand) 7%, transparent)">
       <h3 style="margin:0 0 4px">📝 ملاحظات الزوار</h3>
-      <p class="muted" style="margin:0 0 8px;font-size:.88rem">لاحظت خطأً في اسم أو نسب؟ أو لديك إضافة أو تصحيح؟ أرسل ملاحظتك للإدارة وستُراجَع.</p>
+      <p class="muted" style="margin:0 0 8px;font-size:.88rem">${esc(feedbackCardText)}</p>
       <button class="btn" data-go="#/feedback">✉️ أرسل ملاحظة للإدارة</button>
       ${isAdmin() && (C.feedbackPending || 0) > 0 ? `<button class="btn outline" data-go="#/feedbacks" style="margin-top:8px">📨 عرض الملاحظات الواردة (${C.feedbackPending})</button>` : ''}
       ${!isAdmin() && isManager() && (C.feedbackPending || 0) > 0 ? `<button class="btn outline" data-go="#/feedbacks" style="margin-top:8px">📨 طلبات وملاحظات فرعك (${C.feedbackPending})</button>` : ''}
@@ -2057,7 +2073,7 @@ function screenMore() {
       <div class="more-group-title">${title}</div>
       ${items.map(([l, h, hint]) => `<div class="card click more-card" data-act="${h}"><div class="li-title">${l}</div>${hint ? hintBtn(hint) : ''}</div>`).join('')}
     </div>`).join('')
-    + `<div class="muted" style="text-align:center;margin-top:14px;font-size:.85rem">قاعدة بيانات قبيلة المفارجة<br><span style="font-size:.78rem;opacity:.85">powered by Mohamad Shaman almfrji</span></div>`;
+    + `<div class="muted" style="text-align:center;margin-top:14px;font-size:.85rem">${esc(siteTitle)}${sitePowered ? `<br><span style="font-size:.78rem;opacity:.85">${esc(sitePowered)}</span>` : ''}</div>`;
   view().querySelectorAll('[data-act]').forEach(c => c.addEventListener('click', (e) => {
     if (e.target.closest('[data-hint]')) return;   // لا تتنقّل عند الضغط على (i)
     if (c.dataset.act === '#pickdesc') pickDescendantStart();
@@ -2837,6 +2853,23 @@ function screenTexts() {
       <button class="btn sm danger" id="visits_reset" style="margin-top:10px">↺ تصفير إحصاء الزيارات</button>
       <button class="btn sm outline" id="recent_reset" style="margin-top:10px">↺ تصفير «آخر الإضافات»</button>
       <p class="muted" style="font-size:.78rem;margin-top:6px">يُحتسب كل من يدخل الموقع (زائر/مشرف/مدير). «المتواجدون الآن» = نشِطون خلال آخر ٣ دقائق. وتصفير «آخر الإضافات» يبدأ عدّ الإضافات من جديد دون حذف بيانات.</p></div>
+    <div class="card"><h3>🏷️ عنوان الموقع وسطر «powered by»</h3>
+      <p class="muted" style="font-size:.85rem;margin-top:-2px">يظهران في شاشات الدخول (الزائر والمسؤول) وفي تذييل قائمة «المزيد».</p>
+      ${fInput('عنوان الموقع', 'tx_title', siteTitle)}
+      ${fInput('سطر الإسناد (powered by) — اتركه فارغاً لإخفائه', 'tx_powered', sitePowered)}
+      <button class="btn sm" id="tx_titleSave" style="margin-top:6px">حفظ</button></div>
+    <div class="card"><h3>🌳 عنوان الرئيسية</h3>
+      <p class="muted" style="font-size:.85rem;margin-top:-2px">العنوان الكبير أعلى الصفحة الرئيسية بعد الدخول.</p>
+      ${fInput('العنوان', 'tx_hero', homeHero)}
+      <button class="btn sm" id="tx_heroSave" style="margin-top:6px">حفظ</button></div>
+    <div class="card"><h3>✉️ نص بطاقة «ملاحظات الزوار»</h3>
+      <p class="muted" style="font-size:.85rem;margin-top:-2px">النص التعريفي في بطاقة إرسال الملاحظة بالرئيسية.</p>
+      ${fTextarea('النص', 'tx_fbcard', feedbackCardText)}
+      <button class="btn sm" id="tx_fbcardSave" style="margin-top:6px">حفظ النص</button></div>
+    <div class="card"><h3>🚪 دعوة الزائر للدخول</h3>
+      <p class="muted" style="font-size:.85rem;margin-top:-2px">يظهر للزائر فوق حقل كتابة الاسم في شاشة الدخول.</p>
+      ${fInput('النص', 'tx_gprompt', guestPrompt)}
+      <button class="btn sm" id="tx_gpromptSave" style="margin-top:6px">حفظ</button></div>
     <div class="card"><h3>📝 نص الرئيسية ${hintBtn('banner')}</h3>
       <p class="muted" style="font-size:.85rem;margin-top:-2px">يظهر أعلى الصفحة الرئيسية للجميع.</p>
       ${fTextarea('النص', 'tx_banner', bannerText)}
@@ -2871,6 +2904,29 @@ function screenTexts() {
   }); }
   pingPresence(false);   // تحديث «المتواجدون الآن» وتفصيلهم حسب الفرع عند فتح البطاقة
   { const rrc = document.getElementById('recent_reset'); if (rrc) rrc.addEventListener('click', resetRecent); }
+  document.getElementById('tx_titleSave').addEventListener('click', async () => {
+    const t = val('tx_title').trim() || DEFAULT_SITE_TITLE; const pw = val('tx_powered').trim();
+    const ok = await guard(async () => {
+      let { error } = await sb.from('almfrje_settings').upsert({ key: 'site_title', value: t, updated_at: new Date().toISOString() }, { onConflict: 'key' }); if (error) throw error;
+      ({ error } = await sb.from('almfrje_settings').upsert({ key: 'site_powered', value: pw, updated_at: new Date().toISOString() }, { onConflict: 'key' })); if (error) throw error;
+    });
+    if (ok) { siteTitle = t; sitePowered = pw; toast('تم حفظ العنوان'); }
+  });
+  document.getElementById('tx_heroSave').addEventListener('click', async () => {
+    const t = val('tx_hero').trim() || DEFAULT_HOME_HERO;
+    const ok = await guard(async () => { const { error } = await sb.from('almfrje_settings').upsert({ key: 'home_hero', value: t, updated_at: new Date().toISOString() }, { onConflict: 'key' }); if (error) throw error; });
+    if (ok) { homeHero = t; toast('تم حفظ العنوان'); }
+  });
+  document.getElementById('tx_fbcardSave').addEventListener('click', async () => {
+    const t = val('tx_fbcard').trim() || DEFAULT_FB_CARD;
+    const ok = await guard(async () => { const { error } = await sb.from('almfrje_settings').upsert({ key: 'feedback_card_text', value: t, updated_at: new Date().toISOString() }, { onConflict: 'key' }); if (error) throw error; });
+    if (ok) { feedbackCardText = t; toast('تم حفظ النص'); }
+  });
+  document.getElementById('tx_gpromptSave').addEventListener('click', async () => {
+    const t = val('tx_gprompt').trim() || DEFAULT_GUEST_PROMPT;
+    const ok = await guard(async () => { const { error } = await sb.from('almfrje_settings').upsert({ key: 'guest_prompt', value: t, updated_at: new Date().toISOString() }, { onConflict: 'key' }); if (error) throw error; });
+    if (ok) { guestPrompt = t; toast('تم حفظ النص'); }
+  });
   document.getElementById('tx_bannerSave').addEventListener('click', async () => {
     const txt = val('tx_banner').trim();
     const ok = await guard(async () => { const { error } = await sb.from('almfrje_settings').upsert({ key: 'banner_text', value: txt, updated_at: new Date().toISOString() }, { onConflict: 'key' }); if (error) throw error; });
@@ -3600,10 +3656,10 @@ function renderAuth() {
     // ===== واجهة الزائر: حقل واحد فقط (الاسم بالتسلسل) =====
     box.innerHTML = `<div class="auth-box">
       <div class="logo" style="font-size:3.2rem">🌳</div>
-      <h2 style="margin:.2rem 0 0">قاعدة بيانات قبيلة المفارجة</h2>
-      <div style="font-size:.72rem;opacity:.8;margin-bottom:.4rem">powered by Mohamad Shaman almfrji</div>
+      <h2 style="margin:.2rem 0 0">${esc(siteTitle)}</h2>
+      ${sitePowered ? `<div style="font-size:.72rem;opacity:.8;margin-bottom:.4rem">${esc(sitePowered)}</div>` : ''}
       <div style="font-size:.95rem;line-height:1.85;margin-bottom:16px;font-weight:700">${esc(bannerText || 'شجرة أنساب العائلة')}</div>
-      <div style="font-size:1.1rem;font-weight:800;margin-bottom:6px">اكتب اسمك ثم أباك ثم جدّك للدخول</div>
+      <div style="font-size:1.1rem;font-weight:800;margin-bottom:6px">${esc(guestPrompt)}</div>
       <div style="font-size:.92rem;font-weight:700;margin-bottom:12px">تدخل تلقائياً بمجرد أن يتميّز اسمك — مثال: <span style="color:var(--brand)">${esc(gensExample(3))}</span></div>
       ${fInput('اكتب اسمك بالتسلسل هنا', 'g_lineage', '')}
       <div class="auth-msg" id="a_msg"></div>
@@ -3619,8 +3675,8 @@ function renderAuth() {
   }
   // ===== واجهة المسؤول/المشرف =====
   box.innerHTML = `<div class="auth-box">
-    <div class="logo">🌳</div><h2 style="margin-bottom:0">قاعدة بيانات قبيلة المفارجة</h2>
-    <div style="font-size:.72rem;opacity:.8;margin-bottom:.4rem">powered by Mohamad Shaman almfrji</div><div class="sub">دخول المسؤول / مشرف الفرع</div>
+    <div class="logo">🌳</div><h2 style="margin-bottom:0">${esc(siteTitle)}</h2>
+    ${sitePowered ? `<div style="font-size:.72rem;opacity:.8;margin-bottom:.4rem">${esc(sitePowered)}</div>` : ''}<div class="sub">دخول المسؤول / مشرف الفرع</div>
     ${fInput('الجوال أو اسم المستخدم', 'a_id', '')}
     ${pinField('الرقم السري', 'a_pin')}
     <button class="btn" id="a_submit">تسجيل الدخول</button>
