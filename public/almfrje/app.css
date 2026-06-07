@@ -326,7 +326,9 @@ ul.hier ul.hier > .hier-li::before {
 .hier-row:hover { box-shadow: 0 3px 10px rgba(67,56,202,.15); }
 .hier-name { font-weight: 700; cursor: pointer; color: var(--text, inherit); }
 .hier-name:hover { color: var(--brand); }
-.hier-meta { font-size: .72rem; color: var(--muted, #999); background: var(--bg); padding: 1px 8px; border-radius: 999px; }
+.hier-main { display: flex; flex-direction: column; min-width: 0; gap: 1px; }
+.hier-line { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.hier-meta { display: block; font-size: .68rem; color: var(--muted, #999); font-weight: normal; }
 .hier-tog {
   width: 22px; height: 22px; flex: none; border: 0; cursor: pointer;
   border-radius: 7px; background: var(--brand); color: #fff;

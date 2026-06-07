@@ -1263,8 +1263,10 @@ function hierNode(id, depth) {
   let html = `<li class="hier-li lvl${lvl}">
     <div class="hier-row">
       ${toggle}
-      <span class="hier-name ${nameCls(p)}" data-hopen="${id}"${nameTitle(p)}>${esc(p.name)}</span>${statusTag(p)}
-      ${meta}
+      <div class="hier-main">
+        <div class="hier-line"><span class="hier-name ${nameCls(p)}" data-hopen="${id}"${nameTitle(p)}>${esc(p.name)}</span>${statusTag(p)}</div>
+        ${meta}
+      </div>
     </div>`;
   if (has && open) {
     html += `<ul class="hier">${cs.map(c => hierNode(c.id, depth + 1)).join('')}</ul>`;
