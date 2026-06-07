@@ -300,14 +300,17 @@ async function fetchAll(table, pageSize = 1000) {
   return out;
 }
 async function loadAll() {
-  const [pr, br, mr] = await Promise.all([
+  const [pr, br, mr, fb] = await Promise.all([
     fetchAll('almfrje_persons').then(d => ({ data: d }), e => ({ error: e })),
     fetchAll('almfrje_branches').then(d => ({ data: d }), e => ({ error: e })),
     fetchAll('almfrje_members').then(d => ({ data: d }), e => ({ error: e })),
+    sb.from('almfrje_feedback').select('id,status').then(r => ({ data: r.data }), e => ({ error: e })),
   ]);
   C.persons = pr.error ? [] : (pr.data || []);
   C.branches = br.error ? [] : (br.data || []);
   C.members = mr.error ? [] : (mr.data || []);
+  // عدد الطلبات/الملاحظات قيد المراجعة التي يراها هذا المستخدم (RLS يحصر النطاق) — لإظهار زر الرئيسية عند وجودها فقط.
+  C.feedbackPending = (fb && !fb.error && fb.data ? fb.data : []).filter(f => f.status !== 'done').length;
   await loadSettings();
   buildIndex();
 }
@@ -638,8 +641,8 @@ function screenHome() {
       <h3 style="margin:0 0 4px">📝 ملاحظات الزوار</h3>
       <p class="muted" style="margin:0 0 8px;font-size:.88rem">لاحظت خطأً في اسم أو نسب؟ أو لديك إضافة أو تصحيح؟ أرسل ملاحظتك للإدارة وستُراجَع.</p>
       <button class="btn" data-go="#/feedback">✉️ أرسل ملاحظة للإدارة</button>
-      ${isAdmin() ? `<button class="btn outline" data-go="#/feedbacks" style="margin-top:8px">📨 عرض الملاحظات الواردة</button>` : ''}
-      ${!isAdmin() && isManager() ? `<button class="btn outline" data-go="#/feedbacks" style="margin-top:8px">📨 طلبات وملاحظات فرعك</button>` : ''}
+      ${isAdmin() && (C.feedbackPending || 0) > 0 ? `<button class="btn outline" data-go="#/feedbacks" style="margin-top:8px">📨 عرض الملاحظات الواردة (${C.feedbackPending})</button>` : ''}
+      ${!isAdmin() && isManager() && (C.feedbackPending || 0) > 0 ? `<button class="btn outline" data-go="#/feedbacks" style="margin-top:8px">📨 طلبات وملاحظات فرعك (${C.feedbackPending})</button>` : ''}
     </div>
     <div class="search"><input id="q" placeholder="ابحث بالاسم أو اللقب…"></div><div id="qr"></div>
     <div class="stats">
