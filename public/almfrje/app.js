@@ -2862,6 +2862,7 @@ async function screenAudit() {
   const actCls = { add: 'add', edit: '', delete: 'off' };
   view().innerHTML = adminTabBar('audit') + `
     <div class="muted" style="margin-bottom:8px">${mine ? 'سجلّ تعديلاتك أنت (ضمن فرعك)' : 'كل إضافة/تعديل/حذف على الأسماء مع من قام به'} (${list.length}). التعديلات قابلة للتراجع في أي وقت.</div>
+    ${isAdmin() && list.length ? `<button class="btn sm danger" id="audit_clear" style="margin-bottom:10px">🗑️ حذف كل السجل نهائياً</button>` : ''}
     ${list.length ? list.map(a => {
       const canUndo = a.action === 'edit' && a.undo_data && a.undo_data.items && a.undo_data.items.length && !a.undone;
       return `<div class="card" style="padding:10px">
@@ -2879,7 +2880,17 @@ async function screenAudit() {
     const row = list.find(x => String(x.id) === b.dataset.undo);
     if (row) undoFromAudit(row);
   }));
+  { const cb = document.getElementById('audit_clear'); if (cb) cb.addEventListener('click', clearAudit); }
   bindGo();
+}
+// حذف كامل سجل التعديلات نهائياً (للمدير) — مع تأكيد مزدوج. يُلغي إمكانية التراجع عن التعديلات السابقة.
+async function clearAudit() {
+  if (!isAdmin()) return;
+  if (!(await confirm2('⚠️ حذف كل سجل التعديلات نهائياً؟ سيُمسح كامل السجل، وتُلغى إمكانية التراجع عن التعديلات السابقة. (لا يؤثّر على بيانات الشجرة.)', { title: 'مسح السجل', okText: 'حذف الكل', danger: true }))) return;
+  const typed = await uiPrompt('للتأكيد النهائي اكتب كلمة: حذف', { title: 'تأكيد نهائي', placeholder: 'حذف', okText: 'حذف نهائي' });
+  if ((typed || '').trim() !== 'حذف') { toast('أُلغي المسح'); return; }
+  const ok = await guard(async () => { const { error } = await sb.from('almfrje_audit').delete().neq('id', -1); if (error) throw error; });
+  if (ok) { toast('تم مسح سجل التعديلات'); screenAudit(); }
 }
 
 /* ===== النسخ الاحتياطية (محفوظة في القاعدة — يطلبها المدير في أي وقت) ===== */
