@@ -3707,7 +3707,7 @@ async function guestGateEnter() {
     const res = await fetch('/api/almfrje-guest-verify', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ input: inp }) });
     const j = await res.json().catch(() => ({}));
     if (res.ok && j.ok) {
-      try { sessionStorage.setItem('almfrje_guest_name', inp); if (j.branch != null) sessionStorage.setItem('almfrje_guest_branch', String(j.branch)); } catch (e) { /* */ }
+      try { sessionStorage.setItem('almfrje_guest_name', (j.name && String(j.name).trim()) || inp); if (j.branch != null) sessionStorage.setItem('almfrje_guest_branch', String(j.branch)); } catch (e) { /* */ }
       location.hash = '#/home';
       const entered = await browseAsGuest(m);
       if (entered) {
@@ -3927,7 +3927,13 @@ async function init() {
   let t = 'light'; try { t = localStorage.getItem('almfrje_theme') || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'); } catch (e) { }
   applyTheme(t);
   document.getElementById('themeBtn').addEventListener('click', () => applyTheme(document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark'));
-  { const rfb = document.getElementById('refreshBtn'); if (rfb) rfb.addEventListener('click', () => location.reload()); }
+  { const rfb = document.getElementById('refreshBtn'); if (rfb) rfb.addEventListener('click', () => {
+    // تحديث كامل: تجاوز ذاكرة المتصفّح بإعادة تحميل المستند برابطٍ جديد (يُبقي الشاشة الحالية).
+    try {
+      const hash = location.hash || '#/home';
+      location.replace(location.pathname + '?r=' + Date.now() + hash);
+    } catch (e) { location.reload(); }
+  }); }
   if (configMissing()) { showSetup(); return; }
   sb = window.supabase.createClient(window.ALMFRJE_CONFIG.SUPABASE_URL, window.ALMFRJE_CONFIG.SUPABASE_ANON_KEY);
   // إعداد تلقائي للقاعدة بأسلوب «أفضل جهد» وبلا انتظار — لا يحجب فتح التطبيق.
