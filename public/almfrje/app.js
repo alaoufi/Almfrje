@@ -224,6 +224,10 @@ let sitePowered = DEFAULT_SITE_POWERED;
 let homeHero = DEFAULT_HOME_HERO;
 let feedbackCardText = DEFAULT_FB_CARD;
 let guestPrompt = DEFAULT_GUEST_PROMPT;
+// كلمة المناسبات: تظهر تحت عنوان شاشة الدخول بخط غامق، نصّها ولونها من «التحكم ← النصوص».
+let occasionText = '';
+let occasionColor = '#c0392b';
+const okColor = (c) => (/^#[0-9a-fA-F]{3,8}$/.test(String(c || '')) ? c : '#c0392b');
 // الصفحة التعريفية (HTML منسّق) — يحرّرها المدير من «التحكم ← الصفحة التعريفية».
 const DEFAULT_ABOUT =
   '<p class="about-eyebrow">نبذة تعريفية</p>' +
@@ -370,6 +374,8 @@ async function loadSettings() {
     feedbackCardText = typeof map.feedback_card_text === 'string' && map.feedback_card_text ? map.feedback_card_text : DEFAULT_FB_CARD;
     guestPrompt = typeof map.guest_prompt === 'string' && map.guest_prompt ? map.guest_prompt : DEFAULT_GUEST_PROMPT;
     aboutHtml = typeof map.about_html === 'string' && map.about_html ? map.about_html : DEFAULT_ABOUT;
+    occasionText = typeof map.occasion_text === 'string' ? map.occasion_text : '';
+    occasionColor = okColor(map.occasion_color);
     // تطبيق نصوص التعليمات المعدّلة من الإعدادات فوق الافتراضية
     applyHintOverrides(map.hints_overrides);
   } catch (e) { /* تجاهل — تبقى القيم الافتراضية */ }
@@ -2955,6 +2961,12 @@ function screenTexts() {
       ${fInput('عنوان الموقع', 'tx_title', siteTitle)}
       ${fInput('سطر الإسناد (powered by) — اتركه فارغاً لإخفائه', 'tx_powered', sitePowered)}
       <button class="btn sm" id="tx_titleSave" style="margin-top:6px">حفظ</button></div>
+    <div class="card"><h3>🎉 كلمة المناسبات (شاشة الدخول)</h3>
+      <p class="muted" style="font-size:.85rem;margin-top:-2px">تظهر تحت العنوان مباشرة في شاشة الدخول بخط غامق وباللون الذي تختاره. اتركها فارغة لإخفائها.</p>
+      ${fInput('الكلمة', 'tx_occ', occasionText)}
+      <div class="field"><label>لون الكلمة</label><input type="color" id="tx_occ_color" value="${okColor(occasionColor)}" style="width:60px;height:38px;padding:2px;border:1px solid var(--line);border-radius:8px;background:var(--card)"></div>
+      <div id="occPreview" style="font-weight:800;font-size:1.05rem;text-align:center;margin:8px 0;color:${okColor(occasionColor)}">${esc(occasionText || 'معاينة الكلمة')}</div>
+      <button class="btn sm" id="tx_occSave">حفظ</button></div>
     <div class="card"><h3>✉️ نص بطاقة «ملاحظات الزوار»</h3>
       <p class="muted" style="font-size:.85rem;margin-top:-2px">النص التعريفي في بطاقة إرسال الملاحظة بالرئيسية.</p>
       ${fTextarea('النص', 'tx_fbcard', feedbackCardText)}
@@ -3005,6 +3017,20 @@ function screenTexts() {
     });
     if (ok) { siteTitle = t; sitePowered = pw; toast('تم حفظ العنوان'); }
   });
+  { // كلمة المناسبات: معاينة حيّة + حفظ النص واللون
+    const occInp = document.getElementById('tx_occ'), occCol = document.getElementById('tx_occ_color'), occPrev = document.getElementById('occPreview');
+    const refresh = () => { if (!occPrev) return; occPrev.textContent = (occInp.value || '').trim() || 'معاينة الكلمة'; occPrev.style.color = okColor(occCol.value); };
+    if (occInp) occInp.addEventListener('input', refresh);
+    if (occCol) occCol.addEventListener('input', refresh);
+    document.getElementById('tx_occSave').addEventListener('click', async () => {
+      const t = (occInp.value || '').trim(); const c = okColor(occCol.value);
+      const ok = await guard(async () => {
+        let { error } = await sb.from('almfrje_settings').upsert({ key: 'occasion_text', value: t, updated_at: new Date().toISOString() }, { onConflict: 'key' }); if (error) throw error;
+        ({ error } = await sb.from('almfrje_settings').upsert({ key: 'occasion_color', value: c, updated_at: new Date().toISOString() }, { onConflict: 'key' })); if (error) throw error;
+      });
+      if (ok) { occasionText = t; occasionColor = c; toast(t ? 'تم حفظ كلمة المناسبة' : 'أُخفيت كلمة المناسبة'); }
+    });
+  }
   document.getElementById('tx_fbcardSave').addEventListener('click', async () => {
     const t = val('tx_fbcard').trim() || DEFAULT_FB_CARD;
     const ok = await guard(async () => { const { error } = await sb.from('almfrje_settings').upsert({ key: 'feedback_card_text', value: t, updated_at: new Date().toISOString() }, { onConflict: 'key' }); if (error) throw error; });
@@ -3744,7 +3770,8 @@ function renderAuth() {
     // ===== واجهة الزائر: حقل واحد فقط (الاسم بالتسلسل) =====
     box.innerHTML = `<div class="auth-box">
       <div class="logo" style="font-size:3.2rem">🌳</div>
-      <h2 style="margin:.2rem 0 12px">${esc(siteTitle)}</h2>
+      <h2 style="margin:.2rem 0 ${occasionText ? '4px' : '12px'}">${esc(siteTitle)}</h2>
+      ${occasionText ? `<div style="font-weight:800;font-size:1.05rem;margin:0 0 12px;text-align:center;color:${okColor(occasionColor)}">${esc(occasionText)}</div>` : ''}
       <div style="font-size:1.1rem;font-weight:800;margin-bottom:10px;text-align:center">${esc(guestPrompt)}</div>
       ${fInput('اكتب اسمك بالتسلسل هنا', 'g_lineage', '')}
       <div style="font-size:.92rem;font-weight:700;margin:6px 0 4px;text-align:center">تدخل تلقائياً بمجرد أن يتميّز اسمك — مثال: <span style="color:var(--brand)">${esc(gensExample(3))}</span></div>
@@ -3763,6 +3790,7 @@ function renderAuth() {
   // ===== واجهة المسؤول/المشرف =====
   box.innerHTML = `<div class="auth-box">
     <div class="logo">🌳</div><h2 style="margin-bottom:0">${esc(siteTitle)}</h2>
+    ${occasionText ? `<div style="font-weight:800;font-size:1.05rem;margin:4px 0 2px;text-align:center;color:${okColor(occasionColor)}">${esc(occasionText)}</div>` : ''}
     ${sitePowered ? `<div style="font-size:.72rem;opacity:.8;margin-bottom:.4rem">${esc(sitePowered)}</div>` : ''}<div class="sub">دخول المسؤول / مشرف الفرع</div>
     ${fInput('الجوال أو اسم المستخدم', 'a_id', '')}
     ${pinField('الرقم السري', 'a_pin')}
