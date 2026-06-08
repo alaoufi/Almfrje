@@ -1003,10 +1003,11 @@ function openLens(id) {
       <button class="btn sm" data-ql="lineage">🧬 مسار النسب</button>
       <button class="btn sm" data-ql="desc">🗺️ خريطة الذرية</button>
       <button class="btn sm" data-ql="rel">👨‍👩‍👧 أقربائي</button>
+      <button class="btn sm" data-ql="radial">🔆 اجعله مركز الدائرية</button>
       <button class="btn sm outline" data-ql="tree">🌳 فتح في الشجرة</button>
       <button class="btn sm outline" data-ql="profile">📄 فتح الملف الكامل</button>
     </div>`, () => {
-    const act = { lineage: () => { closeModal(); lineagePathModal(id); }, desc: () => { closeModal(); descendantsMiniMap(id); }, rel: () => { closeModal(); relativesModal(id); }, tree: () => { closeModal(); setHash('#/tree/' + id); }, profile: () => { closeModal(); setHash('#/person/' + id); } };
+    const act = { lineage: () => { closeModal(); lineagePathModal(id); }, desc: () => { closeModal(); descendantsMiniMap(id); }, rel: () => { closeModal(); relativesModal(id); }, radial: () => { closeModal(); setHash('#/radial/' + id); }, tree: () => { closeModal(); setHash('#/tree/' + id); }, profile: () => { closeModal(); setHash('#/person/' + id); } };
     document.querySelectorAll('#modalRoot [data-ql]').forEach(b => b.addEventListener('click', () => act[b.dataset.ql]()));
   });
 }
@@ -1116,14 +1117,16 @@ function buildRadial(rootId, maxGen) {
   }
   const tree = build(root, 0);
   (function weigh(n) { if (!n.children.length) { n.w = 1; return 1; } n.w = n.children.reduce((s, c) => s + weigh(c), 0); return n.w; })(tree);
-  const ring = 150; const nodes = [], links = [];
+  // مسافة الحلقات تكبر مع الأجيال لمنع الازدحام في الحلقات الخارجية.
+  const ringR = (d) => [0, 200, 360, 510, 650, 780, 900][d] != null ? [0, 200, 360, 510, 650, 780, 900][d] : d * 150;
+  const nodes = [], links = [];
   (function place(n, a0, a1) {
-    const mid = (a0 + a1) / 2, r = n.depth * ring;
-    n.x = r * Math.cos(mid); n.y = r * Math.sin(mid); nodes.push(n);
+    const mid = (a0 + a1) / 2, r = ringR(n.depth);
+    n.x = r * Math.cos(mid); n.y = r * Math.sin(mid); n.angle = mid; nodes.push(n);
     let a = a0; const tot = n.w || 1;
     for (const c of n.children) { const span = (a1 - a0) * ((c.w || 1) / tot); place(c, a, a + span); links.push([n, c]); a += span; }
-  })(tree, 0, Math.PI * 2);
-  return { nodes, links };
+  })(tree, -Math.PI / 2, Math.PI * 1.5);
+  return { nodes, links, ringR, maxGen };
 }
 function screenRadial(arg) {
   if (arg && arg !== 'all') { const rid = parseInt(arg, 10); if (byId.get(rid)) radRoot = byId.get(rid); }
@@ -1136,27 +1139,52 @@ function screenRadial(arg) {
   const lay = buildRadial(radRoot.id, maxG);
   let minX = 1e9, minY = 1e9, maxX = -1e9, maxY = -1e9;
   lay.nodes.forEach(n => { minX = Math.min(minX, n.x); maxX = Math.max(maxX, n.x); minY = Math.min(minY, n.y); maxY = Math.max(maxY, n.y); });
-  const pad = 90, vbW = (maxX - minX) + pad * 2, vbH = (maxY - minY) + pad * 2, ox = minX - pad, oy = minY - pad;
+  const pad = 170, vbW = (maxX - minX) + pad * 2, vbH = (maxY - minY) + pad * 2, ox = minX - pad, oy = minY - pad;
   const big = lay.nodes.length > 120;
-  const lines = lay.links.map(([a, b]) => `<line x1="${a.x.toFixed(1)}" y1="${a.y.toFixed(1)}" x2="${b.x.toFixed(1)}" y2="${b.y.toFixed(1)}" class="rad-link"/>`).join('');
-  const circles = lay.nodes.map(n => {
-    if (n.more) return `<g class="rad-g rad-more" data-radmore="${n.parentId}"><circle cx="${n.x.toFixed(1)}" cy="${n.y.toFixed(1)}" r="16"/><text x="${n.x.toFixed(1)}" y="${(n.y + 4).toFixed(1)}" text-anchor="middle">+${n.n}</text></g>`;
-    const r = n.depth === 0 ? 26 : (n.depth === 1 ? 19 : 15);
-    const nm = n.p.name.length > 8 ? n.p.name.slice(0, 8) + '…' : n.p.name;
-    return `<g class="rad-g" data-radid="${n.p.id}"><title>${esc(n.p.name)}</title><circle cx="${n.x.toFixed(1)}" cy="${n.y.toFixed(1)}" r="${r}" class="rad-c d${Math.min(n.depth, 3)} ${nameCls(n.p)}"/><text x="${n.x.toFixed(1)}" y="${(n.y + 4).toFixed(1)}" text-anchor="middle" class="rad-t">${esc(nm)}</text></g>`;
+  // حلقات إرشادية خافتة لكل جيل
+  const guides = [];
+  for (let d = 1; d <= maxG; d++) { const rr = lay.ringR(d); if (rr) guides.push(`<circle cx="0" cy="0" r="${rr}" class="rad-ring"/>`); }
+  // وصلات منحنية أنيقة (منحنى تربيعي نحو المركز) أوضح من الخطوط المتقاطعة
+  const lines = lay.links.map(([a, b]) => {
+    const mx = (a.x + b.x) / 2 * 0.6, my = (a.y + b.y) / 2 * 0.6;
+    return `<path d="M${a.x.toFixed(1)} ${a.y.toFixed(1)} Q ${mx.toFixed(1)} ${my.toFixed(1)} ${b.x.toFixed(1)} ${b.y.toFixed(1)}" class="rad-link"/>`;
   }).join('');
+  const RAD = (d) => d === 0 ? 30 : d === 1 ? 21 : d === 2 ? 15 : 11;
+  const circles = lay.nodes.map(n => {
+    if (n.more) return `<g class="rad-g rad-more" data-radmore="${n.parentId}"><circle cx="${n.x.toFixed(1)}" cy="${n.y.toFixed(1)}" r="15"/><text x="${n.x.toFixed(1)}" y="${(n.y + 4).toFixed(1)}" text-anchor="middle">+${n.n}</text></g>`;
+    const r = RAD(n.depth);
+    const nm = n.p.name.length > 12 ? n.p.name.slice(0, 12) + '…' : n.p.name;
+    const circle = `<circle cx="${n.x.toFixed(1)}" cy="${n.y.toFixed(1)}" r="${r}" class="rad-c d${Math.min(n.depth, 3)} ${nameCls(n.p)}"/>`;
+    let label;
+    if (n.depth === 0) {
+      label = `<text x="${n.x.toFixed(1)}" y="${(n.y + 5).toFixed(1)}" text-anchor="middle" class="rad-t rad-t0">${esc(nm)}</text>`;
+    } else {
+      // تسمية شعاعية تخرج من العقدة نحو الخارج (تقلّل التداخل)، تنقلب في النصف الأيسر لتُقرأ
+      const deg = n.angle * 180 / Math.PI;
+      const flip = Math.cos(n.angle) < 0;
+      const lr = r + 5;
+      const lx = n.x + lr * Math.cos(n.angle), ly = n.y + lr * Math.sin(n.angle);
+      const rot = flip ? deg + 180 : deg;
+      const anchor = flip ? 'end' : 'start';
+      label = `<text x="${lx.toFixed(1)}" y="${ly.toFixed(1)}" transform="rotate(${rot.toFixed(1)} ${lx.toFixed(1)} ${ly.toFixed(1)})" text-anchor="${anchor}" dominant-baseline="middle" class="rad-t rad-lbl">${esc(nm)}</text>`;
+    }
+    return `<g class="rad-g" data-radid="${n.p.id}"><title>${esc(n.p.name)}</title>${circle}${label}</g>`;
+  }).join('');
+  const parent = radRoot.father_id ? byId.get(radRoot.father_id) : null;
   view().innerHTML = `
     <div class="card">
       <div class="tl-top"><h3 style="margin:0">🔆 الشجرة الدائرية</h3><span class="tl-rootbadge">المركز: <b>${esc(radRoot.name)}</b></span></div>
       <div class="tl-filters">
-        <button class="btn sm outline" id="rad_pick" style="margin:0">⌖ تغيير الجذر</button>
+        ${parent ? `<button class="btn sm" id="rad_up" style="margin:0">⬆ المركز: ${esc(parent.name)}</button>` : ''}
+        <button class="btn sm outline" id="rad_pick" style="margin:0">⌖ تغيير المركز</button>
         <span class="rad-genctl">الأجيال: <button class="btn sm" id="rad_dec" style="margin:0">−</button> <b>${maxG}</b> <button class="btn sm" id="rad_inc" style="margin:0">+</button></span>
         <span class="rad-genctl">تكبير: <button class="btn sm" id="rad_zout" style="margin:0">−</button> <button class="btn sm" id="rad_zin" style="margin:0">+</button></span>
       </div>
-      ${big ? '<p class="muted" style="font-size:.78rem;margin:6px 0 0">لتحسين الأداء يتم عرض الأجيال المختارة فقط، وتُجمَّع الفروع الكبيرة في «+عدد» (اضغطها لفتح فهرس الذرية).</p>' : ''}
+      <p class="muted" style="font-size:.78rem;margin:6px 0 0">اضغط أي اسم لفتح أدواته و«اجعله المركز». ${big ? 'وتُجمَّع الفروع الكبيرة في «+عدد».' : ''}</p>
     </div>
-    <div class="rad-wrap"><svg class="rad-svg" viewBox="${ox.toFixed(0)} ${oy.toFixed(0)} ${vbW.toFixed(0)} ${vbH.toFixed(0)}" style="width:${(vbW * radZoom).toFixed(0)}px;height:${(vbH * radZoom).toFixed(0)}px">${lines}${circles}</svg></div>`;
-  document.getElementById('rad_pick').addEventListener('click', () => pickPerson('اختر جذر الشجرة الدائرية', p => p && setHash('#/radial/' + p.id)));
+    <div class="rad-wrap"><svg class="rad-svg" viewBox="${ox.toFixed(0)} ${oy.toFixed(0)} ${vbW.toFixed(0)} ${vbH.toFixed(0)}" style="width:${(vbW * radZoom).toFixed(0)}px;height:${(vbH * radZoom).toFixed(0)}px"><g class="rad-guides">${guides.join('')}</g>${lines}${circles}</svg></div>`;
+  { const up = document.getElementById('rad_up'); if (up && parent) up.addEventListener('click', () => setHash('#/radial/' + parent.id)); }
+  document.getElementById('rad_pick').addEventListener('click', () => pickPerson('اختر مركز الشجرة الدائرية', p => p && setHash('#/radial/' + p.id)));
   document.getElementById('rad_inc').addEventListener('click', () => { radGens = Math.min(6, radGens + 1); screenRadial(String(radRoot.id)); });
   document.getElementById('rad_dec').addEventListener('click', () => { radGens = Math.max(1, radGens - 1); screenRadial(String(radRoot.id)); });
   document.getElementById('rad_zin').addEventListener('click', () => { radZoom = Math.min(3, radZoom + 0.25); screenRadial(String(radRoot.id)); });

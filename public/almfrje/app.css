@@ -737,14 +737,18 @@ ul.hier ul.hier > .hier-li::before {
 .rad-genctl .btn { min-width: 30px; padding: 4px 8px; }
 .rad-wrap { width: 100%; overflow: auto; -webkit-overflow-scrolling: touch; border: 1px solid var(--line); border-radius: 12px; background: var(--card); padding: 8px; }
 .rad-svg { display: block; }
-.rad-link { stroke: color-mix(in srgb, var(--brand) 40%, transparent); stroke-width: 1.4; }
+.rad-guides .rad-ring { fill: none; stroke: var(--line); stroke-width: 1; stroke-dasharray: 3 5; opacity: .7; }
+.rad-link { fill: none; stroke: color-mix(in srgb, var(--brand) 35%, transparent); stroke-width: 1.6; }
 .rad-g { cursor: pointer; }
-.rad-c { fill: var(--brand); stroke: #fff; stroke-width: 2; }
-.rad-c.d0 { fill: var(--brand-d); } .rad-c.d1 { fill: var(--brand); } .rad-c.d2 { fill: var(--accent); } .rad-c.d3 { fill: #6b7fd1; }
+.rad-c { fill: var(--brand); stroke: #fff; stroke-width: 2.5; }
+.rad-c.d0 { fill: var(--brand-d); stroke-width: 3; } .rad-c.d1 { fill: var(--brand); } .rad-c.d2 { fill: var(--accent); } .rad-c.d3 { fill: #6b7fd1; }
 .rad-c.n-died { fill: var(--muted); } .rad-c.n-noissue { fill: var(--danger); }
-.rad-t { fill: #fff; font-size: 11px; font-weight: 700; pointer-events: none; }
+/* تسمية المركز داخل الدائرة بيضاء؛ التسميات الشعاعية بلون النص مع هالة بيضاء لوضوحها */
+.rad-t { pointer-events: none; font-weight: 800; }
+.rad-t0 { fill: #fff; font-size: 13px; }
+.rad-lbl { fill: var(--text); font-size: 12px; paint-order: stroke; stroke: var(--card); stroke-width: 3px; stroke-linejoin: round; }
 .rad-more circle { fill: color-mix(in srgb, var(--brand) 22%, var(--card)); stroke: var(--brand); stroke-width: 1.5; }
-.rad-more text { fill: var(--brand); font-size: 11px; font-weight: 800; pointer-events: none; }
+.rad-more text { fill: var(--brand); font-size: 12px; font-weight: 800; pointer-events: none; }
 
 /* ===== وضع تتبّع الفرع ===== */
 .track-bar { background: color-mix(in srgb, var(--brand) 8%, var(--card)); border: 1px solid color-mix(in srgb, var(--brand) 35%, transparent); border-radius: 12px; padding: 10px 12px; margin-bottom: 12px; }
