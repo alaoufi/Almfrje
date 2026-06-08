@@ -2647,6 +2647,7 @@ async function undoFromAudit(row) {
 
 /* ===== قائمة تعديل/مراجعة بيانات الأفراد (لكل فرد على حدة) — الأحياء فقط ===== */
 let gridAncestor = null;   // الجدّ المختار لحصر النطاق في قائمة التعديل/المراجعة
+let gridReviewStatus = 'alive';   // مرشّح المراجعة: alive | dead | all
 // الحقول القابلة للتعديل بالقائمة (بيانات لا بنية — لا الاسم ولا الأب)
 const GRID_FIELDS = [
   { k: 'status', ar: 'الحالة', type: 'select', opts: STATUS },
@@ -2667,10 +2668,12 @@ function fieldEditorNote(p, k) {
   if (p.updated_by_name) return esc(p.updated_by_name) + (p.updated_at ? ' • ' + fmtDate(p.updated_at) : '');
   return '';
 }
-function gridPool() {
+function gridPool(statusFilter) {
   if (!gridAncestor) return [];
-  let pool = descendants(gridAncestor.id).filter(p => p.status !== 'dead');   // الأحياء فقط
-  if (!isAdmin() && isManager()) pool = pool.filter(p => inMyBranch(p));        // مشرف الفرع: نطاقه
+  let pool = descendants(gridAncestor.id);
+  if (statusFilter === 'dead') pool = pool.filter(p => p.status === 'dead');         // المتوفّون فقط
+  else if (statusFilter !== 'all') pool = pool.filter(p => p.status !== 'dead');     // الأحياء (الافتراضي)
+  if (!isAdmin() && isManager()) pool = pool.filter(p => inMyBranch(p));            // مشرف الفرع: نطاقه
   pool.sort((a, b) => (a.generation - b.generation) || (a.sort - b.sort) || (a.id - b.id));
   return pool;
 }
@@ -2722,7 +2725,12 @@ function screenGrid(mode) {
       <p class="muted" style="font-size:.85rem;margin-top:-4px">تظهر الحقول المختارة فقط في القائمة لتعديل كل فرد على حدة.</p>
       ${faNote}
       <div class="grid-fields">${GRID_FIELDS.map(f => `<label class="perm-chk"><input type="checkbox" data-gf="${f.k}"><span>${f.ar}</span></label>`).join('')}</div></div>`}
-    <div class="card"><h3>${review ? '② بيانات الأحياء' : '③ عدّل ثم احفظ'}</h3>
+    <div class="card"><h3>${review ? '② البيانات' : '③ عدّل ثم احفظ'}</h3>
+      ${review ? `<div class="seg" id="g_status">
+        <button class="seg-b${gridReviewStatus === 'alive' ? ' on' : ''}" data-st="alive">الأحياء</button>
+        <button class="seg-b${gridReviewStatus === 'dead' ? ' on' : ''}" data-st="dead">المتوفّون</button>
+        <button class="seg-b${gridReviewStatus === 'all' ? ' on' : ''}" data-st="all">الكل</button>
+      </div>` : ''}
       <div id="g_count" class="search-count"></div>
       <div id="g_list" class="grid-list"></div>
       ${review ? '' : `<button class="btn btn-lg" id="g_save" style="margin-top:12px" disabled>💾 حفظ التعديلات</button>`}
@@ -2735,9 +2743,10 @@ function screenGrid(mode) {
     if (!gridAncestor) { cnt.textContent = 'اختر الجدّ أولاً لعرض القائمة'; box.innerHTML = ''; if (sv) sv.disabled = true; return; }
     const fields = selFields();
     if (!review && !fields.length) { cnt.textContent = 'اختر حقلاً واحداً على الأقل'; box.innerHTML = ''; if (sv) sv.disabled = true; return; }
-    const pool = gridPool();   // الأحياء فقط (المتوفّى لا يُعرض)
-    cnt.innerHTML = `الأحياء في ذرّية «${esc(gridAncestor.name)}»: <b>${pool.length}</b>`;
-    if (!pool.length) { box.innerHTML = '<div class="muted" style="padding:8px">لا أحياء ضمن نطاقك في ذرّية هذا الجدّ.</div>'; if (sv) sv.disabled = true; return; }
+    const pool = gridPool(review ? gridReviewStatus : 'alive');   // التعديل: الأحياء فقط؛ المراجعة: حسب المرشّح
+    const lbl = !review ? 'الأحياء' : (gridReviewStatus === 'dead' ? 'المتوفّون' : gridReviewStatus === 'all' ? 'الكل' : 'الأحياء');
+    cnt.innerHTML = `${lbl} في ذرّية «${esc(gridAncestor.name)}»: <b>${pool.length}</b>`;
+    if (!pool.length) { box.innerHTML = '<div class="muted" style="padding:8px">لا نتائج ضمن نطاقك في ذرّية هذا الجدّ.</div>'; if (sv) sv.disabled = true; return; }
     if (review) {
       box.innerHTML = pool.map(p => gridCard(p, fields, true)).join('');
     } else {
@@ -2750,6 +2759,11 @@ function screenGrid(mode) {
   const setAnc = (fp) => { gridAncestor = fp; const el = document.getElementById('g_ancLabel'); el.textContent = fp ? '👤 ' + fp.name + ' (جيل ' + fp.generation + ')' : '— اختر الجدّ —'; el.classList.toggle('empty', !fp); renderList(); };
   document.getElementById('g_pickAnc').addEventListener('click', () => pickAncestorModal(setAnc));
   document.getElementById('g_clrAnc').addEventListener('click', () => setAnc(null));
+  if (review) view().querySelectorAll('#g_status .seg-b').forEach(b => b.addEventListener('click', () => {
+    gridReviewStatus = b.dataset.st;
+    view().querySelectorAll('#g_status .seg-b').forEach(x => x.classList.toggle('on', x === b));
+    renderList();
+  }));
   if (!review) view().querySelectorAll('input[data-gf]').forEach(cb => cb.addEventListener('change', renderList));
   if (!review) document.getElementById('g_save').addEventListener('click', () => gridSave(selFields()));
   if (gridAncestor) { const el = document.getElementById('g_ancLabel'); el.textContent = '👤 ' + gridAncestor.name + ' (جيل ' + gridAncestor.generation + ')'; el.classList.remove('empty'); }

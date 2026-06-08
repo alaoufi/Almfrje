@@ -474,11 +474,17 @@ ul.hier ul.hier > .hier-li::before {
 .grid-f label { flex: 0 0 92px; font-size: .85rem; color: var(--muted); }
 .grid-f input, .grid-f select { flex: 1; padding: 9px 10px; border: 1px solid var(--line); border-radius: 9px; font: inherit; background: var(--card); color: var(--text); }
 .grid-f input:focus, .grid-f select:focus { outline: none; border-color: var(--brand); box-shadow: 0 0 0 2px var(--brand-l); }
-.grid-rev { display: grid; grid-template-columns: 92px 1fr auto; gap: 8px; align-items: baseline; padding: 4px 0; border-bottom: 1px solid var(--line); }
+.grid-rev { display: grid; grid-template-columns: 92px minmax(0,1fr); gap: 2px 8px; align-items: baseline; padding: 4px 0; border-bottom: 1px solid var(--line); }
 .grid-rev:last-child { border-bottom: 0; }
 .grid-rev-l { font-size: .82rem; color: var(--muted); }
-.grid-rev-v { font-weight: 700; }
-.grid-rev-by { font-size: .72rem; color: var(--brand); white-space: nowrap; }
+.grid-rev-v { font-weight: 700; word-break: break-word; min-width: 0; }
+.grid-rev-by { grid-column: 2; font-size: .72rem; color: var(--brand); white-space: normal; word-break: break-word; min-width: 0; }
+
+/* مبدّل قطاعي (الأحياء/المتوفّون/الكل) */
+.seg { display: flex; gap: 0; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; margin-bottom: 10px; }
+.seg-b { flex: 1; padding: 8px 4px; border: 0; background: var(--card); color: var(--text); font: inherit; font-weight: 700; cursor: pointer; border-inline-start: 1px solid var(--line); }
+.seg-b:first-child { border-inline-start: 0; }
+.seg-b.on { background: var(--brand); color: #fff; }
 /* تخطيط جدولي للتعديل: الاسم وبجانبه حقوله في صفّ واحد */
 .grid-table { border: 1px solid var(--line); border-radius: 12px; overflow-x: auto; margin-top: 6px; }
 .grid-trow { display: grid; grid-template-columns: minmax(100px, 1.2fr) repeat(var(--cols), minmax(116px, 1fr)); gap: 6px; align-items: center; padding: 6px 8px; border-bottom: 1px solid var(--line); }
