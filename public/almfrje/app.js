@@ -105,6 +105,7 @@ const HINTS = {
   hierarchy: ['العرض الهرمي', 'عرض منظّم للشجرة على شكل بطاقات متدرّجة بالألوان حسب الجيل.\n• «توسيع الكل» يفتح كل الفروع.\n• «طباعة / PDF» يصدّر الشجرة كاملة.'],
   outline: ['نموذج الأعمدة', 'عرض الشجرة بأعمدة (كل جيل في عمود) — نفس شكل ملف Excel، ومناسب للطباعة.'],
   descendants: ['فهرس الذرية', 'قائمة مرقّمة بكل ذرية الشخص بنظام أنساب هرمي.\n\nكيف تقرأ الرقم بجوار الاسم؟\n• كل رقم يُمثّل جيلاً، وقيمته = ترتيب الشخص بين إخوته.\n• كلّما طال الرقم نزلنا جيلاً للأسفل.\n\nمثال: لو كان الجذر «فراج»:\n• ‎1‎ = فراج نفسه (الجذر).\n• ‎1‑2‎ = ابن فراج الثاني.\n• ‎1‑2‑1‎ = أوّل أبناء (1‑2)، أي حفيد فراج.\n• ‎1‑2‑1‑3‎ = ثالث أبناء (1‑2‑1)، أي ابن الحفيد.\n\nأي: اقرأ الرقم من اليسار لليمين كسلسلة نسب من الجدّ نزولاً، وآخر رقم هو ترتيبه بين إخوته.\n\nالصفوف ذات الخلفية الملوّنة = آباء لهم ذرية، وتحتها أبناؤهم مُزاحون قليلاً.\n\nومن هذا الفهرس تُصدّر Excel ملوّن أو PDF أو نص مرقّم.'],
+  kinship: ['حاسبة صلة القرابة', 'اختر شخصين فتُحسب صلة القرابة بينهما تلقائياً:\n• الجدّ المشترك الأقرب بينهما.\n• نوع الصلة (أخوان، عمّ وابن أخ، ابنا عمّ…).\n• مسار النسب لكلٍّ منهما حتى الجدّ المشترك.\n\nالحساب يعتمد على سلسلة الآباء المسجّلة. اضغط «↕️ تبديل» لقلب الترتيب، و«مسح» لإعادة الاختيار.'],
   // ——— إضافة وتعديل ———
   add_person: ['إضافة مولود', 'الخطوات:\n١) اختر الأب من الشجرة.\n٢) اكتب اسم المولود.\n٣) (اختياري) أضف بقية البيانات.\n٤) اضغط «إضافة المولود».\n\nيُحدَّد الفرع تلقائياً من فرع الأب.'],
   add_father: ['الأب المباشر', 'اضغط «اختيار الأب» وابحث عن والد المولود.\nيُحدَّد فرع المولود تلقائياً من فرع أبيه.\n\nمشرف الفرع يختار أباً ضمن فرعه فقط.'],
@@ -531,6 +532,7 @@ const ROUTES = {
   outline: { t: 'نموذج الأعمدة', back: true, fn: screenOutline },
   timeline: { t: 'خط الأجيال', back: true, fn: screenTimeline },
   radial: { t: 'الشجرة الدائرية', back: true, fn: screenRadial },
+  kinship: { t: 'حاسبة صلة القرابة', back: true, fn: screenKinship },
   printtree: { t: 'نسخة للطباعة', back: true, fn: screenPrintTree },
   printview: { t: 'نسخة للطباعة', back: true, fn: screenPrintView },
   import: { t: 'استيراد Excel', back: true, fn: screenImport },
@@ -1004,11 +1006,12 @@ function openLens(id) {
       <button class="btn sm" data-ql="lineage">🧬 مسار النسب</button>
       <button class="btn sm" data-ql="desc">🗺️ خريطة الذرية</button>
       <button class="btn sm" data-ql="rel">👨‍👩‍👧 أقربائي</button>
+      <button class="btn sm" data-ql="kin">🧬 صلة قرابته بشخص</button>
       <button class="btn sm" data-ql="radial">🔆 اجعله مركز الدائرية</button>
       <button class="btn sm outline" data-ql="tree">🌳 فتح في الشجرة</button>
       <button class="btn sm outline" data-ql="profile">📄 فتح الملف الكامل</button>
     </div>`, () => {
-    const act = { lineage: () => { closeModal(); lineagePathModal(id); }, desc: () => { closeModal(); descendantsMiniMap(id); }, rel: () => { closeModal(); relativesModal(id); }, radial: () => { closeModal(); setHash('#/radial/' + id); }, tree: () => { closeModal(); setHash('#/tree/' + id); }, profile: () => { closeModal(); setHash('#/person/' + id); } };
+    const act = { lineage: () => { closeModal(); lineagePathModal(id); }, desc: () => { closeModal(); descendantsMiniMap(id); }, rel: () => { closeModal(); relativesModal(id); }, kin: () => { closeModal(); kinA = byId.get(id); kinB = null; setHash('#/kinship'); }, radial: () => { closeModal(); setHash('#/radial/' + id); }, tree: () => { closeModal(); setHash('#/tree/' + id); }, profile: () => { closeModal(); setHash('#/person/' + id); } };
     document.querySelectorAll('#modalRoot [data-ql]').forEach(b => b.addEventListener('click', () => act[b.dataset.ql]()));
   });
 }
@@ -1742,6 +1745,122 @@ function pickPerson(title, onPick, filterFn) {
     };
     q.addEventListener('input', run); q.focus(); run();
   });
+}
+
+/* ===== حاسبة صلة القرابة ===== */
+let kinA = null, kinB = null;
+// الجدّ المشترك الأقرب لشخصين + درجة كلٍّ منهما إليه (عبر سلسلة الآباء).
+function lowestCommonAncestor(idA, idB) {
+  const pathA = getLineagePath(idA), pathB = getLineagePath(idB);
+  const idxB = new Map(); pathB.forEach((p, i) => idxB.set(p.id, i));
+  for (let i = 0; i < pathA.length; i++) {
+    if (idxB.has(pathA[i].id)) return { lca: pathA[i], dA: i, dB: idxB.get(pathA[i].id), pathA, pathB };
+  }
+  return { lca: null, dA: -1, dB: -1, pathA, pathB };
+}
+const genWord = (n) => n === 1 ? 'جيل' : (n === 2 ? 'جيلين' : (n <= 10 ? 'أجيال' : 'جيلاً'));
+// يحوّل (درجة A، درجة B) إلى وصفٍ عربيٍّ لصلة القرابة (نسب أبوي).
+function kinshipSentence(A, B, info) {
+  const { lca, dA, dB } = info;
+  if (!lca) return { rel: 'لا تربطهما قرابة مسجّلة', detail: 'الشخصان يعودان إلى أصلين مختلفين في البيانات، فلا جدّ مشترك بينهما.' };
+  // نسب مباشر (أحدهما من ذرية الآخر)
+  if (dA === 0 || dB === 0) {
+    const n = dA + dB;
+    const ancP = dA === 0 ? A : B, desP = dA === 0 ? B : A;
+    const term = n === 1 ? 'والد' : n === 2 ? 'جدّ' : n === 3 ? 'جدّ والد' : `جدٌّ أعلى (يفصلهما ${n} ${genWord(n)})`;
+    return { rel: `${esc(ancP.name)} ${term} ${esc(desP.name)}`, detail: `${esc(desP.name)} من ذريّة ${esc(ancP.name)} المباشرة (${n} ${genWord(n)}).` };
+  }
+  if (dA === 1 && dB === 1) return { rel: `${esc(A.name)} و${esc(B.name)} أخوان`, detail: `أبوهما المشترك: ${esc(lca.name)}.` };
+  // عمّ / ابن أخ (أحد الطرفين ابنٌ مباشر للجدّ المشترك)
+  if (Math.min(dA, dB) === 1) {
+    const shallow = dA === 1 ? A : B, deep = dA === 1 ? B : A, dDeep = Math.max(dA, dB);
+    const uncle = dDeep === 2 ? 'عمّ' : dDeep === 3 ? 'عمّ والد' : dDeep === 4 ? 'عمّ جدّ' : `عمٌّ من الجيل ${dDeep - 1}`;
+    const neph = dDeep === 2 ? 'ابن أخ' : dDeep === 3 ? 'ابن أخ والد' : 'من ذريّة أخي';
+    return { rel: `${esc(shallow.name)} ${uncle} ${esc(deep.name)}`, detail: `${esc(deep.name)} ${neph} ${esc(shallow.name)} — جدّهما المشترك: ${esc(lca.name)}.` };
+  }
+  // أبناء عمومة (كلاهما على بُعد جيلين أو أكثر)
+  if (dA === dB) {
+    const deg = dA - 1;
+    const label = deg === 1 ? 'ابنا عمّ (الدرجة الأولى)' : deg === 2 ? 'ابنا عمّ (الدرجة الثانية)' : `ابنا عمّ (الدرجة ${deg})`;
+    return { rel: `${esc(A.name)} و${esc(B.name)} ${label}`, detail: `جدّهما المشترك: ${esc(lca.name)}.` };
+  }
+  const deg = Math.min(dA, dB) - 1, df = Math.abs(dA - dB);
+  const base = deg === 1 ? 'ابنا عمّ' : `ابنا عمّ (الدرجة ${deg})`;
+  const higher = dA < dB ? A : B;
+  return { rel: `${esc(A.name)} و${esc(B.name)} ${base} مع فارق ${df} ${genWord(df)}`, detail: `${esc(higher.name)} أعلى جيلاً — جدّهما المشترك: ${esc(lca.name)}.` };
+}
+// سلسلة النسب من الشخص حتى الجدّ المشترك (مع إبراز الجدّ).
+function kinChainHtml(path, upto, lca) {
+  return path.slice(0, upto + 1).map(p => {
+    const isLca = lca && p.id === lca.id;
+    return `<span class="kin-name${isLca ? ' kin-lca-name' : ''} ${nameCls(p)}" data-lensid="${p.id}">${esc(p.name)}</span>`;
+  }).join('<span class="kin-bn">بن</span>');
+}
+function kinPlainText(A, B, info, s) {
+  const lines = [`صلة القرابة بين «${A.name}» و«${B.name}»:`, s.rel + (s.detail ? ' — ' + s.detail : '')];
+  if (info.lca) {
+    lines.push('', `الجدّ المشترك الأقرب: ${info.lca.name}`);
+    lines.push(`نسب ${A.name}: ${info.pathA.slice(0, info.dA + 1).map(p => p.name).join(' بن ')}`);
+    lines.push(`نسب ${B.name}: ${info.pathB.slice(0, info.dB + 1).map(p => p.name).join(' بن ')}`);
+  }
+  return lines.join('\n');
+}
+function renderKinResult() {
+  const box = document.getElementById('kinResult'); if (!box) return;
+  if (!kinA || !kinB) { box.innerHTML = ''; return; }
+  if (kinA.id === kinB.id) { box.innerHTML = '<div class="card kin-card"><div class="kin-rel">⚠️ اخترت الشخص نفسه في الخانتين.</div></div>'; return; }
+  const info = lowestCommonAncestor(kinA.id, kinB.id);
+  const s = kinshipSentence(kinA, kinB, info);
+  box.innerHTML = `
+    <div class="card kin-card">
+      <div class="kin-rel">🧬 ${s.rel}</div>
+      ${s.detail ? `<div class="kin-detail">${s.detail}</div>` : ''}
+      ${info.lca ? `
+        <div class="kin-lca">
+          <div class="kin-lca-l">الجدّ المشترك الأقرب</div>
+          <div class="kin-lca-name ${nameCls(info.lca)}" data-lensid="${info.lca.id}">${esc(info.lca.name)}</div>
+          <div class="muted" style="font-size:.78rem">جيل ${info.lca.generation} • ${esc(branchName(info.lca.branch_id))}</div>
+        </div>
+        <div class="kin-paths">
+          <div class="kin-path"><div class="kin-path-l">${esc(kinA.name)} — ${info.dA} ${info.dA === 1 ? 'درجة' : 'درجات'} حتى الجدّ</div><div class="kin-chain">${kinChainHtml(info.pathA, info.dA, info.lca)}</div></div>
+          <div class="kin-path"><div class="kin-path-l">${esc(kinB.name)} — ${info.dB} ${info.dB === 1 ? 'درجة' : 'درجات'} حتى الجدّ</div><div class="kin-chain">${kinChainHtml(info.pathB, info.dB, info.lca)}</div></div>
+        </div>
+        <p class="muted" style="font-size:.78rem;margin:8px 0 0">اضغط أي اسمٍ لفتح العدسة السريعة.</p>` : ''}
+      <div class="btn-row" style="margin-top:10px">
+        <button class="btn sm outline" id="kin_copy">📋 نسخ النتيجة</button>
+      </div>
+    </div>`;
+  box.querySelectorAll('[data-lensid]').forEach(el => el.addEventListener('click', () => openLens(parseInt(el.dataset.lensid, 10))));
+  document.getElementById('kin_copy').addEventListener('click', () => copyText(kinPlainText(kinA, kinB, info, s)));
+}
+function screenKinship() {
+  const slot = (label, p, which) => `
+    <div class="kin-slot">
+      <div class="kin-slot-l">${label}</div>
+      <div class="kin-slot-body">${p
+        ? `<div class="kin-slot-p"><b class="${nameCls(p)}">${esc(p.name)}</b><div class="muted" style="font-size:.8rem">${esc(ancestryShort(p.id)) || '— (الأصل)'}</div></div>`
+        : '<div class="muted">لم يُختر بعد</div>'}</div>
+      <button class="btn sm outline" data-kpick="${which}">${p ? 'تغيير' : 'اختيار'}</button>
+    </div>`;
+  view().innerHTML = `
+    <div class="card">
+      <div class="muted" style="margin-bottom:10px">اختر شخصين لمعرفة صلة القرابة بينهما والجدّ المشترك الأقرب.</div>
+      ${slot('الشخص الأول', kinA, 'a')}
+      <div class="kin-vs">⇕</div>
+      ${slot('الشخص الثاني', kinB, 'b')}
+      <div class="btn-row" style="margin-top:12px">
+        <button class="btn sm" id="kin_swap"${kinA && kinB ? '' : ' disabled'}>↕️ تبديل</button>
+        <button class="btn sm outline" id="kin_clear"${kinA || kinB ? '' : ' disabled'}>مسح</button>
+      </div>
+    </div>
+    <div id="kinResult"></div>`;
+  view().querySelectorAll('[data-kpick]').forEach(b => b.addEventListener('click', () => {
+    const which = b.dataset.kpick;
+    pickPerson('اختر الشخص ' + (which === 'a' ? 'الأول' : 'الثاني'), (p) => { if (!p) return; if (which === 'a') kinA = p; else kinB = p; screenKinship(); });
+  }));
+  document.getElementById('kin_swap').addEventListener('click', () => { const t = kinA; kinA = kinB; kinB = t; screenKinship(); });
+  document.getElementById('kin_clear').addEventListener('click', () => { kinA = null; kinB = null; screenKinship(); });
+  renderKinResult();
 }
 
 /* ===== العرض الهرمي النصي (للطباعة) ===== */
@@ -2575,6 +2694,7 @@ function screenMore() {
   if (r0) { browse.push(['🌳 العرض الهرمي العام', '#/hierarchy/all', 'hierarchy']); browse.push(['🗒️ نموذج الأعمدة', '#/outline/all', 'outline']); }
   browse.push(['🕓 خط الأجيال', '#/timeline/all']);
   browse.push(['🔆 الشجرة الدائرية', '#/radial/all']);
+  browse.push(['🧬 حاسبة صلة القرابة', '#/kinship', 'kinship']);
   browse.push(['📇 فهرس ذرية شخص', '#pickdesc', 'descendants']);
   browse.push(['🖨️ نسخة مختصرة للطباعة', '#/printtree']);
   groups.push(['🔎 العرض والتقارير', browse]);
@@ -3460,12 +3580,13 @@ const GUIDE = [
     { t: 'دلالة ألوان الأسماء', fn: 'فهم لون كل اسم في المشجرات.', brief: 'تظهر أسفل قوائم الشجرة.', det: 'اللون العادي = حي، الرمادي = متوفّى وله ذرية، الأحمر الداكن = متوفّى ولم يعقب. (المسميات يحدّدها المدير).' },
   ]},
   { sec: '🧭 أدوات المشجّرة', items: [
-    { t: 'العدسة السريعة', fn: 'بطاقة سريعة لأي شخص دون فتح صفحته.', brief: 'تظهر عند الضغط على أي اسم في الشجرة أو العرض الهرمي.', det: 'تعرض الاسم وأباه وفرعه وحالته وعدد أبنائه وذرّيته، وفيها أزرار: مسار النسب • خريطة الذرية • أقربائي • فتح في الشجرة • فتح الملف الكامل.' },
+    { t: 'العدسة السريعة', fn: 'بطاقة سريعة لأي شخص دون فتح صفحته.', brief: 'تظهر عند الضغط على أي اسم في الشجرة أو العرض الهرمي.', det: 'تعرض الاسم وأباه وفرعه وحالته وعدد أبنائه وذرّيته، وفيها أزرار: مسار النسب • خريطة الذرية • أقربائي • صلة قرابته بشخص • اجعله مركز الدائرية • فتح في الشجرة • فتح الملف الكامل.' },
     { t: 'مسار النسب', fn: 'عرض نسب أي شخص حتى الأصل.', brief: 'من العدسة → «مسار النسب».', det: 'يعرض السلسلة من الشخص حتى الجذر مع تمييز الشخص وأيقونة 🌳 للأصل. زر «نسخ النسب» ينسخه بصيغة «فلان بن فلان بن فلان»، و«فتح في الشجرة»، والضغط على أي اسمٍ في المسار يعرض الشجرة منه.' },
     { t: 'خريطة الذرية', fn: 'تلخيص ذرية أي شخص بسرعة.', brief: 'من العدسة → «خريطة الذرية».', det: 'بطاقة بإحصائيات (الأبناء/الأحفاد/إجمالي الذرية/الأجيال/الأحياء/المتوفّون) وأول مستويين من الذرية، مع روابط لفهرس الذرية والعرض الكامل وطباعة مختصر الذرية.' },
     { t: 'أقربائي', fn: 'عرض الأقرباء المباشرين فقط.', brief: 'من العدسة → «أقربائي».', det: 'يعرض الأب والإخوة والأبناء والأعمام وأبناء العم كأسماء قابلة للضغط — عرضٌ مختصر مناسب للجوال.' },
     { t: 'خط الأجيال', fn: 'عرض الأفراد مقسّمين حسب الجيل.', brief: 'المزيد → «خط الأجيال».', det: 'كل جيل في قسمٍ مع عدد أفراده، مع فلترة (الفرع/الأحياء/المتوفّون/لم يعقب) وبحث، وزر «ابدأ من شخص» لعرض الأجيال تحته فقط.' },
     { t: 'الشجرة الدائرية', fn: 'عرض بصري دائري للمشجّرة.', brief: 'المزيد → «الشجرة الدائرية».', det: 'المركز في الوسط والأجيال حلقاتٌ حوله (٣ افتراضياً، حتى ٦) بتسميات شعاعية واضحة. ضغطة قصيرة على أي اسم تفتح العدسة، و«ضغطة مطوّلة تجعله المركز». ولتغيير المركز أيضاً: زر «⬆ المركز: الأب»، أو «⌖ تغيير المركز»، أو «🔆 اجعله مركز الدائرية» من العدسة. مع تكبير، وتجميع الفروع الكبيرة في «+عدد» يفتح فهرس الذرية.' },
+    { t: 'حاسبة صلة القرابة', fn: 'معرفة صلة القرابة بين أيّ شخصين.', brief: 'المزيد → «حاسبة صلة القرابة»، أو من العدسة → «صلة قرابته بشخص».', det: 'اختر شخصين فيُحسب تلقائياً: الجدّ المشترك الأقرب بينهما، ونوع الصلة (أخوان، عمّ وابن أخ، ابنا عمّ بدرجاتها، أو نسب مباشر أب/جدّ)، ومسار نسب كلٍّ منهما حتى الجدّ المشترك مع إبرازه. يعتمد الحساب على سلسلة الآباء المسجّلة. أزرار: «↕️ تبديل» لقلب الترتيب، و«مسح»، و«📋 نسخ النتيجة». والضغط على أي اسمٍ يفتح العدسة السريعة.' },
     { t: 'نسخة مختصرة للطباعة', fn: 'مشجّرة نظيفة للطباعة أو PDF.', brief: 'المزيد → «نسخة مختصرة للطباعة».', det: 'اختر الفرع/الجدّ وعدد الأجيال وما يظهر (الحالة/المدينة/عدد الأبناء/الأحياء فقط)، ونمط الطباعة: «فهرس مرقّم مضغوط» (كل فرد في سطر — أقل صفحات) أو «مشجّرة متدرّجة». تُولَّد صفحة A4 نظيفة بأعمدة تلقائية تملأ الصفحة، للطباعة أو حفظ PDF.' },
     { t: 'تتبّع الفرع', fn: 'تركيز الشجرة على فرعٍ واحد.', brief: 'شاشة الفرع → «تتبّع هذا الفرع».', det: 'تركّز الشجرة على الفرع وتعرض شريطاً بـ«تتصفّح فرع: …» مع «تحديثات هذا الفرع» (عدد الأفراد والأجيال وآخر الإضافات). مشرف الفرع يبدأ على فرعه تلقائياً، والزائر يُقترح عليه «عرض فرعي فقط».' },
   ]},
