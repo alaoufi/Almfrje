@@ -745,3 +745,13 @@ ul.hier ul.hier > .hier-li::before {
 .rad-t { fill: #fff; font-size: 11px; font-weight: 700; pointer-events: none; }
 .rad-more circle { fill: color-mix(in srgb, var(--brand) 22%, var(--card)); stroke: var(--brand); stroke-width: 1.5; }
 .rad-more text { fill: var(--brand); font-size: 11px; font-weight: 800; pointer-events: none; }
+
+/* ===== وضع تتبّع الفرع ===== */
+.track-bar { background: color-mix(in srgb, var(--brand) 8%, var(--card)); border: 1px solid color-mix(in srgb, var(--brand) 35%, transparent); border-radius: 12px; padding: 10px 12px; margin-bottom: 12px; }
+.track-bar.suggest { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-weight: 700; }
+.track-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-weight: 700; flex-wrap: wrap; }
+.track-up { margin-top: 8px; border-top: 1px dashed var(--line); padding-top: 8px; }
+.track-up-h { font-size: .8rem; font-weight: 800; color: var(--brand); margin-bottom: 4px; }
+.track-stats { display: flex; gap: 14px; font-size: .85rem; color: var(--muted); margin-bottom: 6px; }
+.track-recent { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; }
+.track-lbl { font-size: .78rem; color: var(--muted); }

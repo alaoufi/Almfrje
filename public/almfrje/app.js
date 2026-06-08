@@ -1588,13 +1588,42 @@ function exportDescendantsText(rootId) {
 
 /* ===== الشجرة التفاعلية ===== */
 const treeOpen = new Set();
+/* ===== (7) وضع تتبّع الفرع ===== */
+const TRACK_KEY = 'almfrje_tracked_branch';
+function getTracked() { try { const v = parseInt(localStorage.getItem(TRACK_KEY) || '0', 10); return (v && branchById.get(v)) ? v : 0; } catch (e) { return 0; } }
+function setTracked(bid) { try { if (bid) localStorage.setItem(TRACK_KEY, String(bid)); else localStorage.removeItem(TRACK_KEY); } catch (e) { /* */ } }
+function branchPeople(bid) { const r = branchRoot(bid); if (!r) return []; return [r, ...descendants(r.id)]; }
+function trackingBarHtml() {
+  const bid = getTracked();
+  if (!bid) {
+    const gb = isGuestUser() ? (parseInt(sessionStorage.getItem('almfrje_guest_branch') || '0', 10) || 0) : 0;
+    return (gb && branchById.get(gb)) ? `<div class="track-bar suggest"><span>عرض فرعك فقط؟</span><button class="btn sm" data-track="${gb}" style="margin:0">🎯 عرض فرعي فقط</button></div>` : '';
+  }
+  const ppl = branchPeople(bid);
+  const gensArr = ppl.map(p => p.generation || 0);
+  const gens = ppl.length ? (Math.max(...gensArr) - Math.min(...gensArr) + 1) : 0;
+  const recent = ppl.filter(p => p.created_at).sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at)).slice(0, 6);
+  return `<div class="track-bar">
+    <div class="track-head"><span>🎯 تتصفّح فرع: <b>${esc(branchName(bid))}</b></span><button class="btn sm outline" id="track_cancel" style="margin:0">إلغاء التتبع</button></div>
+    <div class="track-up"><div class="track-up-h">تحديثات هذا الفرع</div>
+      <div class="track-stats"><span>الأفراد <b>${ppl.length}</b></span><span>الأجيال <b>${gens}</b></span></div>
+      ${recent.length ? `<div class="track-recent"><span class="track-lbl">آخر الإضافات:</span>${recent.map(p => `<span class="rel-chip" data-lensid="${p.id}">${esc(p.name)}</span>`).join('')}</div>` : ''}
+    </div></div>`;
+}
+function bindTrackingBar() {
+  const c = document.getElementById('track_cancel'); if (c) c.addEventListener('click', () => { setTracked(0); render(); });
+  view().querySelectorAll('[data-track]').forEach(b => b.addEventListener('click', () => { const bid = parseInt(b.dataset.track, 10); setTracked(bid); const r = branchRoot(bid); setHash(r ? '#/tree/' + r.id : '#/tree/'); }));
+  view().querySelectorAll('.track-bar [data-lensid]').forEach(el => el.addEventListener('click', () => openLens(parseInt(el.dataset.lensid, 10))));
+}
 function screenTree(arg) {
   const rs = roots();
   let rootId = parseInt(arg, 10);
+  // افتراض المشرف: فرعه عند فتح الشجرة بلا تحديد، مع تفعيل التتبّع.
+  if ((!arg || !byId.has(rootId)) && !isAdmin() && isManager() && !getTracked()) { const b = myBranches()[0], r = b && branchRoot(b); if (r) { setTracked(b); rootId = r.id; } }
   if (!rootId || !byId.has(rootId)) rootId = rs.length ? rs[0].id : 0;
   if (!rootId) { view().innerHTML = '<div class="center-empty">لا توجد بيانات بعد.</div>'; return; }
   const rootOpts = rs.map(r => ({ k: String(r.id), ar: r.name }));
-  view().innerHTML = `
+  view().innerHTML = trackingBarHtml() + `
     <div class="card no-print tree-ctl"><div class="grid2">
       ${rootOpts.length > 1 ? fSelect('ابدأ من', 't_root', rootOpts, rootId) : ''}
       <div class="field"><label>اذهب لشخص</label><button class="btn outline" id="t_pick" style="margin-top:0">🔍 اختر شخصاً</button></div>
@@ -1607,6 +1636,7 @@ function screenTree(arg) {
   treeOpen.add(rootId);
   renderTree(rootId);
   bindGo();
+  bindTrackingBar();
   const sel = document.getElementById('t_root'); if (sel) sel.addEventListener('change', () => setHash('#/tree/' + sel.value));
   document.getElementById('t_pick').addEventListener('click', () => pickPerson('اختر شخصاً للشجرة', (p) => p && setHash('#/tree/' + p.id)));
   document.getElementById('t_expand').addEventListener('click', () => { childrenOf(rootId).forEach(c => treeOpen.add(c.id)); renderTree(rootId); });
@@ -2174,6 +2204,7 @@ function screenBranch(arg) {
       <div class="stat g"><div class="n">${Object.keys(gens).length}</div><div class="l">عدد الأجيال</div></div>
     </div>
     <div class="btn-row no-print" style="margin-bottom:10px">
+      <button class="btn sm" id="trackB">🎯 تتبّع هذا الفرع</button>
       <button class="btn sm outline" id="h_expand">توسيع الكل</button>
       <button class="btn sm outline" id="h_collapse">طيّ الكل</button>
       ${canExport() ? `<button class="btn sm outline" id="prn">🖨️ طباعة / PDF</button>` : ''}
@@ -2182,6 +2213,7 @@ function screenBranch(arg) {
     <div class="hier-wrap" id="hierBox"></div>`;
   bindGo();
   const eb = document.getElementById('editB'); if (eb) eb.addEventListener('click', () => branchModal(b));
+  { const tb = document.getElementById('trackB'); if (tb) tb.addEventListener('click', () => { setTracked(id); toast('بدأ تتبّع فرع ' + b.name); setHash(rootP ? '#/tree/' + rootP.id : '#/tree/'); }); }
   const sonIds = sons.map(s => s.id);
   if (!sonIds.length) { document.getElementById('hierBox').innerHTML = '<div class="center-empty">لا أبناء في هذا الفرع.</div>'; return; }
   sonIds.forEach(s => { hierOpen.add(s); childrenOf(s).forEach(c => hierOpen.add(c.id)); });
