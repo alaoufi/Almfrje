@@ -2680,11 +2680,11 @@ function gridPool(statusFilter) {
 }
 function gridCard(p, fields, review) {
   const sub = `${esc(lineageShort(p.id, 4))} • جيل ${p.generation}`;
+  // لا نعرض «من قام بالتعديل» هنا — يبقى محفوظاً في سجل التعديلات فقط (يُرجع إليه عند الخلاف).
   const rows = fields.map(k => {
     const f = GRID_FIELDS.find(x => x.k === k);
     const v = f.type === 'select' ? arOf(f.opts, p[k]) : (p[k] ? esc(p[k]) : '—');
-    const by = fieldEditorNote(p, k);
-    return `<div class="grid-rev"><span class="grid-rev-l">${f.ar}</span><span class="grid-rev-v">${v}</span><span class="grid-rev-by">${by ? '✎ ' + by : ''}</span></div>`;
+    return `<div class="grid-rev"><span class="grid-rev-l">${f.ar}</span><span class="grid-rev-v">${v}</span></div>`;
   }).join('');
   return `<div class="grid-card"><div class="grid-head"><b>${esc(p.name)}</b> <span class="muted">${sub}</span></div>${rows}</div>`;
 }
