@@ -1226,6 +1226,11 @@ function screenPrintTree() {
         <div class="father-pick"><div id="pt_anclbl" class="father-name empty">— من جذر الفرع —</div>
         <div class="btn-row"><button class="btn sm" id="pt_pick" style="margin:0">🔍 اختيار الجدّ</button><button class="btn sm outline" id="pt_clr" style="margin:0">إلغاء</button></div></div></div>
       <div class="field"><label>عدد الأجيال المعروضة</label><input id="pt_gens" type="number" min="1" max="12" value="4" class="tl-sel" style="width:100px"></div>
+      <div class="field"><label>نمط الطباعة</label>
+        <select id="pt_style" class="tl-sel" style="width:100%">
+          <option value="compact">فهرس مرقّم مضغوط (أقل صفحات)</option>
+          <option value="outline">مشجّرة متدرّجة (شكل الشجرة)</option>
+        </select></div>
       <div class="grid-fields">
         <label class="perm-chk"><input type="checkbox" id="pt_status" checked><span>إظهار الحالة</span></label>
         <label class="perm-chk"><input type="checkbox" id="pt_city"><span>إظهار المدينة</span></label>
@@ -1249,50 +1254,77 @@ function screenPrintTree() {
       city: document.getElementById('pt_city').checked,
       kids: document.getElementById('pt_kids').checked,
       aliveOnly: document.getElementById('pt_alive').checked,
+      style: document.getElementById('pt_style').value,
       branchName: branchId ? branchName(parseInt(branchId, 10)) : '',
     });
   });
 }
 function buildPrintTree(start, o) {
-  const node = (p, depth) => {
+  const childrenFor = (p) => {
+    let cs = childrenOf(p.id);
+    if (o.aliveOnly) cs = cs.filter(c => c.status !== 'dead');
+    return cs.slice().sort((a, b) => (a.sort - b.sort) || (a.id - b.id));
+  };
+  const metaOf = (p) => {
     const meta = [];
     if (o.status && p.status === 'dead') meta.push((descCount.get(p.id) || 0) === 0 ? 'لم يعقب' : 'متوفّى');
     if (o.city && p.city) meta.push(esc(p.city));
     if (o.kids && (childCount.get(p.id) || 0)) meta.push((childCount.get(p.id)) + ' أبناء');
-    const m = meta.length ? ` <span class="m">(${meta.join(' • ')})</span>` : '';
-    let sub = '';
-    if (depth + 1 < o.gens) {
-      let cs = childrenOf(p.id);
-      if (o.aliveOnly) cs = cs.filter(c => c.status !== 'dead');
-      cs = cs.slice().sort((a, b) => (a.sort - b.sort) || (a.id - b.id));
-      if (cs.length) sub = `<ul>${cs.map(c => node(c, depth + 1)).join('')}</ul>`;
-    }
-    return `<li><span class="nm">${esc(p.name)}</span>${m}${sub}</li>`;
+    return meta.length ? ` <span class="m">(${meta.join(' • ')})</span>` : '';
   };
+  let bodyHtml, count = 0;
+  if (o.style === 'outline') {
+    // مشجّرة متدرّجة (شكل الشجرة) — أعمدة تلقائية لتقليل الصفحات.
+    const node = (p, depth) => {
+      count++;
+      let sub = '';
+      if (depth + 1 < o.gens) { const cs = childrenFor(p); if (cs.length) sub = `<ul>${cs.map(c => node(c, depth + 1)).join('')}</ul>`; }
+      return `<li><span class="nm">${esc(p.name)}</span>${metaOf(p)}${sub}</li>`;
+    };
+    bodyHtml = `<div class="cols"><ul class="tree">${node(start, 0)}</ul></div>`;
+  } else {
+    // فهرس مرقّم مضغوط: كل فرد في سطر واحد برقمٍ نَسَبي وإزاحة بسيطة — أقلّ صفحات.
+    const lines = [];
+    (function walk(p, num, depth) {
+      count++;
+      const ind = Math.min(depth, 8) * 9;
+      lines.push(`<div class="r" style="padding-inline-start:${ind}px"><span class="num">${num.join('‑')}</span> <span class="nm">${esc(p.name)}</span>${metaOf(p)}</div>`);
+      if (depth + 1 < o.gens) childrenFor(p).forEach((c, i) => walk(c, num.concat(i + 1), depth + 1));
+    })(start, [1], 0);
+    bodyHtml = `<div class="cols idx">${lines.join('')}</div>`;
+  }
   const w = window.open('', '_blank');
   if (!w) { toast('اسمح بالنوافذ المنبثقة للطباعة'); return; }
   const title = o.branchName ? ('فرع ' + o.branchName) : start.name;
   w.document.write(`<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>مشجّرة ${esc(title)}</title>
     <style>
-    @page { size: A4; margin: 14mm; }
-    body { font-family: "Segoe UI", Tahoma, "Noto Naskh Arabic", sans-serif; color: #111; direction: rtl; }
-    h1 { color: #312E81; margin: 0 0 2px; font-size: 20px; }
-    .sub { color: #555; margin-bottom: 12px; font-size: 13px; }
-    ul { list-style: none; margin: 0; padding-inline-start: 18px; border-inline-start: 1px dotted #999; }
-    body > .tree > ul { border: 0; padding-inline-start: 0; }
-    li { margin: 3px 0; line-height: 1.7; page-break-inside: avoid; }
-    .nm { font-weight: 700; }
-    .m { color: #666; font-weight: 400; font-size: .85em; }
-    .foot { margin-top: 20px; color: #777; font-size: 11px; border-top: 1px solid #ccc; padding-top: 6px; }
-    .bar { margin-bottom: 12px; }
+    @page { size: A4; margin: 12mm; }
+    * { box-sizing: border-box; }
+    body { font-family: "Segoe UI", Tahoma, "Noto Naskh Arabic", sans-serif; color: #111; direction: rtl; margin: 0; }
+    h1 { color: #312E81; margin: 0 0 2px; font-size: 19px; }
+    .sub { color: #555; margin-bottom: 10px; font-size: 12.5px; border-bottom: 2px solid #312E81; padding-bottom: 6px; }
+    /* أعمدة تلقائية: تملأ عرض الصفحة فتقلّ الصفحات */
+    .cols { column-width: 250px; column-gap: 20px; column-rule: 1px solid #e2e2ea; }
+    /* الفهرس المرقّم المضغوط */
+    .idx .r { break-inside: avoid; line-height: 1.45; font-size: 12px; padding: 1.5px 0; border-bottom: 1px dotted #e6e6ee; }
+    .idx .num { color: #312E81; font-family: ui-monospace, monospace; font-size: 10.5px; font-weight: 700; direction: ltr; unicode-bidi: isolate; }
+    .idx .nm { font-weight: 700; }
+    /* المشجّرة المتدرّجة */
+    ul.tree, .tree ul { list-style: none; margin: 0; padding-inline-start: 14px; border-inline-start: 1px dotted #aaa; }
+    .tree { padding-inline-start: 0 !important; border: 0 !important; }
+    .tree li { margin: 2px 0; line-height: 1.5; font-size: 12.5px; break-inside: avoid; }
+    .tree .nm { font-weight: 700; }
+    .m { color: #666; font-weight: 400; font-size: .82em; }
+    .foot { margin-top: 16px; color: #777; font-size: 11px; border-top: 1px solid #ccc; padding-top: 6px; }
+    .bar { margin-bottom: 10px; }
     @media print { .bar { display: none; } }
     button { font: inherit; padding: 8px 16px; border: 1px solid #312E81; background: #312E81; color: #fff; border-radius: 8px; cursor: pointer; }
     </style></head><body>
     <div class="bar"><button onclick="window.print()">🖨️ طباعة / حفظ PDF</button></div>
     <h1>المشجّرة المختصرة — ${esc(title)}</h1>
-    <div class="sub">يبدأ من: ${esc(start.name)} • ${o.gens} أجيال • ${new Date().toLocaleDateString('ar')}</div>
-    <div class="tree"><ul>${node(start, 0)}</ul></div>
-    <div class="foot">هذه نسخة مختصرة من قاعدة بيانات قبيلة المفارجة</div>
+    <div class="sub">يبدأ من: ${esc(start.name)} • ${o.gens} أجيال • ${count} فرد • ${new Date().toLocaleDateString('ar')}</div>
+    ${bodyHtml}
+    <div class="foot">هذه نسخة مختصرة من قاعدة بيانات قبيلة المفارجة — powered by Mohamad Shaman almfrji</div>
     </body></html>`);
   w.document.close();
 }
