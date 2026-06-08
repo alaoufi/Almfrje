@@ -474,6 +474,10 @@ async function trashSnap(tbl, id, action, label) {
 // يعيد معرّف صف السجل (أو null) ليُربط به التراجع.
 async function auditLog(action, personId, personName, undoData) {
   try {
+    // «يحفظ آخر تعديل فقط»: عند تعديل شخص، تُحذف تعديلاته الأقدم فيبقى الأخير وحده.
+    if (action === 'edit' && personId) {
+      try { await sb.from('almfrje_audit').delete().eq('action', 'edit').eq('person_id', personId); } catch (e) { /* أفضل جهد */ }
+    }
     const { data } = await sb.from('almfrje_audit').insert({
       action, person_id: personId || null, person_name: personName || '',
       actor_name: (me && (me.full_name || me.username || me.phone)) || '',
@@ -882,8 +886,7 @@ async function screenPerson(arg) {
       ${p.phone && !hideForGuest('phone') ? row('الجوال', esc(p.phone)) : ''}
       ${p.email && !hideForGuest('phone') ? row('البريد', esc(p.email)) : ''}
       ${p.notes && !hideForGuest('notes') ? row('ملاحظات', esc(p.notes)) : ''}
-      ${p.created_by_name ? row('أضافه', esc(p.created_by_name)) : ''}
-      ${p.updated_by_name ? row('آخر تعديل', esc(p.updated_by_name) + (p.updated_at ? ' • ' + fmtDateTime(p.updated_at) : '')) : ''}
+      ${''/* «من أضاف/عدّل» لا يظهر في ملف الشخص — يبقى في سجل التعديلات لمدير النظام فقط */}
     </div>
     <div class="stats" style="grid-template-columns:1fr 1fr 1fr">
       <div class="stat"><div class="n">${cs.length}</div><div class="l">الأبناء</div></div>
@@ -1433,7 +1436,7 @@ function screenPersonEdit(arg) {
         <div class="field"><label>المدينة</label><input id="p_city" type="text" value="${esc(p.city || '')}" placeholder="اختياري"></div>
         <div class="field"><label>الجوال</label><input id="p_phone" type="tel" inputmode="tel" value="${esc(p.phone || '')}" placeholder="اختياري"></div>
       </div>
-      <div class="field"><label>سنة الوفاة</label><input id="p_death" type="text" value="${esc(p.death || '')}" placeholder="إن وُجدت"></div>
+      <div class="field" id="p_death_wrap" style="${(p.status === 'dead') ? '' : 'display:none'}"><label>سنة الوفاة</label><input id="p_death" type="text" value="${esc(p.death || '')}" placeholder="إن وُجدت"></div>
       ${fInput('البريد الإلكتروني', 'p_email', p.email, 'email', 'placeholder="اختياري"')}
     </div>
     <div class="card"><h3>الصورة الشخصية (اختياري)</h3>
@@ -1449,6 +1452,9 @@ function screenPersonEdit(arg) {
   document.getElementById('saveBtn').addEventListener('click', () => savePerson(id, p));
   const delB = document.getElementById('delBtn');
   if (delB) delB.addEventListener('click', () => deletePerson(id, p));
+  // سنة الوفاة تظهر للمتوفّى فقط — تُظهر/تُخفى مع تغيير الحالة.
+  { const st = document.getElementById('p_status'), dw = document.getElementById('p_death_wrap');
+    if (st && dw) st.addEventListener('change', () => { dw.style.display = st.value === 'dead' ? '' : 'none'; if (st.value !== 'dead') { const d = document.getElementById('p_death'); if (d) d.value = ''; } }); }
 }
 
 // حذف اسم (لمدير النظام فقط) — حذف مؤقت إلى سلة المحذوفات مع تأكيدين قبل التنفيذ.
@@ -1629,7 +1635,7 @@ async function savePerson(id, existing) {
   const obj = {
     name, father_id: father ? father.id : null, branch_id, generation,
     nickname: val('p_nickname').trim(),
-    status: val('p_status'), work: val('p_work'), birth: val('p_birth').trim(), birthplace: val('p_birthplace').trim(), death: val('p_death').trim(),
+    status: val('p_status'), work: val('p_work'), birth: val('p_birth').trim(), birthplace: val('p_birthplace').trim(), death: val('p_status') === 'dead' ? val('p_death').trim() : '',
     city: val('p_city').trim(), phone: val('p_phone').trim(), email: val('p_email').trim(), notes: val('p_notes').trim(),
   };
   if (existing && !(await confirm2('حفظ التعديل على هذا الشخص؟ النسخة السابقة تبقى في سلة المحذوفات.'))) return;
