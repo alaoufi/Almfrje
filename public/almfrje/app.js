@@ -860,6 +860,174 @@ function runAdvanced() {
   bindGo(box);
 }
 
+/* ===== أدوات المشجّرة الجديدة (حول الشخص) — إضافات لا تستبدل أي عرضٍ قائم ===== */
+// نسخ نصٍّ للحافظة مع بديلٍ احتياطي.
+async function copyText(s) {
+  try { if (navigator.clipboard && navigator.clipboard.writeText) { await navigator.clipboard.writeText(s); toast('تم النسخ ✓'); return true; } } catch (e) { /* */ }
+  try { const ta = document.createElement('textarea'); ta.value = s; ta.style.position = 'fixed'; ta.style.opacity = '0'; document.body.appendChild(ta); ta.focus(); ta.select(); document.execCommand('copy'); ta.remove(); toast('تم النسخ ✓'); return true; } catch (e) { toast('تعذّر النسخ'); return false; }
+}
+// مسار النسب: من الشخص حتى الأصل، مع حمايةٍ من الدوائر ونقص البيانات (بحدٍّ أقصى للأجيال).
+function getLineagePath(id, maxDepth = 50) {
+  const out = []; const seen = new Set(); let cur = byId.get(id); let g = 0;
+  while (cur && g++ < maxDepth) { if (seen.has(cur.id)) break; seen.add(cur.id); out.push(cur); cur = cur.father_id ? byId.get(cur.father_id) : null; }
+  return out;
+}
+const lineageBin = (id) => getLineagePath(id).map(p => p.name).join(' بن ');
+
+// (1) مسار النسب الذكي
+function lineagePathModal(id) {
+  const path = getLineagePath(id);
+  if (!path.length) { toast('الشخص غير موجود'); return; }
+  const lastP = path[path.length - 1];
+  const incomplete = !!(lastP.father_id && !byId.get(lastP.father_id));
+  const rows = path.map((p, i) => {
+    const isSelf = i === 0; const isRoot = i === path.length - 1 && !p.father_id;
+    return `<div class="lp-row${isSelf ? ' lp-self' : ''}" data-lpid="${p.id}" title="عرض الشجرة من هنا">
+      <span class="lp-ico">${isRoot ? '🌳' : (isSelf ? '◀' : '•')}</span>
+      <span class="lp-name ${nameCls(p)}">${esc(p.name)}</span>
+      <span class="lp-gen">جيل ${p.generation}</span>
+    </div>`;
+  }).join('<div class="lp-arrow">↑</div>');
+  openModal('مسار النسب', `
+    ${incomplete ? '<div class="lp-warn">⚠️ النسب غير مكتمل في قاعدة البيانات</div>' : ''}
+    <div class="lp-list">${rows}</div>
+    <div class="lp-full" id="lp_full">${esc(lineageBin(id))}</div>
+    <p class="muted" style="font-size:.78rem;margin:6px 0 0">اضغط أي اسمٍ في المسار لعرض الشجرة منه.</p>
+    <div class="btn-row" style="margin-top:10px">
+      <button class="btn sm" id="lp_copy">📋 نسخ النسب</button>
+      <button class="btn sm outline" id="lp_tree">🌳 فتح في الشجرة</button>
+    </div>`, () => {
+    document.getElementById('lp_copy').addEventListener('click', () => copyText(lineageBin(id)));
+    document.getElementById('lp_tree').addEventListener('click', () => { closeModal(); setHash('#/tree/' + id); });
+    document.querySelectorAll('#modalRoot [data-lpid]').forEach(el => el.addEventListener('click', () => { closeModal(); setHash('#/tree/' + el.dataset.lpid); }));
+  });
+}
+
+// (3) خريطة الذرية المصغّرة
+function getDescendantsSummary(id) {
+  const all = descendants(id);
+  const kidsArr = childrenOf(id);
+  const grand = kidsArr.flatMap(c => childrenOf(c.id));
+  let alive = 0, dead = 0, noissue = 0;
+  for (const p of all) { if (p.status === 'dead') { dead++; if ((descCount.get(p.id) || 0) === 0) noissue++; } else alive++; }
+  let depth = 0; const stack = [[id, 0]]; const seen = new Set(); let guard = 0;
+  while (stack.length && guard++ < 200000) { const [pid, d] = stack.pop(); if (seen.has(pid)) continue; seen.add(pid); if (d > depth) depth = d; for (const c of childrenOf(pid)) stack.push([c.id, d + 1]); }
+  const last = all.slice().filter(p => p.created_at).sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at))[0] || null;
+  return { total: all.length, kids: kidsArr.length, grand: grand.length, gens: depth, alive, dead, noissue, last };
+}
+function descendantsMiniMap(id) {
+  const p = byId.get(id); if (!p) { toast('الشخص غير موجود'); return; }
+  const s = getDescendantsSummary(id);
+  const noIssue = p.status === 'dead' && s.total === 0;
+  const stat = (n, l, cls) => `<div class="mini-stat ${cls || ''}"><div class="n">${n}</div><div class="l">${l}</div></div>`;
+  // أول مستويين فقط
+  const kidsArr = childrenOf(id);
+  const lvl = kidsArr.length ? kidsArr.slice(0, 30).map(c => {
+    const gk = childrenOf(c.id);
+    const sub = gk.length ? `<div class="mini-sub">${gk.slice(0, 12).map(g => `<span class="rel-chip ${nameCls(g)}" data-lensid="${g.id}">${esc(g.name)}</span>`).join('')}${gk.length > 12 ? `<span class="rel-more" data-descfull="${c.id}">+${gk.length - 12}</span>` : ''}</div>` : '';
+    return `<div class="mini-node"><span class="rel-chip strong ${nameCls(c)}" data-lensid="${c.id}">${esc(c.name)}${(childCount.get(c.id) || 0) ? ` <b>(${childCount.get(c.id)})</b>` : ''}</span>${sub}</div>`;
+  }).join('') + (kidsArr.length > 30 ? `<div class="rel-more" data-descfull="${id}">+${kidsArr.length - 30} المزيد</div>` : '') : '<div class="muted" style="padding:6px">لا توجد ذرية مسجلة</div>';
+  openModal('خريطة الذرية', `
+    <div class="mini-head"><b>${esc(p.name)}</b> <span class="muted" style="font-weight:400">${esc(ancestryShort(p.id, 3))}</span><div class="muted" style="font-size:.8rem">الفرع: ${esc(branchName(p.branch_id))}${noIssue ? ' • <span class="n-noissue">لم يعقب</span>' : ''}</div></div>
+    <div class="mini-grid">
+      ${stat(s.kids, 'الأبناء')}${stat(s.grand, 'الأحفاد')}${stat(s.total, 'إجمالي الذرية')}
+      ${stat(s.gens, 'الأجيال تحته')}${stat(s.alive, 'الأحياء', 'ok')}${stat(s.dead, 'المتوفّون', 'mut')}
+    </div>
+    ${s.noissue ? `<div class="muted" style="font-size:.82rem;margin:6px 0">منهم <b>${s.noissue}</b> لم يعقب.</div>` : ''}
+    ${s.last ? `<div class="muted" style="font-size:.82rem;margin:2px 0">آخر إضافة: <b>${esc(s.last.name)}</b>${s.last.created_at ? ' • ' + fmtDate(s.last.created_at) : ''}</div>` : ''}
+    <div class="mini-lvl">${lvl}</div>
+    <div class="btn-row" style="margin-top:10px">
+      <button class="btn sm" data-go-close="#/descendants/${id}">📇 فتح فهرس الذرية</button>
+      <button class="btn sm outline" data-go-close="#/tree/${id}">🌳 عرض الذرية كاملة</button>
+      ${canExport() ? `<button class="btn sm outline" id="mini_print">🖨️ طباعة مختصر الذرية</button>` : ''}
+    </div>`, () => {
+    bindLensChips();
+    document.querySelectorAll('#modalRoot [data-go-close]').forEach(b => b.addEventListener('click', () => { closeModal(); setHash(b.dataset.goClose); }));
+    document.querySelectorAll('#modalRoot [data-descfull]').forEach(b => b.addEventListener('click', () => { closeModal(); setHash('#/descendants/' + b.dataset.descfull); }));
+    const pr = document.getElementById('mini_print'); if (pr) pr.addEventListener('click', () => { closeModal(); printDescSummary(id); });
+  });
+}
+
+// (9) شجرة الأقرباء المباشرين
+function getImmediateRelatives(id) {
+  const p = byId.get(id); if (!p) return null;
+  const father = p.father_id ? byId.get(p.father_id) : null;
+  const siblings = father ? childrenOf(father.id).filter(x => x.id !== id) : [];
+  const children = childrenOf(id);
+  const grand = father && father.father_id ? byId.get(father.father_id) : null;
+  const uncles = grand ? childrenOf(grand.id).filter(x => !father || x.id !== father.id) : [];
+  const cousins = uncles.flatMap(u => childrenOf(u.id));
+  return { p, father, siblings, children, uncles, cousins };
+}
+function relativesModal(id) {
+  const r = getImmediateRelatives(id);
+  if (!r) { toast('الشخص غير موجود'); return; }
+  const chips = (arr) => arr.length ? arr.map(x => `<span class="rel-chip ${nameCls(x)}" data-lensid="${x.id}">${esc(x.name)}</span>`).join('') : '<span class="muted" style="font-size:.82rem">—</span>';
+  const sec = (t, arr, openable) => `<div class="rel-sec"><div class="rel-sec-h">${t} ${arr.length ? `<span class="muted">(${arr.length})</span>` : ''}</div><div class="rel-chips">${chips(arr)}</div></div>`;
+  const incomplete = !r.father && r.p.father_id;
+  openModal('أقرباء ' + r.p.name, `
+    ${incomplete ? '<div class="lp-warn">⚠️ بيانات النسب غير مكتملة</div>' : ''}
+    ${r.father ? `<div class="rel-sec"><div class="rel-sec-h">الأب</div><div class="rel-chips"><span class="rel-chip strong ${nameCls(r.father)}" data-lensid="${r.father.id}">${esc(r.father.name)}</span></div></div>` : ''}
+    <div class="rel-sec rel-self"><div class="rel-sec-h">هو</div><div class="rel-chips"><span class="rel-chip strong" style="background:var(--brand);color:#fff">${esc(r.p.name)}</span></div></div>
+    ${sec('الإخوة', r.siblings)}
+    ${sec('الأبناء', r.children)}
+    ${sec('الأعمام', r.uncles)}
+    ${sec('أبناء العم', r.cousins)}
+    <div class="btn-row" style="margin-top:10px">
+      <button class="btn sm" id="rel_tree">🌳 فتح في الشجرة</button>
+      <button class="btn sm outline" id="rel_lin">🧬 مسار النسب</button>
+      <button class="btn sm outline" id="rel_desc">📇 عرض الذرية</button>
+    </div>`, () => {
+    bindLensChips();
+    document.getElementById('rel_tree').addEventListener('click', () => { closeModal(); setHash('#/tree/' + id); });
+    document.getElementById('rel_lin').addEventListener('click', () => { closeModal(); lineagePathModal(id); });
+    document.getElementById('rel_desc').addEventListener('click', () => { closeModal(); setHash('#/descendants/' + id); });
+  });
+}
+
+// (10) عدسة التكبير — البطاقة السريعة المركزية لكل الأدوات (تُفتح عند الضغط على أي اسم).
+function bindLensChips(root) {
+  (root || document).querySelectorAll('#modalRoot [data-lensid]').forEach(el => el.addEventListener('click', () => { const nid = parseInt(el.dataset.lensid, 10); closeModal(); openLens(nid); }));
+}
+function openLens(id) {
+  const p = byId.get(id); if (!p) { toast('الشخص غير موجود'); return; }
+  const kids = childCount.get(id) || 0, desc = descCount.get(id) || 0;
+  const father = p.father_id ? byId.get(p.father_id) : null;
+  openModal(p.name, `
+    <div class="ql-sub">${father ? 'بن ' + esc(father.name) + ' • ' : ''}${esc(branchName(p.branch_id))} • جيل ${p.generation}${statusTag(p)}</div>
+    <div class="ql-stats"><div class="ql-stat"><div class="n">${kids}</div><div class="l">الأبناء</div></div><div class="ql-stat"><div class="n">${desc}</div><div class="l">الذرية</div></div></div>
+    <div class="ql-tools">
+      <button class="btn sm" data-ql="lineage">🧬 مسار النسب</button>
+      <button class="btn sm" data-ql="desc">🗺️ خريطة الذرية</button>
+      <button class="btn sm" data-ql="rel">👨‍👩‍👧 أقربائي</button>
+      <button class="btn sm outline" data-ql="tree">🌳 فتح في الشجرة</button>
+      <button class="btn sm outline" data-ql="profile">📄 فتح الملف الكامل</button>
+    </div>`, () => {
+    const act = { lineage: () => { closeModal(); lineagePathModal(id); }, desc: () => { closeModal(); descendantsMiniMap(id); }, rel: () => { closeModal(); relativesModal(id); }, tree: () => { closeModal(); setHash('#/tree/' + id); }, profile: () => { closeModal(); setHash('#/person/' + id); } };
+    document.querySelectorAll('#modalRoot [data-ql]').forEach(b => b.addEventListener('click', () => act[b.dataset.ql]()));
+  });
+}
+
+// طباعة مختصر الذرية (صفحة نظيفة) — تُستخدم من خريطة الذرية.
+function printDescSummary(id) {
+  const p = byId.get(id); if (!p) return;
+  const s = getDescendantsSummary(id);
+  const w = window.open('', '_blank');
+  if (!w) { toast('اسمح بالنوافذ المنبثقة للطباعة'); return; }
+  const rowsTop = childrenOf(id).map(c => `<li><b>${esc(c.name)}</b> — ${descCount.get(c.id) || 0} ذرية</li>`).join('');
+  w.document.write(`<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>مختصر ذرية ${esc(p.name)}</title>
+    <style>body{font-family:"Segoe UI",Tahoma,sans-serif;padding:24px;color:#111;direction:rtl}h1{color:#312E81;margin:0 0 2px}.sub{color:#555;margin-bottom:14px}
+    .g{display:flex;flex-wrap:wrap;gap:10px;margin:12px 0}.b{border:1px solid #ccc;border-radius:8px;padding:8px 14px;text-align:center;min-width:90px}.b .n{font-size:1.5rem;font-weight:800;color:#312E81}.b .l{font-size:.8rem;color:#555}
+    ul{line-height:1.9}.foot{margin-top:18px;color:#777;font-size:.8rem}</style></head><body>
+    <h1>مختصر ذرية: ${esc(p.name)}</h1>
+    <div class="sub">${esc(ancestryShort(p.id, 4))} • الفرع: ${esc(branchName(p.branch_id))} • ${new Date().toLocaleDateString('ar')}</div>
+    <div class="g"><div class="b"><div class="n">${s.kids}</div><div class="l">الأبناء</div></div><div class="b"><div class="n">${s.grand}</div><div class="l">الأحفاد</div></div><div class="b"><div class="n">${s.total}</div><div class="l">إجمالي الذرية</div></div><div class="b"><div class="n">${s.gens}</div><div class="l">الأجيال</div></div><div class="b"><div class="n">${s.alive}</div><div class="l">الأحياء</div></div><div class="b"><div class="n">${s.dead}</div><div class="l">المتوفّون</div></div></div>
+    <h3>الأبناء المباشرون</h3><ul>${rowsTop || '<li>لا توجد ذرية مسجلة</li>'}</ul>
+    <div class="foot">هذه نسخة مختصرة من قاعدة بيانات قبيلة المفارجة</div>
+    <script>window.onload=function(){window.print()}<\/script></body></html>`);
+  w.document.close();
+}
+
 /* ===== صفحة الشخص ===== */
 async function screenPerson(arg) {
   const id = parseInt(arg, 10); const p = byId.get(id);
@@ -907,6 +1075,7 @@ async function screenPerson(arg) {
       ${canEditPerson(p) ? `<button class="btn outline" id="addDoc" style="margin-top:8px">➕ إضافة صورة/وثيقة</button>` : ''}
     </div>` : ''}
     <div class="btn-row no-print">
+      <button class="btn" id="toolsP">🧭 أدوات النسب</button>
       <button class="btn outline" data-go="#/tree/${id}">🌳 الشجرة</button>
       <button class="btn outline" data-go="#/descendants/${id}">👨‍👩‍👧 الذرية</button>
       ${canExport() ? `<button class="btn outline" id="printP">🖨️ تقرير / PDF</button>` : ''}
@@ -914,6 +1083,7 @@ async function screenPerson(arg) {
       ${canEditPerson(p) ? `<button class="btn outline" data-go="#/person-edit/${id}">✎ تعديل</button>` : ''}
     </div>`;
   bindGo();
+  { const tb = document.getElementById('toolsP'); if (tb) tb.addEventListener('click', () => openLens(id)); }
   const as = document.getElementById('addSon'); if (as) as.addEventListener('click', () => { presetFather = p; setHash('#/person-edit/0'); });
   const pr = document.getElementById('printP'); if (pr) pr.addEventListener('click', () => window.print());
   const ad = document.getElementById('addDoc'); if (ad) ad.addEventListener('click', () => addDocModal(p));
@@ -1227,7 +1397,7 @@ function renderTree(rootId) {
     e.stopPropagation(); const id = parseInt(b.dataset.tog, 10);
     treeOpen.has(id) ? treeOpen.delete(id) : treeOpen.add(id); renderTree(rootId);
   }));
-  box.querySelectorAll('[data-open]').forEach(b => b.addEventListener('click', () => setHash('#/person/' + b.dataset.open)));
+  box.querySelectorAll('[data-open]').forEach(b => b.addEventListener('click', () => openLens(parseInt(b.dataset.open, 10))));
 }
 function treeNodeHtml(id) {
   const p = byId.get(id); if (!p) return '';
@@ -1289,7 +1459,7 @@ function renderHier(rootId) {
     if (hierOpen.has(hid)) hierOpen.delete(hid); else hierOpen.add(hid);
     renderHier(rootId);
   }));
-  box.querySelectorAll('[data-hopen]').forEach(b => b.addEventListener('click', () => setHash('#/person/' + b.dataset.hopen)));
+  box.querySelectorAll('[data-hopen]').forEach(b => b.addEventListener('click', () => openLens(parseInt(b.dataset.hopen, 10))));
 }
 // عرض هرمي للفرع: يبدأ من أبناء جذر الفرع (الجيل الثالث) كإخوة، فهدهود (ج٢) عنوان فقط.
 function screenBranchHier(arg) {

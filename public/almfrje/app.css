@@ -669,3 +669,48 @@ ul.hier ul.hier > .hier-li::before {
 .install-txt { flex: 1; min-width: 160px; font-weight: 600; font-size: .92rem; line-height: 1.6; }
 .install-actions { display: flex; gap: 8px; }
 .install-actions .btn { margin: 0; }
+
+/* ===== أدوات المشجّرة الجديدة (مسار النسب/خريطة الذرية/الأقرباء/العدسة) ===== */
+/* مسار النسب */
+.lp-list { display: flex; flex-direction: column; gap: 0; margin: 4px 0 10px; }
+.lp-row { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); cursor: pointer; }
+.lp-row:active { background: var(--brand-l); }
+.lp-self { border-color: var(--brand); background: color-mix(in srgb, var(--brand) 10%, transparent); }
+.lp-ico { flex: none; width: 22px; text-align: center; }
+.lp-name { font-weight: 800; flex: 1; min-width: 0; word-break: break-word; }
+.lp-gen { font-size: .72rem; color: var(--muted); white-space: nowrap; }
+.lp-arrow { text-align: center; color: var(--muted); font-size: .8rem; line-height: 1.4; }
+.lp-warn { background: color-mix(in srgb, var(--danger) 12%, transparent); color: var(--danger); border: 1px solid color-mix(in srgb, var(--danger) 35%, transparent); border-radius: 8px; padding: 6px 10px; font-size: .85rem; margin-bottom: 8px; font-weight: 700; }
+.lp-full { background: var(--bg); border: 1px dashed var(--line); border-radius: 8px; padding: 8px 10px; font-weight: 700; line-height: 1.9; }
+
+/* خريطة الذرية المصغّرة */
+.mini-head { margin-bottom: 8px; }
+.mini-head b { font-size: 1.05rem; }
+.mini-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin: 6px 0; }
+.mini-stat { border: 1px solid var(--line); border-radius: 10px; padding: 8px 4px; text-align: center; background: var(--bg); }
+.mini-stat .n { font-size: 1.5rem; font-weight: 800; color: var(--brand); }
+.mini-stat .l { font-size: .72rem; color: var(--muted); }
+.mini-stat.ok .n { color: var(--ok); } .mini-stat.mut .n { color: var(--muted); }
+.mini-lvl { margin-top: 8px; max-height: 40vh; overflow-y: auto; }
+.mini-node { padding: 6px 0; border-bottom: 1px dashed var(--line); }
+.mini-sub { margin-top: 4px; padding-inline-start: 14px; display: flex; flex-wrap: wrap; gap: 4px; }
+
+/* رقائق الأسماء (الأقرباء/الذرية) */
+.rel-sec { margin: 8px 0; }
+.rel-sec-h { font-size: .82rem; font-weight: 800; color: var(--brand); margin-bottom: 4px; }
+.rel-chips { display: flex; flex-wrap: wrap; gap: 5px; }
+.rel-self .rel-chips .rel-chip { }
+.rel-chip { display: inline-block; background: var(--bg); border: 1px solid var(--line); border-radius: 999px; padding: 4px 11px; font-weight: 700; font-size: .9rem; cursor: pointer; }
+.rel-chip:active { background: var(--brand-l); }
+.rel-chip.strong { border-color: var(--brand); }
+.rel-chip.n-died { color: var(--muted); } .rel-chip.n-noissue { color: var(--danger); }
+.rel-more { display: inline-block; background: color-mix(in srgb, var(--brand) 12%, transparent); color: var(--brand); border-radius: 999px; padding: 4px 11px; font-weight: 800; font-size: .85rem; cursor: pointer; }
+
+/* العدسة السريعة */
+.ql-sub { color: var(--muted); font-size: .9rem; margin: -4px 0 10px; line-height: 1.7; }
+.ql-stats { display: flex; gap: 10px; margin-bottom: 12px; }
+.ql-stat { flex: 1; border: 1px solid var(--line); border-radius: 10px; padding: 8px; text-align: center; background: var(--bg); }
+.ql-stat .n { font-size: 1.6rem; font-weight: 800; color: var(--brand); }
+.ql-stat .l { font-size: .75rem; color: var(--muted); }
+.ql-tools { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.ql-tools .btn { margin: 0; }
