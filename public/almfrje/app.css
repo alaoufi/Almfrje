@@ -112,8 +112,12 @@ html.dark .br-online { color: #4cd07d; }
 .about-body .about-sign { text-align: center; color: var(--brand); font-weight: 800; margin-top: 14px; }
 html.dark .about-card { box-shadow: 0 18px 44px -18px rgba(0,0,0,.8), 0 2px 0 color-mix(in srgb, var(--brand) 40%, transparent); }
 
-/* دليل الموقع (الكتيّب) */
-.guide-card { text-align: right; }
+/* دليل الموقع (الكتيّب) — بلا تدوير ثلاثي الأبعاد (يُفرغ المحتوى الطويل على الجوال) */
+.guide-card { text-align: right; transform: none !important; overflow: visible; }
+.guide-card:hover { transform: translateY(-2px) !important; }
+.guide-card h2 { color: var(--brand); text-align: center; font-size: 1.4rem; margin: .2em 0 .4em; }
+.guide-card .about-eyebrow { text-align: center; color: var(--gold, #c9a227); font-weight: 800; letter-spacing: 2px; font-size: .8rem; margin: 0 0 2px; }
+.guide-card hr { border: 0; height: 2px; width: 70px; margin: 6px auto 16px; background: linear-gradient(90deg, transparent, var(--brand), transparent); }
 .guide-toc { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin: 0 0 18px; }
 .guide-toc-link { background: color-mix(in srgb, var(--brand) 10%, transparent); color: var(--brand); border: 1px solid color-mix(in srgb, var(--brand) 30%, transparent); border-radius: 999px; padding: 5px 12px; font: inherit; font-weight: 700; font-size: .85rem; cursor: pointer; }
 .guide-toc-link:active { background: var(--brand); color: #fff; }
