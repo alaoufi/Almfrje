@@ -2522,12 +2522,13 @@ function screenBulkEdit() {
 // نافذة اختيار جدّ هرمية: المدير يبدأ من الأصول (فراج/مفرج)، ومشرف الفرع من فرعه
 // (الجيل الثاني). تتنقّل بالضغط على الاسم للدخول لأبنائه، مع زر «اختيار» لكل اسم.
 let _ancNav = null;   // الشخص المعروض حالياً (null = القمة)
-function pickAncestorModal(onPick) {
+function pickAncestorModal(onPick, startAt) {
   // نقاط البداية: للمسؤول جذور فروعه (ج٢)، للمدير الأصول
   const tops = (!isAdmin() && isManager())
     ? myBranches().map(bid => branchRoot(bid)).filter(Boolean)
     : roots();
-  _ancNav = null;
+  // افتح عند موقع الاختيار الحالي (تعديل الجدّ دون البدء من جديد) — وإلا من القمة.
+  _ancNav = (startAt && byId.get(startAt.id)) ? byId.get(startAt.id) : null;
   const render = () => {
     const cur = _ancNav;
     const list = cur ? childrenOf(cur.id) : tops;
@@ -2543,7 +2544,7 @@ function pickAncestorModal(onPick) {
         ${list.length ? list.map(c => {
           const kc = childCount.get(c.id) || 0;
           return `<div class="anc-row">
-            <span class="anc-name" data-ancinto="${c.id}">${esc(c.name)} <span class="muted" style="font-size:.78rem">(جيل ${c.generation}${kc ? ' • ' + kc + ' ابن' : ''})</span></span>
+            <span class="anc-name" data-ancinto="${c.id}"><b>${esc(c.name)}</b> <span class="muted" style="font-size:.78rem;font-weight:400">(جيل ${c.generation}${kc ? ' • ' + kc + ' ابن' : ''})</span></span>
             <button class="btn sm" data-ancpick="${c.id}">اختيار</button>
           </div>`;
         }).join('') : '<div class="muted" style="padding:8px">لا أبناء.</div>'}
@@ -2729,8 +2730,8 @@ function screenGrid(mode) {
       <p class="muted" style="font-size:.85rem;margin-top:-4px">يُعرض <b>الأحياء</b> من ذرّيته فقط${review ? ' — للمراجعة دون تعديل.' : ' لتعديل بياناتهم.'}</p>
       <div class="field"><label>الجدّ</label>
         <div class="father-pick">
-          <div id="g_ancLabel" class="father-name empty">— اختر الجدّ —</div>
-          <div class="btn-row"><button class="btn sm" id="g_pickAnc" style="margin:0">🔍 اختيار الجدّ</button><button class="btn sm outline" id="g_clrAnc" style="margin:0">إلغاء</button></div>
+          <div id="g_ancLabel" class="father-name empty" style="cursor:pointer" title="اضغط لتغيير الجدّ">— اختر الجدّ —</div>
+          <div class="btn-row"><button class="btn sm" id="g_pickAnc" style="margin:0">🔍 ${gridAncestor ? 'تغيير الجدّ' : 'اختيار الجدّ'}</button><button class="btn sm outline" id="g_clrAnc" style="margin:0">إلغاء</button></div>
         </div>
       </div>
     </div>
@@ -2775,8 +2776,17 @@ function screenGrid(mode) {
     }
     if (sv) sv.disabled = !pool.length;
   };
-  const setAnc = (fp) => { gridAncestor = fp; const el = document.getElementById('g_ancLabel'); el.textContent = fp ? '👤 ' + fp.name + ' (جيل ' + fp.generation + ')' : '— اختر الجدّ —'; el.classList.toggle('empty', !fp); renderList(); };
-  document.getElementById('g_pickAnc').addEventListener('click', () => pickAncestorModal(setAnc));
+  const setAnc = (fp) => {
+    gridAncestor = fp;
+    const el = document.getElementById('g_ancLabel');
+    el.innerHTML = fp ? `👤 <b>${esc(fp.name)}</b> <span class="muted" style="font-weight:400">(جيل ${fp.generation})</span>` : '— اختر الجدّ —';
+    el.classList.toggle('empty', !fp);
+    const pb = document.getElementById('g_pickAnc'); if (pb) pb.textContent = '🔍 ' + (fp ? 'تغيير الجدّ' : 'اختيار الجدّ');
+    renderList();
+  };
+  const openPick = () => pickAncestorModal(setAnc, gridAncestor);   // يفتح عند الجدّ الحالي (تغيير دون بدء من جديد)
+  document.getElementById('g_pickAnc').addEventListener('click', openPick);
+  document.getElementById('g_ancLabel').addEventListener('click', openPick);   // الضغط على الاسم يغيّره مباشرة
   document.getElementById('g_clrAnc').addEventListener('click', () => setAnc(null));
   if (review) view().querySelectorAll('#g_status .seg-b').forEach(b => b.addEventListener('click', () => {
     gridReviewStatus = b.dataset.st;
@@ -2790,7 +2800,7 @@ function screenGrid(mode) {
   }));
   if (!review) view().querySelectorAll('input[data-gf]').forEach(cb => cb.addEventListener('change', renderList));
   if (!review) document.getElementById('g_save').addEventListener('click', () => gridSave(selFields()));
-  if (gridAncestor) { const el = document.getElementById('g_ancLabel'); el.textContent = '👤 ' + gridAncestor.name + ' (جيل ' + gridAncestor.generation + ')'; el.classList.remove('empty'); }
+  if (gridAncestor) { const el = document.getElementById('g_ancLabel'); el.innerHTML = `👤 <b>${esc(gridAncestor.name)}</b> <span class="muted" style="font-weight:400">(جيل ${gridAncestor.generation})</span>`; el.classList.remove('empty'); }
   renderList();
 }
 async function gridSave(fields) {
