@@ -6,8 +6,8 @@ const nextConfig = {
   },
   async rewrites() {
     return [
-      // مشروع المفرجي مستقل: جذر النطاق يفتح التطبيق مباشرة (مع إبقاء /almfrji و/almfrje كمرادفين).
-      { source: '/', destination: '/almfrje/index.html' },
+      // المفرجي يُخدَم على المسار alaoufi.me/almfrji (الجذر يبقى صفحة فارغة).
+      { source: '/', destination: '/blank.html' },
       { source: '/almfrji', destination: '/almfrje/index.html' },
       { source: '/almfrji/', destination: '/almfrje/index.html' },
       { source: '/almfrje', destination: '/almfrje/index.html' },
