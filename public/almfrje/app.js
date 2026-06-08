@@ -1214,6 +1214,7 @@ function bindLongPress(el, onTap, onLong, ms) {
 
 /* ===== (6) المشجّرة المختصرة للطباعة ===== */
 let ptStart = null;   // الجدّ الذي تبدأ منه (اختياري)
+let ptStyle = 'compact';   // نمط الطباعة: compact | outline
 function screenPrintTree() {
   const branches = (isAdmin() ? C.branches.filter(b => isLiveBranch(b.id)) : C.branches.filter(b => myBranches().includes(b.id)));
   const bopts = branches.sort((a, b) => String(a.name).localeCompare(String(b.name), 'ar')).map(b => `<option value="${b.id}">${esc(b.name)}</option>`).join('');
@@ -1221,16 +1222,18 @@ function screenPrintTree() {
     <div class="card">
       <h3>🖨️ نسخة مختصرة للطباعة</h3>
       <p class="muted" style="font-size:.85rem;margin-top:-2px">اختر ما تريد ثم «توليد النسخة» لصفحة طباعة نظيفة (طباعة أو حفظ PDF).</p>
+      <div class="field"><label>نمط الطباعة</label>
+        <div class="seg" id="pt_style">
+          <button class="seg-b${ptStyle === 'compact' ? ' on' : ''}" data-pst="compact">فهرس مرقّم مضغوط</button>
+          <button class="seg-b${ptStyle === 'outline' ? ' on' : ''}" data-pst="outline">مشجّرة متدرّجة</button>
+        </div>
+        <div class="muted" style="font-size:.76rem;margin-top:3px">المضغوط = كل فرد في سطر بأعمدة (أقل صفحات).</div>
+      </div>
       <div class="field"><label>الفرع</label><select id="pt_branch" class="tl-sel" style="width:100%">${isAdmin() ? '<option value="">كل الشجرة</option>' : ''}${bopts}</select></div>
       <div class="field"><label>ابدأ من جدٍّ محدّد (اختياري)</label>
         <div class="father-pick"><div id="pt_anclbl" class="father-name empty">— من جذر الفرع —</div>
         <div class="btn-row"><button class="btn sm" id="pt_pick" style="margin:0">🔍 اختيار الجدّ</button><button class="btn sm outline" id="pt_clr" style="margin:0">إلغاء</button></div></div></div>
       <div class="field"><label>عدد الأجيال المعروضة</label><input id="pt_gens" type="number" min="1" max="12" value="4" class="tl-sel" style="width:100px"></div>
-      <div class="field"><label>نمط الطباعة</label>
-        <select id="pt_style" class="tl-sel" style="width:100%">
-          <option value="compact">فهرس مرقّم مضغوط (أقل صفحات)</option>
-          <option value="outline">مشجّرة متدرّجة (شكل الشجرة)</option>
-        </select></div>
       <div class="grid-fields">
         <label class="perm-chk"><input type="checkbox" id="pt_status" checked><span>إظهار الحالة</span></label>
         <label class="perm-chk"><input type="checkbox" id="pt_city"><span>إظهار المدينة</span></label>
@@ -1242,6 +1245,7 @@ function screenPrintTree() {
   const setAnc = (p) => { ptStart = p; const el = document.getElementById('pt_anclbl'); el.textContent = p ? '👤 ' + p.name + ' (جيل ' + p.generation + ')' : '— من جذر الفرع —'; el.classList.toggle('empty', !p); };
   document.getElementById('pt_pick').addEventListener('click', () => pickPerson('اختر الجدّ الذي تبدأ منه', p => setAnc(p), (!isAdmin() && isManager()) ? (p => inMyBranch(p)) : null));
   document.getElementById('pt_clr').addEventListener('click', () => setAnc(null));
+  document.querySelectorAll('#pt_style .seg-b').forEach(b => b.addEventListener('click', () => { ptStyle = b.dataset.pst; document.querySelectorAll('#pt_style .seg-b').forEach(x => x.classList.toggle('on', x === b)); }));
   document.getElementById('pt_go').addEventListener('click', () => {
     const branchId = document.getElementById('pt_branch').value;
     let start = ptStart;
@@ -1254,7 +1258,7 @@ function screenPrintTree() {
       city: document.getElementById('pt_city').checked,
       kids: document.getElementById('pt_kids').checked,
       aliveOnly: document.getElementById('pt_alive').checked,
-      style: document.getElementById('pt_style').value,
+      style: ptStyle,
       branchName: branchId ? branchName(parseInt(branchId, 10)) : '',
     });
   });
