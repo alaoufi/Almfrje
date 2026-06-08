@@ -1180,7 +1180,7 @@ function screenRadial(arg) {
         <span class="rad-genctl">الأجيال: <button class="btn sm" id="rad_dec" style="margin:0">−</button> <b>${maxG}</b> <button class="btn sm" id="rad_inc" style="margin:0">+</button></span>
         <span class="rad-genctl">تكبير: <button class="btn sm" id="rad_zout" style="margin:0">−</button> <button class="btn sm" id="rad_zin" style="margin:0">+</button></span>
       </div>
-      <p class="muted" style="font-size:.78rem;margin:6px 0 0">اضغط أي اسم لفتح أدواته و«اجعله المركز». ${big ? 'وتُجمَّع الفروع الكبيرة في «+عدد».' : ''}</p>
+      <p class="muted" style="font-size:.78rem;margin:6px 0 0">ضغطة على الاسم تفتح أدواته، و<b>ضغطة مطوّلة تجعله المركز</b>. ${big ? 'وتُجمَّع الفروع الكبيرة في «+عدد».' : ''}</p>
     </div>
     <div class="rad-wrap"><svg class="rad-svg" viewBox="${ox.toFixed(0)} ${oy.toFixed(0)} ${vbW.toFixed(0)} ${vbH.toFixed(0)}" style="width:${(vbW * radZoom).toFixed(0)}px;height:${(vbH * radZoom).toFixed(0)}px"><g class="rad-guides">${guides.join('')}</g>${lines}${circles}</svg></div>`;
   { const up = document.getElementById('rad_up'); if (up && parent) up.addEventListener('click', () => setHash('#/radial/' + parent.id)); }
@@ -1189,8 +1189,27 @@ function screenRadial(arg) {
   document.getElementById('rad_dec').addEventListener('click', () => { radGens = Math.max(1, radGens - 1); screenRadial(String(radRoot.id)); });
   document.getElementById('rad_zin').addEventListener('click', () => { radZoom = Math.min(3, radZoom + 0.25); screenRadial(String(radRoot.id)); });
   document.getElementById('rad_zout').addEventListener('click', () => { radZoom = Math.max(0.5, radZoom - 0.25); screenRadial(String(radRoot.id)); });
-  view().querySelectorAll('[data-radid]').forEach(g => g.addEventListener('click', () => openLens(parseInt(g.dataset.radid, 10))));
+  view().querySelectorAll('[data-radid]').forEach(g => {
+    const nid = parseInt(g.dataset.radid, 10);
+    // ضغطة قصيرة = العدسة؛ ضغط مطوّل = اجعله المركز.
+    bindLongPress(g, () => openLens(nid), () => setHash('#/radial/' + nid));
+  });
   view().querySelectorAll('[data-radmore]').forEach(g => g.addEventListener('click', () => setHash('#/descendants/' + g.dataset.radmore)));
+}
+// ضغطة قصيرة/مطوّلة على عنصر (لمس وفأرة) — مع منع النقر بعد الضغط المطوّل.
+function bindLongPress(el, onTap, onLong, ms) {
+  let timer = null, longed = false, sx = 0, sy = 0;
+  el.style.touchAction = 'manipulation';
+  el.addEventListener('pointerdown', (e) => {
+    longed = false; sx = e.clientX; sy = e.clientY;
+    timer = setTimeout(() => { longed = true; if (navigator.vibrate) { try { navigator.vibrate(30); } catch (_) { } } onLong(); }, ms || 500);
+  });
+  el.addEventListener('pointermove', (e) => { if (timer && (Math.abs(e.clientX - sx) > 12 || Math.abs(e.clientY - sy) > 12)) { clearTimeout(timer); timer = null; } });
+  const stop = () => { clearTimeout(timer); timer = null; };
+  el.addEventListener('pointerup', stop);
+  el.addEventListener('pointercancel', stop);
+  el.addEventListener('pointerleave', stop);
+  el.addEventListener('click', (e) => { if (longed) { longed = false; e.preventDefault(); e.stopPropagation(); return; } onTap(); });
 }
 
 /* ===== (6) المشجّرة المختصرة للطباعة ===== */
