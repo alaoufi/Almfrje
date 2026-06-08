@@ -532,6 +532,7 @@ const ROUTES = {
   timeline: { t: 'خط الأجيال', back: true, fn: screenTimeline },
   radial: { t: 'الشجرة الدائرية', back: true, fn: screenRadial },
   printtree: { t: 'نسخة للطباعة', back: true, fn: screenPrintTree },
+  printview: { t: 'نسخة للطباعة', back: true, fn: screenPrintView },
   import: { t: 'استيراد Excel', back: true, fn: screenImport },
   members: { t: 'المستخدمون والصلاحيات', back: true, fn: screenMembers },
   branchadmin: { t: 'الفروع والمشرفون', back: true, fn: screenBranchAdmin },
@@ -1215,6 +1216,7 @@ function bindLongPress(el, onTap, onLong, ms) {
 /* ===== (6) المشجّرة المختصرة للطباعة ===== */
 let ptStart = null;   // الجدّ الذي تبدأ منه (اختياري)
 let ptStyle = 'compact';   // نمط الطباعة: compact | outline
+let ptOpts = null;    // خيارات النسخة المولّدة (لعرض الطباعة داخل الموقع)
 function screenPrintTree() {
   const branches = (isAdmin() ? C.branches.filter(b => isLiveBranch(b.id)) : C.branches.filter(b => myBranches().includes(b.id)));
   const bopts = branches.sort((a, b) => String(a.name).localeCompare(String(b.name), 'ar')).map(b => `<option value="${b.id}">${esc(b.name)}</option>`).join('');
@@ -1252,7 +1254,8 @@ function screenPrintTree() {
     if (!start) { if (branchId) start = branchRoot(parseInt(branchId, 10)); else start = roots()[0]; }
     if (!start) { toast('اختر فرعاً أو جدّاً'); return; }
     if (!isAdmin() && isManager() && !inMyBranch(start)) { toast('هذا خارج فرعك'); return; }
-    buildPrintTree(start, {
+    ptOpts = {
+      start,
       gens: Math.max(1, Math.min(12, parseInt(document.getElementById('pt_gens').value, 10) || 4)),
       status: document.getElementById('pt_status').checked,
       city: document.getElementById('pt_city').checked,
@@ -1260,10 +1263,13 @@ function screenPrintTree() {
       aliveOnly: document.getElementById('pt_alive').checked,
       style: ptStyle,
       branchName: branchId ? branchName(parseInt(branchId, 10)) : '',
-    });
+    };
+    setHash('#/printview');
   });
 }
-function buildPrintTree(start, o) {
+// يبني جسم النسخة المختصرة (يُعرض داخل الموقع ثم يُطبع) — بنمطين.
+function printTreeBody(o) {
+  const start = o.start;
   const childrenFor = (p) => {
     let cs = childrenOf(p.id);
     if (o.aliveOnly) cs = cs.filter(c => c.status !== 'dead');
@@ -1276,61 +1282,41 @@ function buildPrintTree(start, o) {
     if (o.kids && (childCount.get(p.id) || 0)) meta.push((childCount.get(p.id)) + ' أبناء');
     return meta.length ? ` <span class="m">(${meta.join(' • ')})</span>` : '';
   };
-  let bodyHtml, count = 0;
+  let body, count = 0;
   if (o.style === 'outline') {
-    // مشجّرة متدرّجة (شكل الشجرة) — أعمدة تلقائية لتقليل الصفحات.
     const node = (p, depth) => {
       count++;
       let sub = '';
       if (depth + 1 < o.gens) { const cs = childrenFor(p); if (cs.length) sub = `<ul>${cs.map(c => node(c, depth + 1)).join('')}</ul>`; }
       return `<li><span class="nm">${esc(p.name)}</span>${metaOf(p)}${sub}</li>`;
     };
-    bodyHtml = `<div class="cols"><ul class="tree">${node(start, 0)}</ul></div>`;
+    body = `<div class="ptv-cols"><ul class="ptv-tree">${node(start, 0)}</ul></div>`;
   } else {
-    // فهرس مرقّم مضغوط: كل فرد في سطر واحد برقمٍ نَسَبي وإزاحة بسيطة — أقلّ صفحات.
     const lines = [];
     (function walk(p, num, depth) {
       count++;
       const ind = Math.min(depth, 8) * 9;
-      lines.push(`<div class="r" style="padding-inline-start:${ind}px"><span class="num">${num.join('‑')}</span> <span class="nm">${esc(p.name)}</span>${metaOf(p)}</div>`);
+      lines.push(`<div class="ptv-r" style="padding-inline-start:${ind}px"><span class="ptv-num">${num.join('‑')}</span> <span class="nm">${esc(p.name)}</span>${metaOf(p)}</div>`);
       if (depth + 1 < o.gens) childrenFor(p).forEach((c, i) => walk(c, num.concat(i + 1), depth + 1));
     })(start, [1], 0);
-    bodyHtml = `<div class="cols idx">${lines.join('')}</div>`;
+    body = `<div class="ptv-cols ptv-idx">${lines.join('')}</div>`;
   }
-  const w = window.open('', '_blank');
-  if (!w) { toast('اسمح بالنوافذ المنبثقة للطباعة'); return; }
   const title = o.branchName ? ('فرع ' + o.branchName) : start.name;
-  w.document.write(`<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>مشجّرة ${esc(title)}</title>
-    <style>
-    @page { size: A4; margin: 12mm; }
-    * { box-sizing: border-box; }
-    body { font-family: "Segoe UI", Tahoma, "Noto Naskh Arabic", sans-serif; color: #111; direction: rtl; margin: 0; }
-    h1 { color: #312E81; margin: 0 0 2px; font-size: 19px; }
-    .sub { color: #555; margin-bottom: 10px; font-size: 12.5px; border-bottom: 2px solid #312E81; padding-bottom: 6px; }
-    /* أعمدة تلقائية: تملأ عرض الصفحة فتقلّ الصفحات */
-    .cols { column-width: 250px; column-gap: 20px; column-rule: 1px solid #e2e2ea; }
-    /* الفهرس المرقّم المضغوط */
-    .idx .r { break-inside: avoid; line-height: 1.45; font-size: 12px; padding: 1.5px 0; border-bottom: 1px dotted #e6e6ee; }
-    .idx .num { color: #312E81; font-family: ui-monospace, monospace; font-size: 10.5px; font-weight: 700; direction: ltr; unicode-bidi: isolate; }
-    .idx .nm { font-weight: 700; }
-    /* المشجّرة المتدرّجة */
-    ul.tree, .tree ul { list-style: none; margin: 0; padding-inline-start: 14px; border-inline-start: 1px dotted #aaa; }
-    .tree { padding-inline-start: 0 !important; border: 0 !important; }
-    .tree li { margin: 2px 0; line-height: 1.5; font-size: 12.5px; break-inside: avoid; }
-    .tree .nm { font-weight: 700; }
-    .m { color: #666; font-weight: 400; font-size: .82em; }
-    .foot { margin-top: 16px; color: #777; font-size: 11px; border-top: 1px solid #ccc; padding-top: 6px; }
-    .bar { margin-bottom: 10px; }
-    @media print { .bar { display: none; } }
-    button { font: inherit; padding: 8px 16px; border: 1px solid #312E81; background: #312E81; color: #fff; border-radius: 8px; cursor: pointer; }
-    </style></head><body>
-    <div class="bar"><button onclick="window.print()">🖨️ طباعة / حفظ PDF</button></div>
-    <h1>المشجّرة المختصرة — ${esc(title)}</h1>
-    <div class="sub">يبدأ من: ${esc(start.name)} • ${o.gens} أجيال • ${count} فرد • ${new Date().toLocaleDateString('ar')}</div>
-    ${bodyHtml}
-    <div class="foot">هذه نسخة مختصرة من قاعدة بيانات قبيلة المفارجة — powered by Mohamad Shaman almfrji</div>
-    </body></html>`);
-  w.document.close();
+  return `<div class="ptv-h1">المشجّرة المختصرة — ${esc(title)}</div>
+    <div class="ptv-sub">يبدأ من: ${esc(start.name)} • ${o.gens} أجيال • ${count} فرد • ${new Date().toLocaleDateString('ar')}</div>
+    ${body}
+    <div class="ptv-foot">هذه نسخة مختصرة من قاعدة بيانات قبيلة المفارجة — powered by Mohamad Shaman almfrji</div>`;
+}
+function screenPrintView() {
+  if (!ptOpts) { setHash('#/printtree'); return; }
+  view().innerHTML = `
+    <div class="btn-row no-print" style="margin-bottom:10px">
+      <button class="btn" id="pv_print">🖨️ طباعة / حفظ PDF</button>
+      <button class="btn outline" id="pv_back">⚙️ تغيير الخيارات</button>
+    </div>
+    <div class="ptv print-area">${printTreeBody(ptOpts)}</div>`;
+  document.getElementById('pv_print').addEventListener('click', () => window.print());
+  document.getElementById('pv_back').addEventListener('click', () => setHash('#/printtree'));
 }
 
 /* ===== صفحة الشخص ===== */
