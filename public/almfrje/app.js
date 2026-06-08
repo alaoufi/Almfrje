@@ -529,6 +529,7 @@ const ROUTES = {
   hierarchy: { t: 'العرض الهرمي', back: true, fn: screenHierarchy },
   branchhier: { t: 'عرض الفرع', back: true, fn: screenBranchHier },
   outline: { t: 'نموذج الأعمدة', back: true, fn: screenOutline },
+  timeline: { t: 'خط الأجيال', back: true, fn: screenTimeline },
   import: { t: 'استيراد Excel', back: true, fn: screenImport },
   members: { t: 'المستخدمون والصلاحيات', back: true, fn: screenMembers },
   branchadmin: { t: 'الفروع والمشرفون', back: true, fn: screenBranchAdmin },
@@ -1026,6 +1027,72 @@ function printDescSummary(id) {
     <div class="foot">هذه نسخة مختصرة من قاعدة بيانات قبيلة المفارجة</div>
     <script>window.onload=function(){window.print()}<\/script></body></html>`);
   w.document.close();
+}
+
+/* ===== (5) خط الأجيال — عرض الأشخاص حسب الجيل ===== */
+let tlRoot = null, tlBranch = '', tlStatus = 'all', tlSearch = '';
+function timelineBasePool() {
+  let pool = (tlRoot && byId.get(tlRoot.id)) ? [byId.get(tlRoot.id), ...descendants(tlRoot.id)] : C.persons.slice();
+  if (!isAdmin() && isManager()) pool = pool.filter(p => inMyBranch(p));   // المشرف: فرعه فقط
+  return pool;
+}
+function screenTimeline(arg) {
+  if (arg && arg !== 'all') { const rid = parseInt(arg, 10); if (byId.get(rid)) tlRoot = byId.get(rid); } else if (arg === 'all') tlRoot = null;
+  const branchOpts = (isAdmin() ? C.branches.filter(b => isLiveBranch(b.id)) : C.branches.filter(b => myBranches().includes(b.id)))
+    .map(b => `<option value="${b.id}" ${tlBranch === String(b.id) ? 'selected' : ''}>${esc(b.name)}</option>`).join('');
+  view().innerHTML = `
+    <div class="card">
+      <div class="tl-top">
+        <h3 style="margin:0">🕓 خط الأجيال</h3>
+        ${tlRoot ? `<span class="tl-rootbadge">من: <b>${esc(tlRoot.name)}</b> <button class="btn sm outline" id="tl_all" style="margin:0">كل الشجرة</button></span>` : ''}
+      </div>
+      <p class="muted" style="font-size:.84rem;margin:4px 0 8px">عرض الأفراد مقسّمين حسب الجيل. اضغط أي اسم لفتح أدواته.</p>
+      <div class="tl-filters">
+        <select id="tl_branch" class="tl-sel"><option value="">كل الفروع</option>${branchOpts}</select>
+        <div class="seg" id="tl_status">
+          <button class="seg-b${tlStatus === 'all' ? ' on' : ''}" data-st="all">الكل</button>
+          <button class="seg-b${tlStatus === 'alive' ? ' on' : ''}" data-st="alive">الأحياء</button>
+          <button class="seg-b${tlStatus === 'dead' ? ' on' : ''}" data-st="dead">المتوفّون</button>
+          <button class="seg-b${tlStatus === 'noissue' ? ' on' : ''}" data-st="noissue">لم يعقب</button>
+        </div>
+        <div class="search" style="margin:0"><input id="tl_q" placeholder="بحث بالاسم…" value="${esc(tlSearch)}"></div>
+        <button class="btn sm outline" id="tl_pick" style="margin:0">▶ ابدأ من شخص</button>
+      </div>
+    </div>
+    <div id="tl_list"></div>`;
+  const listEl = document.getElementById('tl_list');
+  const renderList = () => {
+    let f = timelineBasePool();
+    if (tlBranch) f = f.filter(p => String(p.branch_id) === tlBranch);
+    if (tlStatus === 'alive') f = f.filter(p => p.status !== 'dead');
+    else if (tlStatus === 'dead') f = f.filter(p => p.status === 'dead');
+    else if (tlStatus === 'noissue') f = f.filter(p => p.status === 'dead' && (descCount.get(p.id) || 0) === 0);
+    if (tlSearch.trim()) f = f.filter(p => nameMatch(p, tlSearch));
+    const byGen = new Map();
+    f.forEach(p => { const g = byId.get(p.father_id) || !p.father_id ? (p.generation || 0) : -1; const key = (p.father_id && !byId.get(p.father_id)) ? 'x' : (p.generation || 0); if (!byGen.has(key)) byGen.set(key, []); byGen.get(key).push(p); });
+    const keys = [...byGen.keys()].filter(k => k !== 'x').sort((a, b) => a - b);
+    if (byGen.has('x')) keys.push('x');
+    if (!f.length) { listEl.innerHTML = '<div class="center-empty">لا نتائج بهذه الفلترة.</div>'; return; }
+    listEl.innerHTML = keys.map(g => {
+      const arr = byGen.get(g).slice().sort((a, b) => (a.sort - b.sort) || (a.id - b.id));
+      const title = g === 'x' ? 'بيانات غير مكتملة' : 'الجيل ' + g;
+      const cards = arr.map(p => {
+        const f2 = p.father_id ? byId.get(p.father_id) : null;
+        return `<div class="tl-card" data-lensid="${p.id}">
+          <div class="tl-name ${nameCls(p)}">${esc(p.name)}${statusTag(p)}</div>
+          <div class="tl-meta">${f2 ? 'بن ' + esc(f2.name) + ' • ' : ''}${esc(branchName(p.branch_id))}${(childCount.get(p.id) || 0) ? ' • ' + childCount.get(p.id) + ' ابن' : ''}</div>
+        </div>`;
+      }).join('');
+      return `<div class="tl-gen"><div class="tl-gen-h">${title} <span class="tl-gen-n">${arr.length} شخص</span></div><div class="tl-grid">${cards}</div></div>`;
+    }).join('');
+    listEl.querySelectorAll('[data-lensid]').forEach(el => el.addEventListener('click', () => openLens(parseInt(el.dataset.lensid, 10))));
+  };
+  const ta = document.getElementById('tl_all'); if (ta) ta.addEventListener('click', () => { tlRoot = null; setHash('#/timeline/all'); });
+  document.getElementById('tl_branch').addEventListener('change', e => { tlBranch = e.target.value; renderList(); });
+  document.querySelectorAll('#tl_status .seg-b').forEach(b => b.addEventListener('click', () => { tlStatus = b.dataset.st; document.querySelectorAll('#tl_status .seg-b').forEach(x => x.classList.toggle('on', x === b)); renderList(); }));
+  { let t = null; document.getElementById('tl_q').addEventListener('input', e => { tlSearch = e.target.value; clearTimeout(t); t = setTimeout(renderList, 200); }); }
+  document.getElementById('tl_pick').addEventListener('click', () => pickPerson('اختر شخصاً لبدء خط الأجيال منه', (p) => p && setHash('#/timeline/' + p.id)));
+  renderList();
 }
 
 /* ===== صفحة الشخص ===== */
@@ -2250,6 +2317,7 @@ function screenMore() {
   // العرض والتصفّح (للجميع)
   const browse = [['📊 التقرير الإحصائي', '#/stats']];
   if (r0) { browse.push(['🌳 العرض الهرمي العام', '#/hierarchy/all', 'hierarchy']); browse.push(['🗒️ نموذج الأعمدة', '#/outline/all', 'outline']); }
+  browse.push(['🕓 خط الأجيال', '#/timeline/all']);
   browse.push(['📇 فهرس ذرية شخص', '#pickdesc', 'descendants']);
   groups.push(['🔎 العرض والتقارير', browse]);
   // البيانات (إضافة/تعديل/استيراد)

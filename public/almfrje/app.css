@@ -714,3 +714,20 @@ ul.hier ul.hier > .hier-li::before {
 .ql-stat .l { font-size: .75rem; color: var(--muted); }
 .ql-tools { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .ql-tools .btn { margin: 0; }
+
+/* ===== خط الأجيال ===== */
+.tl-top { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+.tl-rootbadge { font-size: .85rem; color: var(--muted); display: inline-flex; align-items: center; gap: 6px; }
+.tl-filters { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.tl-sel { height: 36px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); color: var(--text); padding: 0 8px; font: inherit; }
+.tl-filters .search { flex: 1; min-width: 140px; }
+.tl-gen { margin-bottom: 14px; }
+.tl-gen-h { font-weight: 800; color: var(--brand); font-size: 1.02rem; padding: 6px 4px; border-bottom: 2px solid color-mix(in srgb, var(--brand) 30%, transparent); margin-bottom: 8px; display: flex; align-items: center; gap: 8px; }
+.tl-gen-n { font-size: .75rem; font-weight: 700; color: #fff; background: var(--brand); border-radius: 999px; padding: 2px 9px; }
+.tl-grid { display: grid; grid-template-columns: 1fr; gap: 8px; }
+@media (min-width: 560px) { .tl-grid { grid-template-columns: 1fr 1fr; } }
+@media (min-width: 860px) { .tl-grid { grid-template-columns: 1fr 1fr 1fr; } }
+.tl-card { border: 1px solid var(--line); border-inline-start: 3px solid color-mix(in srgb, var(--brand) 45%, transparent); border-radius: 10px; padding: 9px 11px; background: var(--card); cursor: pointer; }
+.tl-card:active { background: var(--brand-l); }
+.tl-name { font-weight: 800; }
+.tl-meta { font-size: .8rem; color: var(--muted); margin-top: 2px; }
