@@ -764,7 +764,7 @@ ul.hier ul.hier > .hier-li::before {
 .ptv { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px; }
 .ptv-h1 { color: var(--brand); font-size: 1.2rem; font-weight: 800; margin: 0 0 2px; }
 .ptv-sub { color: var(--muted); font-size: .85rem; border-bottom: 2px solid var(--brand); padding-bottom: 6px; margin-bottom: 10px; }
-.ptv-cols { column-width: 250px; column-gap: 20px; }
+.ptv-cols { column-width: auto; }   /* عمود واحد على الشاشة لتفادي التداخل */
 .ptv-idx .ptv-r { break-inside: avoid; line-height: 1.5; font-size: .9rem; padding: 2px 0; border-bottom: 1px dotted var(--line); }
 .ptv-idx .ptv-num { color: var(--brand); font-family: ui-monospace, monospace; font-size: .72rem; font-weight: 700; direction: ltr; unicode-bidi: isolate; }
 .ptv .nm { font-weight: 700; }
@@ -777,7 +777,8 @@ ul.hier ul.hier > .hier-li::before {
   /* اطبع منطقة النسخة فقط بشكلٍ نظيف */
   .ptv { border: 0 !important; padding: 0 !important; }
   .ptv-h1 { color: #312E81 !important; }
-  .ptv-cols { column-width: 250px; }
+  /* الأعمدة عند الطباعة فقط، وللفهرس المرقّم فقط (المشجّرة المتدرّجة تبقى عموداً واحداً) */
+  .ptv-idx { column-width: 250px; column-gap: 20px; }
   .ptv-idx .ptv-r { border-bottom: 1px dotted #e6e6ee; }
   .ptv-num { color: #312E81 !important; }
 }
