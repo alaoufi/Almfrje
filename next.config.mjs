@@ -6,9 +6,8 @@ const nextConfig = {
   },
   async rewrites() {
     return [
-      // الرئيسية مقفلة = صفحة بيضاء فارغة (المفارجة على /almfrji فقط)
-      { source: '/', destination: '/blank.html' },
-      // نظام المفارجة (الأنساب) — الرابط المعتمد /almfrji (مع إبقاء /almfrje كمرادف)
+      // مشروع المفرجي مستقل: جذر النطاق يفتح التطبيق مباشرة (مع إبقاء /almfrji و/almfrje كمرادفين).
+      { source: '/', destination: '/almfrje/index.html' },
       { source: '/almfrji', destination: '/almfrje/index.html' },
       { source: '/almfrji/', destination: '/almfrje/index.html' },
       { source: '/almfrje', destination: '/almfrje/index.html' },
