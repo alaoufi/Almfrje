@@ -531,6 +531,7 @@ const ROUTES = {
   outline: { t: 'نموذج الأعمدة', back: true, fn: screenOutline },
   timeline: { t: 'خط الأجيال', back: true, fn: screenTimeline },
   radial: { t: 'الشجرة الدائرية', back: true, fn: screenRadial },
+  printtree: { t: 'نسخة للطباعة', back: true, fn: screenPrintTree },
   import: { t: 'استيراد Excel', back: true, fn: screenImport },
   members: { t: 'المستخدمون والصلاحيات', back: true, fn: screenMembers },
   branchadmin: { t: 'الفروع والمشرفون', back: true, fn: screenBranchAdmin },
@@ -1162,6 +1163,91 @@ function screenRadial(arg) {
   document.getElementById('rad_zout').addEventListener('click', () => { radZoom = Math.max(0.5, radZoom - 0.25); screenRadial(String(radRoot.id)); });
   view().querySelectorAll('[data-radid]').forEach(g => g.addEventListener('click', () => openLens(parseInt(g.dataset.radid, 10))));
   view().querySelectorAll('[data-radmore]').forEach(g => g.addEventListener('click', () => setHash('#/descendants/' + g.dataset.radmore)));
+}
+
+/* ===== (6) المشجّرة المختصرة للطباعة ===== */
+let ptStart = null;   // الجدّ الذي تبدأ منه (اختياري)
+function screenPrintTree() {
+  const branches = (isAdmin() ? C.branches.filter(b => isLiveBranch(b.id)) : C.branches.filter(b => myBranches().includes(b.id)));
+  const bopts = branches.sort((a, b) => String(a.name).localeCompare(String(b.name), 'ar')).map(b => `<option value="${b.id}">${esc(b.name)}</option>`).join('');
+  view().innerHTML = `
+    <div class="card">
+      <h3>🖨️ نسخة مختصرة للطباعة</h3>
+      <p class="muted" style="font-size:.85rem;margin-top:-2px">اختر ما تريد ثم «توليد النسخة» لصفحة طباعة نظيفة (طباعة أو حفظ PDF).</p>
+      <div class="field"><label>الفرع</label><select id="pt_branch" class="tl-sel" style="width:100%">${isAdmin() ? '<option value="">كل الشجرة</option>' : ''}${bopts}</select></div>
+      <div class="field"><label>ابدأ من جدٍّ محدّد (اختياري)</label>
+        <div class="father-pick"><div id="pt_anclbl" class="father-name empty">— من جذر الفرع —</div>
+        <div class="btn-row"><button class="btn sm" id="pt_pick" style="margin:0">🔍 اختيار الجدّ</button><button class="btn sm outline" id="pt_clr" style="margin:0">إلغاء</button></div></div></div>
+      <div class="field"><label>عدد الأجيال المعروضة</label><input id="pt_gens" type="number" min="1" max="12" value="4" class="tl-sel" style="width:100px"></div>
+      <div class="grid-fields">
+        <label class="perm-chk"><input type="checkbox" id="pt_status" checked><span>إظهار الحالة</span></label>
+        <label class="perm-chk"><input type="checkbox" id="pt_city"><span>إظهار المدينة</span></label>
+        <label class="perm-chk"><input type="checkbox" id="pt_kids"><span>إظهار عدد الأبناء</span></label>
+        <label class="perm-chk"><input type="checkbox" id="pt_alive"><span>الأحياء فقط</span></label>
+      </div>
+      <button class="btn btn-lg" id="pt_go" style="margin-top:10px">📄 توليد النسخة</button>
+    </div>`;
+  const setAnc = (p) => { ptStart = p; const el = document.getElementById('pt_anclbl'); el.textContent = p ? '👤 ' + p.name + ' (جيل ' + p.generation + ')' : '— من جذر الفرع —'; el.classList.toggle('empty', !p); };
+  document.getElementById('pt_pick').addEventListener('click', () => pickPerson('اختر الجدّ الذي تبدأ منه', p => setAnc(p), (!isAdmin() && isManager()) ? (p => inMyBranch(p)) : null));
+  document.getElementById('pt_clr').addEventListener('click', () => setAnc(null));
+  document.getElementById('pt_go').addEventListener('click', () => {
+    const branchId = document.getElementById('pt_branch').value;
+    let start = ptStart;
+    if (!start) { if (branchId) start = branchRoot(parseInt(branchId, 10)); else start = roots()[0]; }
+    if (!start) { toast('اختر فرعاً أو جدّاً'); return; }
+    if (!isAdmin() && isManager() && !inMyBranch(start)) { toast('هذا خارج فرعك'); return; }
+    buildPrintTree(start, {
+      gens: Math.max(1, Math.min(12, parseInt(document.getElementById('pt_gens').value, 10) || 4)),
+      status: document.getElementById('pt_status').checked,
+      city: document.getElementById('pt_city').checked,
+      kids: document.getElementById('pt_kids').checked,
+      aliveOnly: document.getElementById('pt_alive').checked,
+      branchName: branchId ? branchName(parseInt(branchId, 10)) : '',
+    });
+  });
+}
+function buildPrintTree(start, o) {
+  const node = (p, depth) => {
+    const meta = [];
+    if (o.status && p.status === 'dead') meta.push((descCount.get(p.id) || 0) === 0 ? 'لم يعقب' : 'متوفّى');
+    if (o.city && p.city) meta.push(esc(p.city));
+    if (o.kids && (childCount.get(p.id) || 0)) meta.push((childCount.get(p.id)) + ' أبناء');
+    const m = meta.length ? ` <span class="m">(${meta.join(' • ')})</span>` : '';
+    let sub = '';
+    if (depth + 1 < o.gens) {
+      let cs = childrenOf(p.id);
+      if (o.aliveOnly) cs = cs.filter(c => c.status !== 'dead');
+      cs = cs.slice().sort((a, b) => (a.sort - b.sort) || (a.id - b.id));
+      if (cs.length) sub = `<ul>${cs.map(c => node(c, depth + 1)).join('')}</ul>`;
+    }
+    return `<li><span class="nm">${esc(p.name)}</span>${m}${sub}</li>`;
+  };
+  const w = window.open('', '_blank');
+  if (!w) { toast('اسمح بالنوافذ المنبثقة للطباعة'); return; }
+  const title = o.branchName ? ('فرع ' + o.branchName) : start.name;
+  w.document.write(`<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>مشجّرة ${esc(title)}</title>
+    <style>
+    @page { size: A4; margin: 14mm; }
+    body { font-family: "Segoe UI", Tahoma, "Noto Naskh Arabic", sans-serif; color: #111; direction: rtl; }
+    h1 { color: #312E81; margin: 0 0 2px; font-size: 20px; }
+    .sub { color: #555; margin-bottom: 12px; font-size: 13px; }
+    ul { list-style: none; margin: 0; padding-inline-start: 18px; border-inline-start: 1px dotted #999; }
+    body > .tree > ul { border: 0; padding-inline-start: 0; }
+    li { margin: 3px 0; line-height: 1.7; page-break-inside: avoid; }
+    .nm { font-weight: 700; }
+    .m { color: #666; font-weight: 400; font-size: .85em; }
+    .foot { margin-top: 20px; color: #777; font-size: 11px; border-top: 1px solid #ccc; padding-top: 6px; }
+    .bar { margin-bottom: 12px; }
+    @media print { .bar { display: none; } }
+    button { font: inherit; padding: 8px 16px; border: 1px solid #312E81; background: #312E81; color: #fff; border-radius: 8px; cursor: pointer; }
+    </style></head><body>
+    <div class="bar"><button onclick="window.print()">🖨️ طباعة / حفظ PDF</button></div>
+    <h1>المشجّرة المختصرة — ${esc(title)}</h1>
+    <div class="sub">يبدأ من: ${esc(start.name)} • ${o.gens} أجيال • ${new Date().toLocaleDateString('ar')}</div>
+    <div class="tree"><ul>${node(start, 0)}</ul></div>
+    <div class="foot">هذه نسخة مختصرة من قاعدة بيانات قبيلة المفارجة</div>
+    </body></html>`);
+  w.document.close();
 }
 
 /* ===== صفحة الشخص ===== */
@@ -2389,6 +2475,7 @@ function screenMore() {
   browse.push(['🕓 خط الأجيال', '#/timeline/all']);
   browse.push(['🔆 الشجرة الدائرية', '#/radial/all']);
   browse.push(['📇 فهرس ذرية شخص', '#pickdesc', 'descendants']);
+  browse.push(['🖨️ نسخة مختصرة للطباعة', '#/printtree']);
   groups.push(['🔎 العرض والتقارير', browse]);
   // البيانات (إضافة/تعديل/استيراد)
   const data = [];
