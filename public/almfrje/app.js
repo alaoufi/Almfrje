@@ -530,6 +530,7 @@ const ROUTES = {
   branchhier: { t: 'عرض الفرع', back: true, fn: screenBranchHier },
   outline: { t: 'نموذج الأعمدة', back: true, fn: screenOutline },
   timeline: { t: 'خط الأجيال', back: true, fn: screenTimeline },
+  radial: { t: 'الشجرة الدائرية', back: true, fn: screenRadial },
   import: { t: 'استيراد Excel', back: true, fn: screenImport },
   members: { t: 'المستخدمون والصلاحيات', back: true, fn: screenMembers },
   branchadmin: { t: 'الفروع والمشرفون', back: true, fn: screenBranchAdmin },
@@ -1093,6 +1094,74 @@ function screenTimeline(arg) {
   { let t = null; document.getElementById('tl_q').addEventListener('input', e => { tlSearch = e.target.value; clearTimeout(t); t = setTimeout(renderList, 200); }); }
   document.getElementById('tl_pick').addEventListener('click', () => pickPerson('اختر شخصاً لبدء خط الأجيال منه', (p) => p && setHash('#/timeline/' + p.id)));
   renderList();
+}
+
+/* ===== (8) الشجرة الدائرية ===== */
+let radRoot = null, radGens = 3, radZoom = 1;
+function buildRadial(rootId, maxGen) {
+  const CAP = 24;   // أقصى أبناء معروضين لكل عقدة (الباقي يُجمَّع في +عدد)
+  const root = byId.get(rootId);
+  function build(p, depth) {
+    const node = { p, depth, children: [] };
+    if (depth < maxGen) {
+      let cs = childrenOf(p.id);
+      if (!isAdmin() && isManager()) cs = cs.filter(c => inMyBranch(c));
+      let extra = 0;
+      if (cs.length > CAP) { extra = cs.length - CAP; cs = cs.slice(0, CAP); }
+      node.children = cs.map(c => build(c, depth + 1));
+      if (extra) node.children.push({ more: true, n: extra, parentId: p.id, depth: depth + 1, children: [] });
+    }
+    return node;
+  }
+  const tree = build(root, 0);
+  (function weigh(n) { if (!n.children.length) { n.w = 1; return 1; } n.w = n.children.reduce((s, c) => s + weigh(c), 0); return n.w; })(tree);
+  const ring = 150; const nodes = [], links = [];
+  (function place(n, a0, a1) {
+    const mid = (a0 + a1) / 2, r = n.depth * ring;
+    n.x = r * Math.cos(mid); n.y = r * Math.sin(mid); nodes.push(n);
+    let a = a0; const tot = n.w || 1;
+    for (const c of n.children) { const span = (a1 - a0) * ((c.w || 1) / tot); place(c, a, a + span); links.push([n, c]); a += span; }
+  })(tree, 0, Math.PI * 2);
+  return { nodes, links };
+}
+function screenRadial(arg) {
+  if (arg && arg !== 'all') { const rid = parseInt(arg, 10); if (byId.get(rid)) radRoot = byId.get(rid); }
+  if (!radRoot || !byId.get(radRoot.id)) {
+    if (!isAdmin() && isManager()) { const b = myBranches()[0]; radRoot = (b && branchRoot(b)) || roots()[0] || null; }
+    else radRoot = roots()[0] || null;
+  }
+  if (!radRoot) { view().innerHTML = '<div class="center-empty">لا توجد بيانات.</div>'; return; }
+  const maxG = Math.max(1, Math.min(radGens, 6));
+  const lay = buildRadial(radRoot.id, maxG);
+  let minX = 1e9, minY = 1e9, maxX = -1e9, maxY = -1e9;
+  lay.nodes.forEach(n => { minX = Math.min(minX, n.x); maxX = Math.max(maxX, n.x); minY = Math.min(minY, n.y); maxY = Math.max(maxY, n.y); });
+  const pad = 90, vbW = (maxX - minX) + pad * 2, vbH = (maxY - minY) + pad * 2, ox = minX - pad, oy = minY - pad;
+  const big = lay.nodes.length > 120;
+  const lines = lay.links.map(([a, b]) => `<line x1="${a.x.toFixed(1)}" y1="${a.y.toFixed(1)}" x2="${b.x.toFixed(1)}" y2="${b.y.toFixed(1)}" class="rad-link"/>`).join('');
+  const circles = lay.nodes.map(n => {
+    if (n.more) return `<g class="rad-g rad-more" data-radmore="${n.parentId}"><circle cx="${n.x.toFixed(1)}" cy="${n.y.toFixed(1)}" r="16"/><text x="${n.x.toFixed(1)}" y="${(n.y + 4).toFixed(1)}" text-anchor="middle">+${n.n}</text></g>`;
+    const r = n.depth === 0 ? 26 : (n.depth === 1 ? 19 : 15);
+    const nm = n.p.name.length > 8 ? n.p.name.slice(0, 8) + '…' : n.p.name;
+    return `<g class="rad-g" data-radid="${n.p.id}"><title>${esc(n.p.name)}</title><circle cx="${n.x.toFixed(1)}" cy="${n.y.toFixed(1)}" r="${r}" class="rad-c d${Math.min(n.depth, 3)} ${nameCls(n.p)}"/><text x="${n.x.toFixed(1)}" y="${(n.y + 4).toFixed(1)}" text-anchor="middle" class="rad-t">${esc(nm)}</text></g>`;
+  }).join('');
+  view().innerHTML = `
+    <div class="card">
+      <div class="tl-top"><h3 style="margin:0">🔆 الشجرة الدائرية</h3><span class="tl-rootbadge">المركز: <b>${esc(radRoot.name)}</b></span></div>
+      <div class="tl-filters">
+        <button class="btn sm outline" id="rad_pick" style="margin:0">⌖ تغيير الجذر</button>
+        <span class="rad-genctl">الأجيال: <button class="btn sm" id="rad_dec" style="margin:0">−</button> <b>${maxG}</b> <button class="btn sm" id="rad_inc" style="margin:0">+</button></span>
+        <span class="rad-genctl">تكبير: <button class="btn sm" id="rad_zout" style="margin:0">−</button> <button class="btn sm" id="rad_zin" style="margin:0">+</button></span>
+      </div>
+      ${big ? '<p class="muted" style="font-size:.78rem;margin:6px 0 0">لتحسين الأداء يتم عرض الأجيال المختارة فقط، وتُجمَّع الفروع الكبيرة في «+عدد» (اضغطها لفتح فهرس الذرية).</p>' : ''}
+    </div>
+    <div class="rad-wrap"><svg class="rad-svg" viewBox="${ox.toFixed(0)} ${oy.toFixed(0)} ${vbW.toFixed(0)} ${vbH.toFixed(0)}" style="width:${(vbW * radZoom).toFixed(0)}px;height:${(vbH * radZoom).toFixed(0)}px">${lines}${circles}</svg></div>`;
+  document.getElementById('rad_pick').addEventListener('click', () => pickPerson('اختر جذر الشجرة الدائرية', p => p && setHash('#/radial/' + p.id)));
+  document.getElementById('rad_inc').addEventListener('click', () => { radGens = Math.min(6, radGens + 1); screenRadial(String(radRoot.id)); });
+  document.getElementById('rad_dec').addEventListener('click', () => { radGens = Math.max(1, radGens - 1); screenRadial(String(radRoot.id)); });
+  document.getElementById('rad_zin').addEventListener('click', () => { radZoom = Math.min(3, radZoom + 0.25); screenRadial(String(radRoot.id)); });
+  document.getElementById('rad_zout').addEventListener('click', () => { radZoom = Math.max(0.5, radZoom - 0.25); screenRadial(String(radRoot.id)); });
+  view().querySelectorAll('[data-radid]').forEach(g => g.addEventListener('click', () => openLens(parseInt(g.dataset.radid, 10))));
+  view().querySelectorAll('[data-radmore]').forEach(g => g.addEventListener('click', () => setHash('#/descendants/' + g.dataset.radmore)));
 }
 
 /* ===== صفحة الشخص ===== */
@@ -2318,6 +2387,7 @@ function screenMore() {
   const browse = [['📊 التقرير الإحصائي', '#/stats']];
   if (r0) { browse.push(['🌳 العرض الهرمي العام', '#/hierarchy/all', 'hierarchy']); browse.push(['🗒️ نموذج الأعمدة', '#/outline/all', 'outline']); }
   browse.push(['🕓 خط الأجيال', '#/timeline/all']);
+  browse.push(['🔆 الشجرة الدائرية', '#/radial/all']);
   browse.push(['📇 فهرس ذرية شخص', '#pickdesc', 'descendants']);
   groups.push(['🔎 العرض والتقارير', browse]);
   // البيانات (إضافة/تعديل/استيراد)

@@ -731,3 +731,17 @@ ul.hier ul.hier > .hier-li::before {
 .tl-card:active { background: var(--brand-l); }
 .tl-name { font-weight: 800; }
 .tl-meta { font-size: .8rem; color: var(--muted); margin-top: 2px; }
+
+/* ===== الشجرة الدائرية ===== */
+.rad-genctl { font-size: .82rem; color: var(--muted); display: inline-flex; align-items: center; gap: 4px; }
+.rad-genctl .btn { min-width: 30px; padding: 4px 8px; }
+.rad-wrap { width: 100%; overflow: auto; -webkit-overflow-scrolling: touch; border: 1px solid var(--line); border-radius: 12px; background: var(--card); padding: 8px; }
+.rad-svg { display: block; }
+.rad-link { stroke: color-mix(in srgb, var(--brand) 40%, transparent); stroke-width: 1.4; }
+.rad-g { cursor: pointer; }
+.rad-c { fill: var(--brand); stroke: #fff; stroke-width: 2; }
+.rad-c.d0 { fill: var(--brand-d); } .rad-c.d1 { fill: var(--brand); } .rad-c.d2 { fill: var(--accent); } .rad-c.d3 { fill: #6b7fd1; }
+.rad-c.n-died { fill: var(--muted); } .rad-c.n-noissue { fill: var(--danger); }
+.rad-t { fill: #fff; font-size: 11px; font-weight: 700; pointer-events: none; }
+.rad-more circle { fill: color-mix(in srgb, var(--brand) 22%, var(--card)); stroke: var(--brand); stroke-width: 1.5; }
+.rad-more text { fill: var(--brand); font-size: 11px; font-weight: 800; pointer-events: none; }
