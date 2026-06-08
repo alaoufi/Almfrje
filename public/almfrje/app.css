@@ -112,6 +112,19 @@ html.dark .br-online { color: #4cd07d; }
 .about-body .about-sign { text-align: center; color: var(--brand); font-weight: 800; margin-top: 14px; }
 html.dark .about-card { box-shadow: 0 18px 44px -18px rgba(0,0,0,.8), 0 2px 0 color-mix(in srgb, var(--brand) 40%, transparent); }
 
+/* دليل الموقع (الكتيّب) */
+.guide-card { text-align: right; }
+.guide-toc { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin: 0 0 18px; }
+.guide-toc-link { background: color-mix(in srgb, var(--brand) 10%, transparent); color: var(--brand); border: 1px solid color-mix(in srgb, var(--brand) 30%, transparent); border-radius: 999px; padding: 5px 12px; font: inherit; font-weight: 700; font-size: .85rem; cursor: pointer; }
+.guide-toc-link:active { background: var(--brand); color: #fff; }
+.guide-sec { margin-top: 18px; scroll-margin-top: 70px; }
+.guide-sec-h { color: var(--brand); font-size: 1.15rem; margin: 0 0 10px; padding-bottom: 6px; border-bottom: 2px solid color-mix(in srgb, var(--brand) 35%, transparent); }
+.guide-item { background: color-mix(in srgb, var(--brand) 4%, var(--card)); border: 1px solid var(--line); border-inline-start: 3px solid color-mix(in srgb, var(--brand) 45%, transparent); border-radius: 10px; padding: 10px 12px; margin-bottom: 10px; box-shadow: 0 2px 6px -3px rgba(0,0,0,.3); }
+.guide-item-t { font-weight: 800; color: var(--text); font-size: 1.02rem; margin-bottom: 6px; }
+.guide-row { display: grid; grid-template-columns: 86px minmax(0,1fr); gap: 8px; padding: 3px 0; align-items: baseline; }
+.guide-lbl { font-size: .78rem; font-weight: 800; color: var(--brand); }
+.guide-val { font-size: .92rem; line-height: 1.7; word-break: break-word; }
+
 /* محرّر النص الغني (أدوات تنسيق الخطوط) */
 .rte-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; padding: 6px; margin-top: 8px;
   background: var(--bg); border: 1px solid var(--line); border-radius: 10px 10px 0 0; }
