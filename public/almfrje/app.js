@@ -432,6 +432,12 @@ function lineageShort(id, max = 4) {
   if (names.length > max) s += ' …';
   return s;
 }
+// نسب الآباء فقط (بدون اسم الشخص) — يُستخدم بعد عرض الاسم بخط غامق فلا يتكرّر.
+function ancestryShort(id, max = 3) {
+  const anc = lineage(id).slice(1).map(p => p.name);   // الآباء فقط (نُسقط الشخص نفسه)
+  if (!anc.length) return '';
+  return 'بن ' + anc.slice(0, max).join(' بن ') + (anc.length > max ? ' …' : '');
+}
 function descendants(id) { const out = []; const st = [...childrenOf(id)]; while (st.length) { const p = st.pop(); out.push(p); for (const c of childrenOf(p.id)) st.push(c); } return out; }
 // تطبيع سلسلة نسب للمطابقة (مطابق لمنطق التحقق في الخادم): يتجاهل التشكيل/الهمزات/المسافات/«بن»/«ابن»/«ال».
 function normGenChain(s) {
@@ -2685,7 +2691,7 @@ function gridPool(statusFilter) {
   return pool;
 }
 function gridCard(p, fields, review) {
-  const sub = `${esc(lineageShort(p.id, 4))} • جيل ${p.generation}`;
+  const sub = `${esc(ancestryShort(p.id, 3))} • جيل ${p.generation}`;
   // لا نعرض «من قام بالتعديل» هنا — يبقى محفوظاً في سجل التعديلات فقط (يُرجع إليه عند الخلاف).
   const rows = fields.map(k => {
     const f = GRID_FIELDS.find(x => x.k === k);
@@ -2704,7 +2710,7 @@ function gridRow(p, fields) {
       : `<input type="${f.type === 'tel' ? 'tel' : 'text'}" ${f.type === 'tel' ? 'inputmode="tel"' : ''} data-gfld="${k}" value="${esc(cur)}" placeholder="${esc(f.ar)}">`;
     return `<div class="grid-tc">${ctrl}</div>`;
   }).join('');
-  return `<div class="grid-trow" data-grow="${p.id}"><div class="grid-tc grid-tc-name"><b>${esc(p.name)}</b><span class="muted">${esc(lineageShort(p.id, 3))}</span></div>${cells}</div>`;
+  return `<div class="grid-trow" data-grow="${p.id}"><div class="grid-tc grid-tc-name"><b>${esc(p.name)}</b><span class="muted">${esc(ancestryShort(p.id, 2))}</span></div>${cells}</div>`;
 }
 function screenGridEdit() { screenGrid('edit'); }
 function screenGridReview() { screenGrid('review'); }
