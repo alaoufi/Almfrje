@@ -2648,6 +2648,7 @@ async function undoFromAudit(row) {
 /* ===== قائمة تعديل/مراجعة بيانات الأفراد (لكل فرد على حدة) — الأحياء فقط ===== */
 let gridAncestor = null;   // الجدّ المختار لحصر النطاق في قائمة التعديل/المراجعة
 let gridReviewStatus = 'alive';   // مرشّح المراجعة: alive | dead | all
+let gridReviewDetail = 'brief';   // تفصيل المراجعة: brief (الاسم متسلسلاً + الحالة) | full (كل البيانات)
 // الحقول القابلة للتعديل بالقائمة (بيانات لا بنية — لا الاسم ولا الأب)
 const GRID_FIELDS = [
   { k: 'status', ar: 'الحالة', type: 'select', opts: STATUS },
@@ -2730,12 +2731,18 @@ function screenGrid(mode) {
         <button class="seg-b${gridReviewStatus === 'alive' ? ' on' : ''}" data-st="alive">الأحياء</button>
         <button class="seg-b${gridReviewStatus === 'dead' ? ' on' : ''}" data-st="dead">المتوفّون</button>
         <button class="seg-b${gridReviewStatus === 'all' ? ' on' : ''}" data-st="all">الكل</button>
+      </div>
+      <div class="seg" id="g_detail">
+        <button class="seg-b${gridReviewDetail === 'brief' ? ' on' : ''}" data-dt="brief">قائمة مختصرة</button>
+        <button class="seg-b${gridReviewDetail === 'full' ? ' on' : ''}" data-dt="full">قائمة مفصّلة</button>
       </div>` : ''}
       <div id="g_count" class="search-count"></div>
       <div id="g_list" class="grid-list"></div>
       ${review ? '' : `<button class="btn btn-lg" id="g_save" style="margin-top:12px" disabled>💾 حفظ التعديلات</button>`}
     </div>`;
-  const selFields = () => review ? GRID_FIELDS.map(f => f.k) : [...view().querySelectorAll('input[data-gf]:checked')].map(c => c.dataset.gf);
+  const selFields = () => review
+    ? (gridReviewDetail === 'full' ? GRID_FIELDS.map(f => f.k) : ['status'])   // مختصرة: الحالة فقط (مع الاسم متسلسلاً)
+    : [...view().querySelectorAll('input[data-gf]:checked')].map(c => c.dataset.gf);
   const renderList = () => {
     const cnt = document.getElementById('g_count');
     const box = document.getElementById('g_list');
@@ -2762,6 +2769,11 @@ function screenGrid(mode) {
   if (review) view().querySelectorAll('#g_status .seg-b').forEach(b => b.addEventListener('click', () => {
     gridReviewStatus = b.dataset.st;
     view().querySelectorAll('#g_status .seg-b').forEach(x => x.classList.toggle('on', x === b));
+    renderList();
+  }));
+  if (review) view().querySelectorAll('#g_detail .seg-b').forEach(b => b.addEventListener('click', () => {
+    gridReviewDetail = b.dataset.dt;
+    view().querySelectorAll('#g_detail .seg-b').forEach(x => x.classList.toggle('on', x === b));
     renderList();
   }));
   if (!review) view().querySelectorAll('input[data-gf]').forEach(cb => cb.addEventListener('change', renderList));
