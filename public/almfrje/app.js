@@ -2513,7 +2513,7 @@ function screenFeedback() {
     <div class="card" style="text-align:center;border:2px solid var(--brand)">
       <div style="font-size:2rem;line-height:1">✉️</div>
       <h3 style="margin:.3rem 0 .15rem">إرسال ملاحظة للإدارة</h3>
-      <div class="muted" style="font-size:.84rem;line-height:1.7">اختر نوع الملاحظة وأكملها — وستصل للإدارة لمراجعتها واتخاذ الإجراء.</div>
+      <div class="muted" style="font-size:.84rem;line-height:1.7">اختر موضوع الملاحظة وأكملها — وستصل للإدارة لمراجعتها واتخاذ الإجراء.</div>
     </div>
     ${currentUserName() ? `<div class="card"><div class="li-title" style="margin-bottom:6px">المُرسِل</div>
       <div style="padding:8px 10px;border:1px solid var(--brand);border-radius:8px;font-size:.95rem;font-weight:700">👤 ${esc(currentUserName())}</div>
