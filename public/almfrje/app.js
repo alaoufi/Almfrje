@@ -229,6 +229,31 @@ let guestPrompt = DEFAULT_GUEST_PROMPT;
 let occasionText = '';
 let occasionColor = '#c0392b';
 const okColor = (c) => (/^#[0-9a-fA-F]{3,8}$/.test(String(c || '')) ? c : '#c0392b');
+// ===== تهنئة/مبارَكة المناسبات: رسالة من الإدارة تظهر فور الدخول وكشريط بالرئيسية طوال مدّتها =====
+let congrats = null;   // { text, color, mode:'now'|'sched', start:ISO|null, days:number, savedAt:ISO }
+function dtLocalValue(d) { d = d ? new Date(d) : new Date(); if (isNaN(d)) d = new Date(); const p = n => String(n).padStart(2, '0'); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`; }
+function fmtDateTime(ms) { const d = new Date(ms); const p = n => String(n).padStart(2, '0'); return `${d.getFullYear()}/${p(d.getMonth() + 1)}/${p(d.getDate())} الساعة ${p(d.getHours())}:${p(d.getMinutes())}`; }
+function congratsWindow(c) {
+  if (!c || !c.text) return null;
+  const startMs = (c.mode === 'sched' && c.start) ? new Date(c.start).getTime() : (c.savedAt ? new Date(c.savedAt).getTime() : Date.now());
+  const start = isNaN(startMs) ? Date.now() : startMs;
+  const days = Math.max(0, parseInt(c.days, 10) || 0);
+  const end = days > 0 ? start + days * 86400000 : Infinity;
+  return { start, end, days };
+}
+function congratsActive() {
+  if (!congrats || !congrats.text) return null;
+  const w = congratsWindow(congrats); if (!w) return null;
+  const now = Date.now();
+  return (now >= w.start && now < w.end) ? congrats : null;
+}
+function congratsStatusText(c) {
+  if (!c || !c.text) return 'متوقّفة — لا تظهر.';
+  const w = congratsWindow(c), now = Date.now();
+  if (now < w.start) return '⏳ مجدوَلة — تبدأ ' + fmtDateTime(w.start) + (w.end < Infinity ? '، وتنتهي ' + fmtDateTime(w.end) : '، بلا نهاية حتى توقفها');
+  if (now >= w.end) return '✔️ انتهت مدّة عرضها.';
+  return '🟢 فعّالة الآن' + (w.end < Infinity ? '، حتى ' + fmtDateTime(w.end) : '، بلا نهاية حتى توقفها');
+}
 // الصفحة التعريفية (HTML منسّق) — يحرّرها المدير من «التحكم ← الصفحة التعريفية».
 const DEFAULT_ABOUT =
   '<p class="about-eyebrow">نبذة تعريفية</p>' +
@@ -377,6 +402,7 @@ async function loadSettings() {
     aboutHtml = typeof map.about_html === 'string' && map.about_html ? map.about_html : DEFAULT_ABOUT;
     occasionText = typeof map.occasion_text === 'string' ? map.occasion_text : '';
     occasionColor = okColor(map.occasion_color);
+    congrats = (map.congrats && typeof map.congrats === 'object') ? map.congrats : null;
     // تطبيق نصوص التعليمات المعدّلة من الإعدادات فوق الافتراضية
     applyHintOverrides(map.hints_overrides);
   } catch (e) { /* تجاهل — تبقى القيم الافتراضية */ }
@@ -707,6 +733,7 @@ function screenHome() {
     bindGo(); return;
   }
   view().innerHTML = `
+    ${(() => { const c = congratsActive(); return c ? `<div class="congrats-strip"><span class="cs-badge">🎊 تهنئة من الإدارة</span><span class="cs-text" style="color:${okColor(c.color)}">${esc(c.text)}</span></div>` : ''; })()}
     ${bannerText ? `<div class="banner"><button class="about-i banner-i" data-go="#/about" title="نبذة تعريفية عن قبيلة المفارجة" aria-label="نبذة تعريفية">ⓘ</button>${esc(bannerText)}</div>` : ''}
     ${!isGuestUser() && !pwChanged() ? `<div class="notice-pw">🔐 ننصحك بتغيير كلمة المرور الآن لحماية حسابك. <button class="btn sm" id="pwGo" style="margin-top:6px">تغيير كلمة المرور</button> <button class="btn sm outline" id="pwSkip" style="margin-top:6px">لاحقاً</button></div>` : ''}
     <div class="muted">أهلاً ${esc(currentUserName() || me.full_name || '')}${isGuestUser() ? '' : ' • ' + arOf(ROLES, me.role)}${isManager() && myBranches().length ? ' (' + myBranches().map(b => esc(branchName(b))).join('، ') + ')' : ''}</div>
@@ -3745,6 +3772,16 @@ function screenTexts() {
       <div class="field"><label>لون الكلمة</label><input type="color" id="tx_occ_color" value="${okColor(occasionColor)}" style="width:60px;height:38px;padding:2px;border:1px solid var(--line);border-radius:8px;background:var(--card)"></div>
       <div id="occPreview" style="font-weight:800;font-size:1.05rem;text-align:center;margin:8px 0;color:${okColor(occasionColor)}">${esc(occasionText || 'معاينة الكلمة')}</div>
       <button class="btn sm" id="tx_occSave">حفظ</button></div>
+    <div class="card"><h3>🎊 تهنئة / مبارَكة المناسبات</h3>
+      <p class="muted" style="font-size:.85rem;margin-top:-2px">رسالة تهنئة من الإدارة تظهر لكل من يدخل <b>فور الدخول</b> (في الجزء الأوسط العلوي) وكشريط مميّز أعلى الرئيسية <b>طوال مدّة العرض</b>. اترك النص فارغاً لإيقافها.</p>
+      ${fTextarea('نص التهنئة', 'tx_cong', (congrats && congrats.text) || '')}
+      <div class="field"><label>لون الخط</label><input type="color" id="tx_cong_color" value="${okColor(congrats && congrats.color)}" style="width:60px;height:38px;padding:2px;border:1px solid var(--line);border-radius:8px;background:var(--card)"></div>
+      ${fSelect('وقت النشر', 'tx_cong_mode', [{ k: 'now', ar: 'تُنشر الآن مباشرة' }, { k: 'sched', ar: 'بتوقيت محدّد (يوم وساعة)' }], (congrats && congrats.mode) || 'now')}
+      <div class="field" id="tx_cong_start_wrap"><label>تاريخ ووقت بدء النشر</label><input type="datetime-local" id="tx_cong_start" value="${dtLocalValue(congrats && congrats.mode === 'sched' ? congrats.start : null)}" style="width:100%"></div>
+      ${fInput('مدّة العرض (عدد الأيام) — اتركه فارغاً لعرضٍ دائم حتى الإيقاف', 'tx_cong_days', (congrats && congrats.days) || '', 'number', 'min="0" step="1" inputmode="numeric"')}
+      <div class="greet-congrats" style="margin:10px 0"><span class="greet-congrats-badge">🎊 تهنئة من الإدارة</span><div class="greet-congrats-text" id="congPreview" style="color:${okColor(congrats && congrats.color)}">${esc((congrats && congrats.text) || 'معاينة نص التهنئة')}</div></div>
+      <div id="congStatus" class="muted" style="font-size:.82rem;margin:6px 0">${esc(congratsStatusText(congrats))}</div>
+      <button class="btn sm" id="tx_congSave">حفظ التهنئة</button></div>
     <div class="card"><h3>✉️ نص بطاقة «ملاحظات الزوار»</h3>
       <p class="muted" style="font-size:.85rem;margin-top:-2px">النص التعريفي في بطاقة إرسال الملاحظة بالرئيسية.</p>
       ${fTextarea('النص', 'tx_fbcard', feedbackCardText)}
@@ -3807,6 +3844,33 @@ function screenTexts() {
         ({ error } = await sb.from('almfrje_settings').upsert({ key: 'occasion_color', value: c, updated_at: new Date().toISOString() }, { onConflict: 'key' })); if (error) throw error;
       });
       if (ok) { occasionText = t; occasionColor = c; toast(t ? 'تم حفظ كلمة المناسبة' : 'أُخفيت كلمة المناسبة'); }
+    });
+  }
+  { // تهنئة المناسبات: معاينة حيّة + إظهار/إخفاء حقل التوقيت بحسب الوضع + حفظ
+    const cInp = document.getElementById('tx_cong'), cCol = document.getElementById('tx_cong_color'), cMode = document.getElementById('tx_cong_mode'),
+      cStartWrap = document.getElementById('tx_cong_start_wrap'), cPrev = document.getElementById('congPreview');
+    const syncMode = () => { if (cStartWrap) cStartWrap.style.display = (cMode && cMode.value === 'sched') ? '' : 'none'; };
+    const refresh = () => { if (cPrev) { cPrev.textContent = (cInp.value || '').trim() || 'معاينة نص التهنئة'; cPrev.style.color = okColor(cCol.value); } };
+    syncMode(); refresh();
+    if (cInp) cInp.addEventListener('input', refresh);
+    if (cCol) cCol.addEventListener('input', refresh);
+    if (cMode) cMode.addEventListener('change', syncMode);
+    const cSave = document.getElementById('tx_congSave');
+    if (cSave) cSave.addEventListener('click', async () => {
+      const text = (cInp.value || '').trim();
+      const color = okColor(cCol.value);
+      const mode = (cMode && cMode.value === 'sched') ? 'sched' : 'now';
+      const daysRaw = (val('tx_cong_days') || '').trim();
+      const days = daysRaw === '' ? 0 : Math.max(0, parseInt(daysRaw, 10) || 0);
+      let start = null;
+      if (mode === 'sched') { const s = val('tx_cong_start'); if (s) { const d = new Date(s); if (!isNaN(d)) start = d.toISOString(); } }
+      const obj = text ? { text, color, mode, start, days, savedAt: new Date().toISOString() } : null;
+      const ok = await guard(async () => { const { error } = await sb.from('almfrje_settings').upsert({ key: 'congrats', value: obj, updated_at: new Date().toISOString() }, { onConflict: 'key' }); if (error) throw error; });
+      if (ok) {
+        congrats = obj;
+        const st = document.getElementById('congStatus'); if (st) st.textContent = congratsStatusText(congrats);
+        toast(text ? 'تم حفظ التهنئة' : 'تم إيقاف التهنئة');
+      }
     });
   }
   document.getElementById('tx_fbcardSave').addEventListener('click', async () => {
@@ -4397,6 +4461,25 @@ function openModal(title, body, onMount, opts) {
   bindEyes(root);   // فعّل أزرار العين بعد بناء محتوى النافذة
 }
 function closeModal() { document.getElementById('modalRoot').innerHTML = ''; }
+// ===== رسالة الترحيب/المبارَكة — تظهر في الجزء الأوسط العلوي فور الدخول =====
+function showGreeting(firstName) {
+  const c = congratsActive();
+  let welcomeHtml = '';
+  if (isGuestUser() && firstName) {
+    const msg = (guestWelcomeOk || DEFAULT_GUEST_OK).replace(/\{name\}/g, firstName);
+    welcomeHtml = `<div class="greet-welcome">${esc(msg)}</div>`;
+  }
+  let congHtml = '';
+  if (c) {
+    congHtml = `<div class="greet-congrats"><span class="greet-congrats-badge">🎊 تهنئة من الإدارة</span><div class="greet-congrats-text" style="color:${okColor(c.color)}">${esc(c.text)}</div></div>`;
+  }
+  if (!welcomeHtml && !congHtml) return;
+  const root = document.getElementById('modalRoot');
+  root.innerHTML = `<div class="greet-bg"><div class="greet-card">${welcomeHtml}${congHtml}<button class="btn btn-lg" id="greetOk">🌳 ابدأ التصفّح</button></div></div>`;
+  const close = () => { const r = document.getElementById('modalRoot'); if (r) r.innerHTML = ''; };
+  const gb = document.getElementById('greetOk'); if (gb) gb.addEventListener('click', close);
+  const bg = root.querySelector('.greet-bg'); if (bg) bg.addEventListener('click', e => { if (e.target.classList.contains('greet-bg')) close(); });
+}
 
 /* ===== شاشة بانتظار التفعيل ===== */
 function renderPending() {
@@ -4513,12 +4596,8 @@ async function guestGateEnter() {
     if (res.ok && j.ok) {
       try { sessionStorage.setItem('almfrje_guest_name', (j.name && String(j.name).trim()) || inp); if (j.branch != null) sessionStorage.setItem('almfrje_guest_branch', String(j.branch)); } catch (e) { /* */ }
       location.hash = '#/home';
-      const entered = await browseAsGuest(m);
-      if (entered) {
-        const msg = (guestWelcomeOk || DEFAULT_GUEST_OK).replace(/\{name\}/g, firstName);
-        openModal('🌿 أهلاً وسهلاً', `<div style="text-align:center;white-space:pre-wrap;font-size:1.1rem;line-height:1.95;padding:8px 2px">${esc(msg)}</div><button class="btn btn-lg" id="welcomeOk" style="margin-top:16px;width:100%">🌳 ابدأ التصفّح</button>`, null, { noClose: true });
-        const wb = document.getElementById('welcomeOk'); if (wb) wb.addEventListener('click', closeModal);
-      }
+      // رسالة الترحيب تظهر الآن فور الدخول من داخل enterApp (الجزء الأوسط العلوي) — لا نافذة مؤجَّلة هنا
+      await browseAsGuest(m);
     } else if (j.error) {
       // رسالة تشخيصية من الخادم: متكرّر (أضف جدّاً)، أو متوفّى، أو اسم الأب لا يطابق
       m.classList.add('err'); m.textContent = j.error;
@@ -4709,6 +4788,13 @@ async function enterApp(session) {
   if (!me.is_active) { showLoading(false); renderPending(); return; }
   // الزائر حساب مشترك تلقائي — لا يحتاج زرّ خروج (يبقى للمسؤول/المشرف).
   document.getElementById('signoutBtn').classList.toggle('hidden', isGuestUser() && guestGens <= 0);
+  // حمّل الإعدادات أولاً (خفيفة) لإظهار رسالة الترحيب/المبارَكة فوراً قبل تحميل بقية البيانات
+  try { await loadSettings(); } catch (e) { /* تجاهل — تبقى الافتراضية */ }
+  try {
+    let fn = '';
+    try { fn = (sessionStorage.getItem('almfrje_guest_name') || '').trim().split(/\s+/)[0] || ''; } catch (e) { /* */ }
+    showGreeting(fn);
+  } catch (e) { /* تجاهل */ }
   try { await loadAll(); } catch (e) { toast('خطأ تحميل: ' + e.message); }
   showLoading(false);
   // الزائر دخل عبر رابط الإدارة سهواً؟ حوّله للرئيسية بدل بقائه على #login
