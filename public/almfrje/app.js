@@ -237,9 +237,12 @@ function congratsWindow(c) {
   if (!c || !c.text) return null;
   const startMs = (c.mode === 'sched' && c.start) ? new Date(c.start).getTime() : (c.savedAt ? new Date(c.savedAt).getTime() : Date.now());
   const start = isNaN(startMs) ? Date.now() : startMs;
-  const days = Math.max(0, parseInt(c.days, 10) || 0);
-  const end = days > 0 ? start + days * 86400000 : Infinity;
-  return { start, end, days };
+  const unitMs = (c.durUnit === 'd') ? 86400000 : 3600000;   // الافتراضي بالساعات
+  let durMs = 0;
+  if (c.durValue != null && c.durValue !== '') durMs = Math.max(0, parseInt(c.durValue, 10) || 0) * unitMs;
+  else if (c.days != null) durMs = Math.max(0, parseInt(c.days, 10) || 0) * 86400000;   // توافق مع نسخة سابقة (أيام)
+  const end = durMs > 0 ? start + durMs : Infinity;
+  return { start, end };
 }
 function congratsActive() {
   if (!congrats || !congrats.text) return null;
@@ -3778,7 +3781,11 @@ function screenTexts() {
       <div class="field"><label>لون الخط</label><input type="color" id="tx_cong_color" value="${okColor(congrats && congrats.color)}" style="width:60px;height:38px;padding:2px;border:1px solid var(--line);border-radius:8px;background:var(--card)"></div>
       ${fSelect('وقت النشر', 'tx_cong_mode', [{ k: 'now', ar: 'تُنشر الآن مباشرة' }, { k: 'sched', ar: 'بتوقيت محدّد (يوم وساعة)' }], (congrats && congrats.mode) || 'now')}
       <div class="field" id="tx_cong_start_wrap"><label>تاريخ ووقت بدء النشر</label><input type="datetime-local" id="tx_cong_start" value="${dtLocalValue(congrats && congrats.mode === 'sched' ? congrats.start : null)}" style="width:100%"></div>
-      ${fInput('مدّة العرض (عدد الأيام) — اتركه فارغاً لعرضٍ دائم حتى الإيقاف', 'tx_cong_days', (congrats && congrats.days) || '', 'number', 'min="0" step="1" inputmode="numeric"')}
+      <div class="field"><label>مدّة العرض — اتركها فارغة لعرضٍ دائم حتى الإيقاف</label>
+        <div style="display:flex;gap:8px">
+          <input id="tx_cong_dur" type="number" min="0" step="1" inputmode="numeric" value="${(congrats && (congrats.durValue != null ? congrats.durValue : (congrats.days != null ? congrats.days : ''))) ?? ''}" style="flex:1" placeholder="مثلاً 6">
+          ${(() => { const u = (congrats && congrats.durUnit) ? congrats.durUnit : (congrats && congrats.days != null && congrats.durValue == null ? 'd' : 'h'); return `<select id="tx_cong_unit" style="width:120px"><option value="h" ${u === 'h' ? 'selected' : ''}>ساعة</option><option value="d" ${u === 'd' ? 'selected' : ''}>يوم</option></select>`; })()}
+        </div></div>
       <div class="greet-congrats" style="margin:10px 0"><span class="greet-congrats-badge">🎊 تهنئة من الإدارة</span><div class="greet-congrats-text" id="congPreview" style="color:${okColor(congrats && congrats.color)}">${esc((congrats && congrats.text) || 'معاينة نص التهنئة')}</div></div>
       <div id="congStatus" class="muted" style="font-size:.82rem;margin:6px 0">${esc(congratsStatusText(congrats))}</div>
       <button class="btn sm" id="tx_congSave">حفظ التهنئة</button></div>
@@ -3860,11 +3867,12 @@ function screenTexts() {
       const text = (cInp.value || '').trim();
       const color = okColor(cCol.value);
       const mode = (cMode && cMode.value === 'sched') ? 'sched' : 'now';
-      const daysRaw = (val('tx_cong_days') || '').trim();
-      const days = daysRaw === '' ? 0 : Math.max(0, parseInt(daysRaw, 10) || 0);
+      const durRaw = (val('tx_cong_dur') || '').trim();
+      const durUnit = (val('tx_cong_unit') === 'd') ? 'd' : 'h';
+      const durValue = durRaw === '' ? null : Math.max(0, parseInt(durRaw, 10) || 0);
       let start = null;
       if (mode === 'sched') { const s = val('tx_cong_start'); if (s) { const d = new Date(s); if (!isNaN(d)) start = d.toISOString(); } }
-      const obj = text ? { text, color, mode, start, days, savedAt: new Date().toISOString() } : null;
+      const obj = text ? { text, color, mode, start, durValue, durUnit, savedAt: new Date().toISOString() } : null;
       const ok = await guard(async () => { const { error } = await sb.from('almfrje_settings').upsert({ key: 'congrats', value: obj, updated_at: new Date().toISOString() }, { onConflict: 'key' }); if (error) throw error; });
       if (ok) {
         congrats = obj;
