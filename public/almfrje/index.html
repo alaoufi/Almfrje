@@ -16,13 +16,8 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <meta name="apple-mobile-web-app-title" content="المفارجة" />
-  <!-- CSS و JS يُحمّلان برابط فريد لكل فتح لمنع أي كاش للمتصفّح -->
-  <script>
-    (function () {
-      var v = Date.now();
-      document.write('<link rel="stylesheet" href="/almfrje/app.css?v=' + v + '">');
-    })();
-  </script>
+  <!-- الأصول بإعادة تحقّق (ETag): تُحدَّث فور النشر وتُحمَّل بسرعة (304) إن لم تتغيّر -->
+  <link rel="stylesheet" href="/almfrje/app.css">
 </head>
 <body>
   <!-- شاشة المصادقة -->
@@ -49,8 +44,8 @@
        لذا تُحمّلان عند الطلب فقط (lazyLib في app.js) لتسريع البدء. -->
   <!-- احتياطي للاستضافة الثابتة (يُترك فارغاً عند الاعتماد على بيئة alaoufi.me) -->
   <script src="/almfrje/config.js"></script>
-  <!-- الإعداد التلقائي من نفس متغيّرات بيئة alaoufi.me (يطغى إن وُجد) -->
-  <script src="/api/almfrje-config"></script>
-  <script>document.write('<scr' + 'ipt src="/almfrje/app.js?v=' + Date.now() + '"><\/scr' + 'ipt>');</script>
+  <!-- الإعداد التلقائي من متغيّرات بيئة alaoufi.me (مسارٌ قابل للتخزين القصير لتسريع الفتح) -->
+  <script src="/almfrje-config"></script>
+  <script src="/almfrje/app.js"></script>
 </body>
 </html>

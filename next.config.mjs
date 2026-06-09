@@ -34,6 +34,13 @@ const nextConfig = {
       { key: 'Pragma', value: 'no-cache' },
       { key: 'Expires', value: '0' },
     ];
+    // إعادة تحقّق: تُخزَّن في المتصفّح لكن تُراجَع في كل فتح عبر ETag → 304 سريع إن لم
+    // تتغيّر، ونسخة جديدة فور أي نشر. (للأصول الثابتة: app.js / app.css … — أسرع وبلا قِدَم.)
+    const revalidate = [
+      { key: 'Cache-Control', value: 'no-cache' },
+      { key: 'CDN-Cache-Control', value: 'no-cache' },
+      { key: 'Vercel-CDN-Cache-Control', value: 'no-cache' },
+    ];
     return [
       // منصّة الاستشارات على /con (وملفاتها داخل /legacy/)
       { source: '/con', headers: noCache },
@@ -42,10 +49,11 @@ const nextConfig = {
       { source: '/mrah', headers: noCache },
       { source: '/mrahi', headers: noCache },
       { source: '/mrahi/:path*', headers: noCache },
-      // نظام المفارجة (الأنساب)
+      // نظام المفارجة (الأنساب): صفحة الدخول (index) تبقى بلا تخزين، والأصول الثابتة
+      // (app.js/app.css/الأيقونة…) بإعادة تحقّق ETag — أسرع فتحٍ مع بقائها محدّثة دائماً.
       { source: '/almfrji', headers: noCache },
       { source: '/almfrje', headers: noCache },
-      { source: '/almfrje/:path*', headers: noCache },
+      { source: '/almfrje/:path*', headers: revalidate },
       // تطبيق الملاحظات (notes)
       { source: '/notes', headers: noCache },
       { source: '/notes/:path*', headers: noCache },

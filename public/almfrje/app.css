@@ -839,3 +839,47 @@ ul.hier ul.hier > .hier-li::before {
 [data-screen="home"] { font-weight: 700; }
 [data-screen="home"] .muted, [data-screen="home"] .hg-role, [data-screen="home"] p,
 [data-screen="home"] small, [data-screen="home"] .li-sub, [data-screen="home"] li { font-weight: 700; }
+
+/* ===== شاشة «إرسال ملاحظات» — تصميم عصري ثلاثي الأبعاد بخطوط غامقة مميّزة ===== */
+.fb-screen { font-weight: 700; }
+.fb-screen .card {
+  border: 1px solid color-mix(in srgb, var(--brand) 22%, var(--line));
+  border-radius: 18px;
+  background: linear-gradient(160deg, color-mix(in srgb, var(--brand) 7%, var(--card)) 0%, var(--card) 55%);
+  box-shadow: 0 18px 40px -22px color-mix(in srgb, var(--brand) 75%, transparent),
+              0 2px 0 color-mix(in srgb, var(--brand) 22%, transparent),
+              inset 0 1px 0 rgba(255,255,255,.55);
+}
+.fb-screen h3 { font-weight: 800; font-size: 1.2rem; letter-spacing: -.2px; }
+.fb-screen .li-title { font-weight: 800; color: var(--brand); font-size: 1.02rem; }
+.fb-screen .field label, .fb-screen label { font-weight: 800; color: var(--text); }
+.fb-screen .muted { font-weight: 600; }
+.fb-screen .field input, .fb-screen .field select, .fb-screen .field textarea {
+  font-weight: 700; border-radius: 12px;
+  border: 1.5px solid color-mix(in srgb, var(--brand) 28%, var(--line));
+  box-shadow: inset 0 2px 5px -3px rgba(0,0,0,.25);
+  transition: box-shadow .18s ease, border-color .18s ease;
+}
+.fb-screen .field input:focus, .fb-screen .field select:focus, .fb-screen .field textarea:focus {
+  border-color: var(--brand); outline: none;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand) 20%, transparent), inset 0 2px 5px -3px rgba(0,0,0,.2);
+}
+/* بطاقة العنوان (الترويسة) — بارزة أكثر */
+.fb-screen .card:first-child {
+  background: linear-gradient(150deg, color-mix(in srgb, var(--brand) 16%, var(--card)), var(--card) 70%);
+  border-color: color-mix(in srgb, var(--brand) 40%, transparent);
+}
+.fb-screen .card:first-child > div:first-child { filter: drop-shadow(0 4px 6px color-mix(in srgb, var(--brand) 45%, transparent)); }
+/* زر الإرسال — ثلاثي الأبعاد عصري (يضغط للأسفل عند النقر) */
+.fb-screen .btn-lg {
+  font-weight: 800; font-size: 1.06rem; border: 0; border-radius: 14px; color: #fff;
+  background: linear-gradient(180deg, var(--brand), var(--brand-d));
+  box-shadow: 0 12px 24px -10px color-mix(in srgb, var(--brand) 85%, transparent),
+              0 3px 0 var(--brand-d), inset 0 1px 0 rgba(255,255,255,.28);
+  transform: translateY(0); transition: transform .12s ease, box-shadow .12s ease;
+}
+.fb-screen .btn-lg:active {
+  transform: translateY(3px);
+  box-shadow: 0 5px 12px -10px color-mix(in srgb, var(--brand) 85%, transparent),
+              0 0 0 var(--brand-d), inset 0 1px 0 rgba(255,255,255,.28);
+}
