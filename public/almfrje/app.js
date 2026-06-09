@@ -913,6 +913,14 @@ async function copyText(s) {
   try { if (navigator.clipboard && navigator.clipboard.writeText) { await navigator.clipboard.writeText(s); toast('تم النسخ ✓'); return true; } } catch (e) { /* */ }
   try { const ta = document.createElement('textarea'); ta.value = s; ta.style.position = 'fixed'; ta.style.opacity = '0'; document.body.appendChild(ta); ta.focus(); ta.select(); document.execCommand('copy'); ta.remove(); toast('تم النسخ ✓'); return true; } catch (e) { toast('تعذّر النسخ'); return false; }
 }
+// مشاركة الموقع: واجهة المشاركة الأصلية للجهاز إن توفّرت، وإلا نسخ الرابط للحافظة.
+async function shareSite() {
+  const url = location.origin + '/almfrje';
+  try {
+    if (navigator.share) { await navigator.share({ title: 'المفارجة — شجرة العائلة', text: 'تصفّح شجرة قبيلة المفارجة', url }); return; }
+  } catch (e) { if (e && e.name === 'AbortError') return; /* أُلغيت المشاركة → لا بديل */ }
+  copyText(url);   // بديل: نسخ الرابط
+}
 // مسار النسب: من الشخص حتى الأصل، مع حمايةٍ من الدوائر ونقص البيانات (بحدٍّ أقصى للأجيال).
 function getLineagePath(id, maxDepth = 50) {
   const out = []; const seen = new Set(); let cur = byId.get(id); let g = 0;
@@ -4862,6 +4870,7 @@ function showSetup() {
 }
 async function init() {
   applyTheme('light');   // الوضع النهاري فقط (أُلغي العرض الليلي)
+  { const shb = document.getElementById('shareBtn'); if (shb) shb.addEventListener('click', shareSite); }
   { const gdb = document.getElementById('guideBtn'); if (gdb) gdb.addEventListener('click', () => setHash('#/guide')); }
   { const rfb = document.getElementById('refreshBtn'); if (rfb) rfb.addEventListener('click', () => {
     // تحديث كامل: تجاوز ذاكرة المتصفّح بإعادة تحميل المستند برابطٍ جديد (يُبقي الشاشة الحالية).
