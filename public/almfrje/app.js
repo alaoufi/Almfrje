@@ -1773,18 +1773,57 @@ function treeNodeHtml(id) {
   html += `</div>`;
   return html;
 }
-function pickPerson(title, onPick, filterFn) {
-  openModal(title, `<div class="search"><input id="pp_q" placeholder="ابحث بالاسم…"></div><div id="pp_res" style="max-height:50vh;overflow:auto"></div>`, () => {
-    const q = document.getElementById('pp_q'), res = document.getElementById('pp_res');
-    const run = () => {
-      const t = normalizeAr(q.value.trim()); let list = C.persons;
+// منتقٍ موحّد: بحث فوري بالاسم + تصفّح هرمي (جيلاً بجيل مع مسار تنقّل) للوصول لأي جدّ بسهولة.
+//  filterFn: يقيّد ما يُمكن «اختياره» (والتصفّح يمرّ عبر غير القابل للاختيار للوصول لذريّته).
+//  startAt: يفتح التصفّح عند عقدة محدّدة (لتعديل الاختيار دون البدء من القمة).
+function pickPerson(title, onPick, filterFn, startAt) {
+  let nav = (startAt && byId.get(startAt.id)) ? byId.get(startAt.id) : null;   // عقدة التصفّح (null = القمة)
+  const tops = () => (!isAdmin() && isManager()) ? myBranches().map(bid => branchRoot(bid)).filter(Boolean) : roots();
+  const canPick = (p) => !!p && (!filterFn || filterFn(p));
+  openModal(title, `
+    <div class="search"><input id="pp_q" placeholder="ابحث بالاسم… أو تصفّح الأجيال بالأسفل"></div>
+    <div id="pp_body" style="max-height:55vh;overflow:auto"></div>`, () => {
+    const q = document.getElementById('pp_q'), body = document.getElementById('pp_body');
+    const take = (p) => { if (canPick(p)) { closeModal(); onPick(p); } };
+    const renderSearch = () => {
+      let list = C.persons;
       if (filterFn) list = list.filter(filterFn);
-      if (t) list = list.filter(p => nameMatch(p, q.value));
-      list = list.slice(0, 40);
-      res.innerHTML = list.length ? list.map(p => `<div class="card click" data-pid="${p.id}" style="margin:6px 0;padding:10px"><div class="li-title">${esc(p.name)}</div><div class="li-sub">${esc(lineageShort(p.id))}</div></div>`).join('') : '<div class="muted" style="padding:8px">لا نتائج</div>';
-      res.querySelectorAll('[data-pid]').forEach(c => c.addEventListener('click', () => { onPick(byId.get(parseInt(c.dataset.pid, 10))); closeModal(); }));
+      list = list.filter(p => nameMatch(p, q.value)).slice(0, 40);
+      body.innerHTML = list.length
+        ? list.map(p => `<div class="card click" data-pid="${p.id}" style="margin:6px 0;padding:10px"><div class="li-title">${esc(p.name)}</div><div class="li-sub">${esc(lineageShort(p.id))}</div></div>`).join('')
+        : '<div class="muted" style="padding:8px">لا نتائج — امسح البحث لتصفّح الأجيال</div>';
+      body.querySelectorAll('[data-pid]').forEach(c => c.addEventListener('click', () => take(byId.get(parseInt(c.dataset.pid, 10)))));
     };
-    q.addEventListener('input', run); q.focus(); run();
+    const renderBrowse = () => {
+      const cur = nav, list = cur ? childrenOf(cur.id) : tops();
+      const crumb = cur ? lineage(cur.id).slice().reverse() : [];
+      body.innerHTML = `
+        <div class="anc-bar">
+          <button class="btn sm outline" id="pp_top" ${!cur ? 'disabled' : ''}>⌂ القمة</button>
+          ${cur ? '<button class="btn sm outline" id="pp_up">↑ للأعلى</button>' : ''}
+        </div>
+        ${cur
+          ? `<div class="anc-crumb">${crumb.map(x => `<span class="anc-cl" data-ppgo="${x.id}">${esc(x.name)}</span>`).join(' › ')}</div>
+             <div class="anc-cur"><b>${esc(cur.name)}</b> (جيل ${cur.generation})${canPick(cur) ? ' <button class="btn sm" id="pp_pickcur">✅ اختيار هذا</button>' : ''}</div>`
+          : '<div class="muted" style="margin-bottom:6px">اختر الأصل ثم تنقّل لأبنائه وصولاً للمطلوب — أو ابحث بالأعلى:</div>'}
+        <div class="anc-list">
+          ${list.length ? list.map(c => {
+            const kc = childCount.get(c.id) || 0;
+            return `<div class="anc-row">
+              <span class="anc-name" data-ppinto="${c.id}"><b>${esc(c.name)}</b> <span class="muted" style="font-size:.78rem;font-weight:400">(جيل ${c.generation}${kc ? ' • ' + kc + ' ابن' : ''})</span></span>
+              ${canPick(c) ? `<button class="btn sm" data-pppick="${c.id}">اختيار</button>` : ''}
+            </div>`;
+          }).join('') : '<div class="muted" style="padding:8px">لا أبناء — استخدم «اختيار هذا» بالأعلى.</div>'}
+        </div>`;
+      const t = document.getElementById('pp_top'); if (t) t.addEventListener('click', () => { nav = null; renderBrowse(); });
+      const u = document.getElementById('pp_up'); if (u) u.addEventListener('click', () => { nav = (cur && cur.father_id) ? byId.get(cur.father_id) : null; renderBrowse(); });
+      const pc = document.getElementById('pp_pickcur'); if (pc) pc.addEventListener('click', () => take(cur));
+      body.querySelectorAll('[data-ppinto]').forEach(b => b.addEventListener('click', () => { nav = byId.get(parseInt(b.dataset.ppinto, 10)); renderBrowse(); }));
+      body.querySelectorAll('[data-pppick]').forEach(b => b.addEventListener('click', () => take(byId.get(parseInt(b.dataset.pppick, 10)))));
+      body.querySelectorAll('[data-ppgo]').forEach(b => b.addEventListener('click', () => { nav = byId.get(parseInt(b.dataset.ppgo, 10)); renderBrowse(); }));
+    };
+    const run = () => q.value.trim() ? renderSearch() : renderBrowse();
+    q.addEventListener('input', run); q.focus(); renderBrowse();
   });
 }
 
@@ -3180,44 +3219,11 @@ function screenBulkEdit() {
 }
 // نافذة اختيار جدّ هرمية: المدير يبدأ من الأصول (فراج/مفرج)، ومشرف الفرع من فرعه
 // (الجيل الثاني). تتنقّل بالضغط على الاسم للدخول لأبنائه، مع زر «اختيار» لكل اسم.
-let _ancNav = null;   // الشخص المعروض حالياً (null = القمة)
+// اختيار الجدّ: يستخدم المنتقي الموحّد (بحث + تصفّح هرمي). يفتح عند الاختيار الحالي،
+// ويقيّد المسؤول على ذرية فروعه فقط (للمدير: كل الأصول).
 function pickAncestorModal(onPick, startAt) {
-  // نقاط البداية: للمسؤول جذور فروعه (ج٢)، للمدير الأصول
-  const tops = (!isAdmin() && isManager())
-    ? myBranches().map(bid => branchRoot(bid)).filter(Boolean)
-    : roots();
-  // افتح عند موقع الاختيار الحالي (تعديل الجدّ دون البدء من جديد) — وإلا من القمة.
-  _ancNav = (startAt && byId.get(startAt.id)) ? byId.get(startAt.id) : null;
-  const render = () => {
-    const cur = _ancNav;
-    const list = cur ? childrenOf(cur.id) : tops;
-    const crumb = cur ? lineage(cur.id).slice().reverse() : [];
-    const body = `
-      <div class="anc-bar">
-        <button class="btn sm outline" id="anc_top" ${!cur ? 'disabled' : ''}>⌂ القمة</button>
-        ${cur ? `<button class="btn sm outline" id="anc_up">↑ للأعلى</button>` : ''}
-      </div>
-      ${cur ? `<div class="anc-crumb">${crumb.map((x, i) => `<span class="anc-cl" data-ancgo="${x.id}">${esc(x.name)}</span>`).join(' › ')}</div>
-        <div class="anc-cur"><b>${esc(cur.name)}</b> (جيل ${cur.generation}) <button class="btn sm" id="anc_pickcur">✅ اختيار هذا</button></div>` : '<div class="muted" style="margin-bottom:6px">اختر الأصل ثم تنقّل لأبنائه:</div>'}
-      <div class="anc-list">
-        ${list.length ? list.map(c => {
-          const kc = childCount.get(c.id) || 0;
-          return `<div class="anc-row">
-            <span class="anc-name" data-ancinto="${c.id}"><b>${esc(c.name)}</b> <span class="muted" style="font-size:.78rem;font-weight:400">(جيل ${c.generation}${kc ? ' • ' + kc + ' ابن' : ''})</span></span>
-            <button class="btn sm" data-ancpick="${c.id}">اختيار</button>
-          </div>`;
-        }).join('') : '<div class="muted" style="padding:8px">لا أبناء.</div>'}
-      </div>`;
-    openModal('اختيار الجدّ', body, () => {
-      const top = document.getElementById('anc_top'); if (top) top.addEventListener('click', () => { _ancNav = null; render(); });
-      const up = document.getElementById('anc_up'); if (up) up.addEventListener('click', () => { _ancNav = (cur && cur.father_id) ? byId.get(cur.father_id) : null; render(); });
-      const pc = document.getElementById('anc_pickcur'); if (pc) pc.addEventListener('click', () => { closeModal(); onPick(cur); });
-      document.querySelectorAll('[data-ancinto]').forEach(b => b.addEventListener('click', () => { _ancNav = byId.get(parseInt(b.dataset.ancinto, 10)); render(); }));
-      document.querySelectorAll('[data-ancpick]').forEach(b => b.addEventListener('click', () => { closeModal(); onPick(byId.get(parseInt(b.dataset.ancpick, 10))); }));
-      document.querySelectorAll('[data-ancgo]').forEach(b => b.addEventListener('click', () => { _ancNav = byId.get(parseInt(b.dataset.ancgo, 10)); render(); }));
-    });
-  };
-  render();
+  const scope = (!isAdmin() && isManager()) ? (p => inMyBranch(p)) : null;
+  pickPerson('اختيار الجدّ', onPick, scope, startAt);
 }
 // الأفراد المطابقون للنطاق المحدّد (يلزم اختيار جدّ أولاً)
 function bulkMatch() {
