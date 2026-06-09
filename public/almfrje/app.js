@@ -2521,15 +2521,14 @@ function screenFeedback() {
       : `<div class="card"><div class="li-title" style="margin-bottom:6px">اسمك</div>
       <div class="field"><input id="fb_name" type="text" placeholder="اكتب اسمك"></div></div>`}
     <div class="card">
-      <div class="li-title" style="margin-bottom:10px">نوع الملاحظة</div>
       <div class="field"><select id="fb_subject">
-        <option value="">— اختر الموضوع —</option>
+        <option value="">— اختر موضوع الملاحظة —</option>
         <option value="إضافة مولود">👶 إضافة مولود</option>
         <option value="ملاحظة">📝 ملاحظة / تصحيح</option>
         <option value="اقتراح">💡 اقتراح</option>
       </select></div>
       <div id="fb_dynamic"></div>
-      <div class="field"><label id="fb_details_lbl">التفاصيل *</label><textarea id="fb_details" rows="4" placeholder="اكتب التفاصيل…"></textarea></div>
+      <div class="field"><textarea id="fb_details" rows="4" placeholder="أضف هنا"></textarea></div>
     </div>
     <button class="btn btn-lg" id="fb_send" style="width:100%">✉️ إرسال للإدارة</button>
     </div>`;
@@ -2561,7 +2560,7 @@ function fbPickerSearch(term, resEl, aliveOnly, onPick) {
 //  إضافة مولود → اختيار والد المولود (حيّ فقط).  ملاحظة → الفرع + الخطأ.  اقتراح → بلا فرع.
 function renderFbDynamic(subject) {
   const wrap = document.getElementById('fb_dynamic');
-  const lbl = document.getElementById('fb_details_lbl');
+  const det = document.getElementById('fb_details');
   fbFather = null;
   if (subject === 'إضافة مولود') {
     wrap.innerHTML = `
@@ -2582,18 +2581,17 @@ function renderFbDynamic(subject) {
       fs.value = p ? p.name : '';
     }));
   } else if (subject === 'ملاحظة') {
-    lbl.textContent = 'تفاصيل الملاحظة *';
+    if (det) det.placeholder = 'أضف تفاصيل الملاحظة هنا';
     const branchOpts = C.branches.slice().sort((a, b) => String(a.name).localeCompare(String(b.name), 'ar'))
       .map(b => `<option value="${b.id}">${esc(b.name)}</option>`).join('');
     wrap.innerHTML = `
       <div class="field"><label>الفرع</label><select id="fb_branch"><option value="">— اختر الفرع —</option>${branchOpts}</select></div>
       <div class="field"><label>الخطأ — ما هو الخطأ؟</label><textarea id="fb_error" rows="3" placeholder="صِف الخطأ والتصحيح المقترح (اختياري)"></textarea></div>`;
   } else {
-    lbl.textContent = subject === 'اقتراح' ? 'اقتراحك *' : 'التفاصيل *';
+    if (det) det.placeholder = subject === 'اقتراح' ? 'أضف اقتراحك هنا' : 'أضف هنا';
     wrap.innerHTML = '';
   }
   // «إضافة مولود» تكتفي بحقول المولود — أخفِ مربّع التفاصيل العام.
-  const det = document.getElementById('fb_details');
   if (det) { const fld = det.closest('.field'); if (fld) fld.style.display = (subject === 'إضافة مولود') ? 'none' : ''; }
 }
 async function sendFeedback() {
