@@ -1456,7 +1456,7 @@ function addDocModal(p) {
   openModal('إضافة صورة / وثيقة', `
     ${fSelect('النوع', 'd_kind', [{ k: 'photo', ar: 'صورة' }, { k: 'pdf', ar: 'ملف PDF' }, { k: 'doc', ar: 'وثيقة أخرى' }], 'photo')}
     ${fInput('الوصف', 'd_label', '')}
-    <div class="field"><label>رفع ملف (إلى التخزين) — أو ضع رابطاً أدناه</label><input id="d_file" type="file"></div>
+    <div class="field"><label>رفع ملف (إلى التخزين) — أو ضع رابطاً أدناه</label><input id="d_file" type="file" accept="image/*,application/pdf"></div>
     ${fInput('رابط مباشر (اختياري)', 'd_url', '')}
     <button class="btn" id="d_save">حفظ</button>`, () => {
     document.getElementById('d_save').addEventListener('click', async () => {
