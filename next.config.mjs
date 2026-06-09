@@ -20,6 +20,9 @@ const nextConfig = {
       { source: '/mrah/', destination: '/mrahi/index.html' },
       { source: '/mrahi', destination: '/mrahi/index.html' },
       { source: '/mrahi/', destination: '/mrahi/index.html' },
+      // تطبيق الملاحظات (notes) — مشروعٌ مستقلّ يُخدم من /notes
+      { source: '/notes', destination: '/notes/index.html' },
+      { source: '/notes/', destination: '/notes/index.html' },
     ];
   },
   async headers() {
@@ -43,6 +46,9 @@ const nextConfig = {
       { source: '/almfrji', headers: noCache },
       { source: '/almfrje', headers: noCache },
       { source: '/almfrje/:path*', headers: noCache },
+      // تطبيق الملاحظات (notes)
+      { source: '/notes', headers: noCache },
+      { source: '/notes/:path*', headers: noCache },
       // الصفحة الرئيسية
       { source: '/', headers: noCache },
       // كل نقاط الـ API — يجب ألّا تُخزَّن أبداً (محتوى المستخدم)

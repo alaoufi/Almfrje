@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { authFromHeader, isAuthError } from '@/lib/db';
-import { ALMFRJE_SCHEMA_SQL } from '@/lib/almfrje-schema';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -370,11 +369,8 @@ const MIGRATIONS: { id: string; sql: string; about: string }[] = [
     `,
     about: 'مراحي: مخطط كامل (جداول + RLS) + أول مستخدم يصبح مديراً تلقائياً',
   },
-  {
-    id: 'almfrje.genealogy_schema',
-    sql: ALMFRJE_SCHEMA_SQL,
-    about: 'المفارجة (الأنساب): مخطط كامل ببادئة almfrje_ على قاعدة alaoufi.me + أول مستخدم يصبح مديراً تلقائياً',
-  },
+  // (أُزيل مخطط المفارجة من هنا — للمفرجي مسار إعدادٍ مستقلّ /api/almfrje-setup يستهدف
+  //  قاعدته الخاصة. لا يجوز لمُهجِّر الاستشارات أن يُنشئ جداول مشروعٍ آخر — عزلٌ تام.)
   {
     id: 'users.invite_quota',
     sql: `

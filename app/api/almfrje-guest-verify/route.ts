@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { almfrjeEnv } from '@/lib/almfrje-env';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -33,8 +34,7 @@ async function bumpVisit(admin: any, branchId: number | null, city: string | nul
 }
 
 export async function POST(request: NextRequest) {
-  const url = process.env.ALMFRJE_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const service = process.env.ALMFRJE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const { url, service } = almfrjeEnv();
   if (!url || !service) return NextResponse.json({ ok: false, error: 'إعداد الخادم ناقص' }, { status: 500 });
 
   let body: { input?: string };

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { almfrjeEnv } from '@/lib/almfrje-env';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -7,9 +8,7 @@ export const runtime = 'nodejs';
 // رفع الملفات/الصور من جهة الخادم بمفتاح خدمي (يتجاوز سياسات التخزين) بعد التحقق
 // من أن المُنادي عضوٌ مفعّل — فلا حاجة لسياسات RLS على التخزين ولا لإعداد يدوي.
 export async function POST(request: NextRequest) {
-  const url = process.env.ALMFRJE_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const anon = process.env.ALMFRJE_SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  const service = process.env.ALMFRJE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const { url, anon, service } = almfrjeEnv();
   if (!url || !anon || !service) return NextResponse.json({ ok: false, error: 'إعداد الخادم ناقص' }, { status: 500 });
 
   const token = (request.headers.get('authorization') || '').replace(/^Bearer\s+/i, '').trim();
@@ -27,12 +26,27 @@ export async function POST(request: NextRequest) {
   const folder = String(form.get('folder') || 'misc').replace(/[^a-z0-9_-]/gi, '') || 'misc';
   if (!file || typeof file === 'string') return NextResponse.json({ ok: false, error: 'لا يوجد ملف' }, { status: 400 });
   const f = file as File;
-  const ext = ((f.name || 'file').split('.').pop() || 'bin').toLowerCase().replace(/[^a-z0-9]/g, '') || 'bin';
+
+  // تحصين: قائمة بيضاء بالأنواع الآمنة فقط (صور + PDF) وبحجمٍ محدود — المجلّد عام،
+  // فيُمنع رفع HTML/SVG/XML أو السكربتات (XSS مخزّن من رابط التخزين العلني) وكذلك الملفات الضخمة.
+  // أي نوع آخر يُرفض، ويبقى للمستخدم حقل «رابط مباشر» للوثائق الخارجية.
+  const ALLOWED = new Map<string, string>([
+    ['image/jpeg', 'jpg'], ['image/jpg', 'jpg'], ['image/png', 'png'],
+    ['image/webp', 'webp'], ['image/gif', 'gif'], ['image/heic', 'heic'], ['image/heif', 'heif'],
+    ['application/pdf', 'pdf'],
+  ]);
+  const MAX_BYTES = 15 * 1024 * 1024; // 15MB
+  const mime = (f.type || '').toLowerCase().split(';')[0].trim();
+  if (!ALLOWED.has(mime)) return NextResponse.json({ ok: false, error: 'يُسمح بالصور وملفات PDF فقط — لغير ذلك استخدم حقل «رابط مباشر»' }, { status: 415 });
+  if (typeof f.size === 'number' && f.size > MAX_BYTES) return NextResponse.json({ ok: false, error: 'حجم الملف يتجاوز 15 ميجابايت' }, { status: 413 });
+  // الامتداد يُشتق من نوع المحتوى المسموح (لا من اسم الملف) لمنع امتدادات مخادِعة.
+  const ext = ALLOWED.get(mime)!;
   const path = `${folder}/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
   const bytes = Buffer.from(await f.arrayBuffer());
+  if (bytes.length > MAX_BYTES) return NextResponse.json({ ok: false, error: 'حجم الملف يتجاوز 15 ميجابايت' }, { status: 413 });
 
   try { await admin.storage.createBucket('almfrje', { public: true }); } catch { /* موجود مسبقاً */ }
-  const { error } = await admin.storage.from('almfrje').upload(path, bytes, { contentType: f.type || undefined, upsert: false });
+  const { error } = await admin.storage.from('almfrje').upload(path, bytes, { contentType: mime, upsert: false });
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 });
   const pub = admin.storage.from('almfrje').getPublicUrl(path).data.publicUrl;
   return NextResponse.json({ ok: true, url: pub });

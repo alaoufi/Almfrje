@@ -1,3 +1,9 @@
+// =============================================================================
+//  خاصٌّ بمنصّة الاستشارات (public/legacy + app/api/php) — لا تستورده من المفرجي
+//  أو مراح. عميل Supabase هنا يستهدف قاعدة الاستشارات (CON_* مع رجوع للمشتركة)،
+//  ومصادقته JWT مخصّص. المفرجي يستخدم lib/almfrje-env.ts وSupabase Auth بدلاً منه.
+//  راجع SEPARATION.md للحدود بين المشاريع.
+// =============================================================================
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { createHmac, timingSafeEqual } from 'crypto';
 

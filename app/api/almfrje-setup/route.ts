@@ -1,15 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { ALMFRJE_SCHEMA_SQL } from '@/lib/almfrje-schema';
+import { almfrjeEnv } from '@/lib/almfrje-env';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
 // التحقّق أن المُنادي مديرٌ مفعّل (يمنع تشغيل ترقية مميّزة بـ PAT من أي زائر).
 async function isAdminCaller(request: NextRequest): Promise<boolean> {
-  const url = process.env.ALMFRJE_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const anon = process.env.ALMFRJE_SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  const service = process.env.ALMFRJE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const { url, anon, service } = almfrjeEnv();
   const token = (request.headers.get('authorization') || '').replace(/^Bearer\s+/i, '').trim();
   if (!url || !anon || !service || !token) return false;
   try {
@@ -70,7 +69,7 @@ async function runSql(pat: string, ref: string, query: string) {
 }
 
 async function handle() {
-  const pat = process.env.ALMFRJE_SUPABASE_PAT || process.env.SUPABASE_PAT;
+  const pat = almfrjeEnv().pat;
   // ترقية المفارجة تستهدف قاعدتها وحدها فقط (لا رجوع للقاعدة المشتركة) — عزل تام عن مراحي/الاستشارات.
   const supaUrl = process.env.ALMFRJE_SUPABASE_URL || '';
   const m = supaUrl.match(/https:\/\/([a-z0-9]+)\.supabase\.co/i);
