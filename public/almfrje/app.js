@@ -144,6 +144,7 @@ const HINTS = {
   guest_ok: ['ترحيب الزائر — عند النجاح', 'الرسالة التي تظهر للزائر بعد مطابقة اسمه بالشجرة (الترحيب بعد الدخول). اكتب {name} مكان اسم الزائر فيُستبدل تلقائياً باسمه.'],
   guest_fail: ['ترحيب الزائر — عند الفشل', 'الرسالة التي تظهر إذا لم يُطابَق الاسم بالشجرة. اكتب {name} مكان اسم الزائر.'],
   status_labels: ['تعريف ألوان الحالة', 'مسمّيات دلالة الألوان التي تظهر أسفل قوائم الشجرة: الاسم بلونٍ عادي (حي)، رمادي (متوفّى وله ذرية)، أحمر (متوفّى ولم يعقب). عدّل المسميات كما تريد.'],
+  feedback_send: ['ملاحظات الزوّار', 'من هنا تُرسل ملاحظةً للإدارة: تصحيح خطأ، أو طلب إضافة مولود، أو أي اقتراح. يُؤخذ اسمك الذي دخلت به تلقائياً، وتصل ملاحظتك للمدير (وللمشرف ما يخصّ فرعه)، ثم تُراجَع ويُردّ عليها.'],
 };
 function hintBtn(key) { return `<button type="button" class="hint-i" data-hint="${key}" aria-label="تعليمات">i</button>`; }
 function showHint(key) { const h = HINTS[key]; if (!h) return; openModal('💡 ' + h[0], `<div class="hint-body">${esc(h[1]).replace(/\n/g, '<br>')}</div>`); }
@@ -751,7 +752,7 @@ function screenHome() {
     ${!isGuestUser() && !pwChanged() ? `<div class="notice-pw">🔐 ننصحك بتغيير كلمة المرور الآن لحماية حسابك. <button class="btn sm" id="pwGo" style="margin-top:6px">تغيير كلمة المرور</button> <button class="btn sm outline" id="pwSkip" style="margin-top:6px">لاحقاً</button></div>` : ''}
     <div class="home-greet">أهلاً <span class="hg-name">${esc(currentUserName() || me.full_name || '')}</span>${isGuestUser() ? '' : `<span class="hg-role"> • ${esc(arOf(ROLES, me.role))}</span>`}${isManager() && myBranches().length ? `<span class="hg-role"> (${myBranches().map(b => esc(branchName(b))).join('، ')})</span>` : ''}</div>
     <div class="card" style="border:2px solid var(--brand);background:color-mix(in srgb, var(--brand) 7%, transparent)">
-      <h3 style="margin:0 0 4px">📝 ملاحظات الزوار</h3>
+      <h3 style="margin:0 0 4px">📝 ملاحظات الزوار ${hintBtn('feedback_send')}</h3>
       <p class="muted" style="margin:0 0 8px;font-size:.88rem">${esc(feedbackCardText)}</p>
       <button class="btn" data-go="#/feedback">✉️ أرسل ملاحظة للإدارة</button>
       ${isAdmin() && (C.feedbackPending || 0) > 0 ? `<button class="btn outline" data-go="#/feedbacks" style="margin-top:8px">📨 عرض الملاحظات الواردة (${C.feedbackPending})</button>` : ''}
