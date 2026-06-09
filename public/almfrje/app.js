@@ -4843,9 +4843,7 @@ function showSetup() {
     <p class="muted" style="font-size:.85rem">جداول المفارجة تُنشأ تلقائياً عند تشغيل ترقية alaoufi.me (<b>/api/migrate</b>) — بلا تنفيذ SQL يدوي. (للاستضافة الثابتة فقط: عبّئ <b>config.js</b>.)</p></div>`;
 }
 async function init() {
-  let t = 'light'; try { t = localStorage.getItem('almfrje_theme') || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'); } catch (e) { }
-  applyTheme(t);
-  document.getElementById('themeBtn').addEventListener('click', () => applyTheme(document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark'));
+  applyTheme('light');   // الوضع النهاري فقط (أُلغي العرض الليلي)
   { const gdb = document.getElementById('guideBtn'); if (gdb) gdb.addEventListener('click', () => setHash('#/guide')); }
   { const rfb = document.getElementById('refreshBtn'); if (rfb) rfb.addEventListener('click', () => {
     // تحديث كامل: تجاوز ذاكرة المتصفّح بإعادة تحميل المستند برابطٍ جديد (يُبقي الشاشة الحالية).
