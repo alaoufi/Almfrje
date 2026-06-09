@@ -4,6 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "check:boundaries": "node scripts/check-boundaries.mjs",
+    "prebuild": "node scripts/check-boundaries.mjs",
     "build": "next build",
     "start": "next start"
   },
