@@ -802,3 +802,30 @@ ul.hier ul.hier > .hier-li::before {
 .kin-name { font-weight: 700; cursor: pointer; color: var(--text); }
 .kin-name.kin-lca-name { display: inline; font-size: 1rem; background: color-mix(in srgb, var(--brand) 16%, transparent); border-radius: 6px; padding: 1px 6px; }
 .kin-bn { color: var(--muted); font-weight: 400; font-size: .85em; margin: 0 4px; }
+
+/* ===== رسالة الترحيب/المبارَكة بعد الدخول (الجزء الأوسط العلوي) ===== */
+.greet-bg { position: fixed; inset: 0; z-index: 1100; background: rgba(15,17,23,.5); backdrop-filter: blur(3px);
+  display: flex; align-items: flex-start; justify-content: center; padding: 12vh 18px 18px; overflow-y: auto; }
+.greet-card { background: var(--card); color: var(--text); width: 100%; max-width: 460px; border-radius: 18px;
+  padding: 20px 18px; box-shadow: 0 24px 60px -20px rgba(0,0,0,.55); border: 1px solid var(--line);
+  animation: greetIn .28s ease both; }
+@keyframes greetIn { from { opacity: 0; transform: translateY(-14px) scale(.98); } to { opacity: 1; transform: none; } }
+.greet-welcome { text-align: center; white-space: pre-wrap; font-size: 1.15rem; line-height: 1.95; font-weight: 700; padding: 4px 2px; }
+.greet-congrats { position: relative; margin-top: 14px; padding: 16px 14px 14px; border-radius: 14px; text-align: center;
+  background: linear-gradient(150deg, color-mix(in srgb, var(--gold) 14%, var(--card)), var(--card));
+  border: 1px solid color-mix(in srgb, var(--gold) 45%, transparent);
+  box-shadow: 0 6px 20px -10px color-mix(in srgb, var(--gold) 60%, transparent); }
+.greet-congrats-badge { display: inline-block; font-size: .72rem; font-weight: 800; letter-spacing: .5px; color: #fff;
+  background: linear-gradient(135deg, var(--gold), color-mix(in srgb, var(--gold) 70%, #b45309)); padding: 3px 12px; border-radius: 999px; margin-bottom: 8px; }
+.greet-congrats-text { font-size: 1.15rem; font-weight: 800; line-height: 1.8; white-space: pre-wrap; }
+.greet-card .btn-lg { margin-top: 16px; width: 100%; }
+
+/* شريط التهنئة أعلى الرئيسية طوال مدّة العرض */
+.congrats-strip { display: flex; flex-direction: column; align-items: center; gap: 4px; text-align: center;
+  margin: 0 0 12px; padding: 12px 14px; border-radius: var(--radius, 14px);
+  background: linear-gradient(150deg, color-mix(in srgb, var(--gold) 16%, var(--card)), var(--card));
+  border: 1px solid color-mix(in srgb, var(--gold) 45%, transparent);
+  box-shadow: 0 6px 18px -10px color-mix(in srgb, var(--gold) 55%, transparent); }
+.congrats-strip .cs-badge { font-size: .7rem; font-weight: 800; color: #fff;
+  background: linear-gradient(135deg, var(--gold), color-mix(in srgb, var(--gold) 70%, #b45309)); padding: 2px 10px; border-radius: 999px; }
+.congrats-strip .cs-text { font-size: 1.05rem; font-weight: 800; line-height: 1.7; white-space: pre-wrap; }
