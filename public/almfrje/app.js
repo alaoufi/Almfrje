@@ -2528,7 +2528,7 @@ function screenFeedback() {
         <option value="اقتراح">💡 اقتراح</option>
       </select></div>
       <div id="fb_dynamic"></div>
-      <div class="field"><textarea id="fb_details" rows="4" placeholder="أضف هنا"></textarea></div>
+      <div class="field"><textarea id="fb_details" rows="4" placeholder="اكتب التفاصيل هنا"></textarea></div>
     </div>
     <button class="btn btn-lg" id="fb_send" style="width:100%">✉️ إرسال للإدارة</button>
     </div>`;
@@ -2581,14 +2581,14 @@ function renderFbDynamic(subject) {
       fs.value = p ? p.name : '';
     }));
   } else if (subject === 'ملاحظة') {
-    if (det) det.placeholder = 'أضف تفاصيل الملاحظة هنا';
+    if (det) det.placeholder = 'اكتب تفاصيل الملاحظة هنا';
     const branchOpts = C.branches.slice().sort((a, b) => String(a.name).localeCompare(String(b.name), 'ar'))
       .map(b => `<option value="${b.id}">${esc(b.name)}</option>`).join('');
     wrap.innerHTML = `
       <div class="field"><label>الفرع</label><select id="fb_branch"><option value="">— اختر الفرع —</option>${branchOpts}</select></div>
       <div class="field"><label>الخطأ — ما هو الخطأ؟</label><textarea id="fb_error" rows="3" placeholder="صِف الخطأ والتصحيح المقترح (اختياري)"></textarea></div>`;
   } else {
-    if (det) det.placeholder = subject === 'اقتراح' ? 'أضف اقتراحك هنا' : 'أضف هنا';
+    if (det) det.placeholder = subject === 'اقتراح' ? 'اكتب اقتراحك هنا' : 'اكتب التفاصيل هنا';
     wrap.innerHTML = '';
   }
   // «إضافة مولود» تكتفي بحقول المولود — أخفِ مربّع التفاصيل العام.
