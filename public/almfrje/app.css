@@ -829,3 +829,8 @@ ul.hier ul.hier > .hier-li::before {
 .congrats-strip .cs-badge { font-size: .7rem; font-weight: 800; color: #fff;
   background: linear-gradient(135deg, var(--gold), color-mix(in srgb, var(--gold) 70%, #b45309)); padding: 2px 10px; border-radius: 999px; }
 .congrats-strip .cs-text { font-size: 1.05rem; font-weight: 800; line-height: 1.7; white-space: pre-wrap; }
+
+/* سطر الترحيب أعلى الرئيسية: غامق ومميّز، وبخطٍّ أصغر درجةً ليتّسع الاسم كاملاً */
+.home-greet { font-size: .9rem; margin: 2px 0 10px; line-height: 1.7; font-weight: 700; }
+.home-greet .hg-name { font-weight: 800; color: var(--brand); }
+.home-greet .hg-role { color: var(--muted); font-weight: 600; }
