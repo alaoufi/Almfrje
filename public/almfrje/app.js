@@ -4604,7 +4604,8 @@ function guestSessionFresh() {
 }
 async function endGuestSession() { stopPresence(); try { sessionStorage.removeItem('almfrje_guest_ts'); } catch (e) { /* */ } _authUid = null; me = null; try { await sb.auth.signOut(); } catch (e) { /* */ } }
 async function browseAsGuest(msgEl) {
-  try { sessionStorage.removeItem('almfrje_greeted'); } catch (e) { /* دخول فعلي → أظهر الترحيب مرّة */ }
+  // لا نُصفّر علامة الترحيب هنا: قد تُستدعى تلقائياً عند تحديث الصفحة/تجديد الجلسة،
+  // فالتصفير يقتصر على الدخول اليدوي الفعلي (كتابة الاسم / زر التصفّح / دخول المسؤول).
   try {
     let { error } = await sb.auth.signInWithPassword({ email: GUEST_EMAIL, password: GUEST_PASS });
     if (error) {
@@ -4634,7 +4635,7 @@ async function guestGateEnter() {
     const res = await fetch('/api/almfrje-guest-verify', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ input: inp }) });
     const j = await res.json().catch(() => ({}));
     if (res.ok && j.ok) {
-      try { sessionStorage.setItem('almfrje_guest_name', (j.name && String(j.name).trim()) || inp); if (j.branch != null) sessionStorage.setItem('almfrje_guest_branch', String(j.branch)); } catch (e) { /* */ }
+      try { sessionStorage.setItem('almfrje_guest_name', (j.name && String(j.name).trim()) || inp); if (j.branch != null) sessionStorage.setItem('almfrje_guest_branch', String(j.branch)); sessionStorage.removeItem('almfrje_greeted'); } catch (e) { /* */ }
       location.hash = '#/home';
       // رسالة الترحيب تظهر الآن فور الدخول من داخل enterApp (الجزء الأوسط العلوي) — لا نافذة مؤجَّلة هنا
       await browseAsGuest(m);
@@ -4697,7 +4698,7 @@ function renderAuth() {
     ${gated ? `<button class="auth-guest-link" id="to_guest">→ دخول الزوّار</button>` : ''}
     </div>`;
   document.getElementById('a_submit').addEventListener('click', submit);
-  { const gb = document.getElementById('a_guest'); if (gb) gb.addEventListener('click', () => { const m = document.getElementById('a_msg'); m.className = 'auth-msg'; m.textContent = '… جارٍ فتح التصفّح'; location.hash = '#/home'; browseAsGuest(m); }); }
+  { const gb = document.getElementById('a_guest'); if (gb) gb.addEventListener('click', () => { const m = document.getElementById('a_msg'); m.className = 'auth-msg'; m.textContent = '… جارٍ فتح التصفّح'; location.hash = '#/home'; try { sessionStorage.removeItem('almfrje_greeted'); } catch (e) {} browseAsGuest(m); }); }
   { const tg = document.getElementById('to_guest'); if (tg) tg.addEventListener('click', () => { location.hash = '#/home'; renderAuth(); }); }
   box.querySelectorAll('.eye').forEach(b => b.addEventListener('click', () => { const inp = document.getElementById(b.dataset.eye); const show = inp.type === 'password'; inp.type = show ? 'text' : 'password'; b.textContent = show ? '🙈' : '👁'; }));
   box.querySelectorAll('input').forEach(inp => inp.addEventListener('keydown', e => { if (e.key === 'Enter') submit(); }));
