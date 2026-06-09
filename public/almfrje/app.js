@@ -137,6 +137,13 @@ const HINTS = {
   banner: ['نص الرئيسية', 'النص الذي يظهر أعلى الصفحة الرئيسية لكل المستخدمين (مثل تعريف القبيلة).'],
   occasion: ['كلمة المناسبات (شاشة الدخول)', 'كلمة قصيرة تظهر تحت عنوان شاشة الدخول مباشرةً بخطٍّ غامق وباللون الذي تختاره. اتركها فارغة لإخفائها.\n\nوهي غير «تهنئة المناسبات» التي تظهر بعد الدخول.'],
   congrats: ['تهنئة / مبارَكة المناسبات', 'رسالة تهنئة من الإدارة تظهر لكل من يدخل فور الدخول (في الجزء الأوسط العلوي) مرّةً واحدة لكل جلسة، وكشريط ذهبي أعلى الرئيسية طوال مدّة العرض.\n\n• النص + لون الخط الذي تختاره.\n• وقت النشر: «الآن مباشرة»، أو «بتوقيت محدّد» فتظهر حقول اليوم والساعة لتبدأ في موعدها.\n• مدّة العرض: رقم + وحدة (ساعة/يوم)، أو اتركها فارغة لعرضٍ دائم حتى الإيقاف.\n• «حفظ/تعديل» لتحديثها، و«حذف التهنئة» لإيقافها وإزالتها.\n\nالحالة أسفل البطاقة تبيّن: مجدوَلة (تبدأ…)، أو فعّالة (حتى…)، أو منتهية.'],
+  site_title: ['عنوان الموقع و«powered by»', 'عنوان الموقع يظهر في شاشتَي الدخول (الزائر والمسؤول) وفي تذييل «المزيد». وسطر «powered by» سطرُ إسنادٍ صغير أسفل العنوان — اتركه فارغاً لإخفائه.'],
+  feedback_card: ['بطاقة «ملاحظات الزوار»', 'النص التعريفي داخل بطاقة إرسال الملاحظة في الرئيسية — يشجّع الزائر على الإبلاغ عن خطأ أو طلب إضافة مولود.'],
+  guest_prompt: ['دعوة الزائر للدخول', 'الجملة التي تظهر للزائر فوق حقل كتابة الاسم في شاشة الدخول، تحثّه على كتابة اسمه بالتسلسل.'],
+  feedback_thanks: ['رسالة الشكر بعد الملاحظة', 'تظهر للزائر في نافذةٍ بعد إرساله ملاحظته، لطمأنته أنها وصلت الإدارة.'],
+  guest_ok: ['ترحيب الزائر — عند النجاح', 'الرسالة التي تظهر للزائر بعد مطابقة اسمه بالشجرة (الترحيب بعد الدخول). اكتب {name} مكان اسم الزائر فيُستبدل تلقائياً باسمه.'],
+  guest_fail: ['ترحيب الزائر — عند الفشل', 'الرسالة التي تظهر إذا لم يُطابَق الاسم بالشجرة. اكتب {name} مكان اسم الزائر.'],
+  status_labels: ['تعريف ألوان الحالة', 'مسمّيات دلالة الألوان التي تظهر أسفل قوائم الشجرة: الاسم بلونٍ عادي (حي)، رمادي (متوفّى وله ذرية)، أحمر (متوفّى ولم يعقب). عدّل المسميات كما تريد.'],
 };
 function hintBtn(key) { return `<button type="button" class="hint-i" data-hint="${key}" aria-label="تعليمات">i</button>`; }
 function showHint(key) { const h = HINTS[key]; if (!h) return; openModal('💡 ' + h[0], `<div class="hint-body">${esc(h[1]).replace(/\n/g, '<br>')}</div>`); }
@@ -3769,7 +3776,7 @@ function screenTexts() {
       <button class="btn sm danger" id="visits_reset" style="margin-top:10px">↺ تصفير إحصاء الزيارات</button>
       <button class="btn sm outline" id="recent_reset" style="margin-top:10px">↺ تصفير «آخر الإضافات»</button>
       <p class="muted" style="font-size:.78rem;margin-top:6px">يُحتسب كل من يدخل الموقع (زائر/مشرف/مدير). «المتواجدون الآن» = نشِطون خلال آخر ٣ دقائق. وتصفير «آخر الإضافات» يبدأ عدّ الإضافات من جديد دون حذف بيانات.</p></div>
-    <div class="card"><h3>🏷️ عنوان الموقع وسطر «powered by»</h3>
+    <div class="card"><h3>🏷️ عنوان الموقع وسطر «powered by» ${hintBtn('site_title')}</h3>
       <p class="muted" style="font-size:.85rem;margin-top:-2px">يظهران في شاشات الدخول (الزائر والمسؤول) وفي تذييل قائمة «المزيد».</p>
       ${fInput('عنوان الموقع', 'tx_title', siteTitle)}
       ${fInput('سطر الإسناد (powered by) — اتركه فارغاً لإخفائه', 'tx_powered', sitePowered)}
@@ -3797,11 +3804,11 @@ function screenTexts() {
         <button class="btn sm" id="tx_congSave">💾 حفظ / تعديل</button>
         <button class="btn sm danger" id="tx_congDel">🗑️ حذف التهنئة</button>
       </div></div>
-    <div class="card"><h3>✉️ نص بطاقة «ملاحظات الزوار»</h3>
+    <div class="card"><h3>✉️ نص بطاقة «ملاحظات الزوار» ${hintBtn('feedback_card')}</h3>
       <p class="muted" style="font-size:.85rem;margin-top:-2px">النص التعريفي في بطاقة إرسال الملاحظة بالرئيسية.</p>
       ${fTextarea('النص', 'tx_fbcard', feedbackCardText)}
       <button class="btn sm" id="tx_fbcardSave" style="margin-top:6px">حفظ النص</button></div>
-    <div class="card"><h3>🚪 دعوة الزائر للدخول</h3>
+    <div class="card"><h3>🚪 دعوة الزائر للدخول ${hintBtn('guest_prompt')}</h3>
       <p class="muted" style="font-size:.85rem;margin-top:-2px">يظهر للزائر فوق حقل كتابة الاسم في شاشة الدخول.</p>
       ${fInput('النص', 'tx_gprompt', guestPrompt)}
       <button class="btn sm" id="tx_gpromptSave" style="margin-top:6px">حفظ</button></div>
@@ -3809,19 +3816,19 @@ function screenTexts() {
       <p class="muted" style="font-size:.85rem;margin-top:-2px">يظهر أعلى الصفحة الرئيسية للجميع.</p>
       ${fTextarea('النص', 'tx_banner', bannerText)}
       <button class="btn sm" id="tx_bannerSave" style="margin-top:6px">حفظ النص</button></div>
-    <div class="card"><h3>💬 رسالة الشكر بعد إرسال ملاحظة</h3>
+    <div class="card"><h3>💬 رسالة الشكر بعد إرسال ملاحظة ${hintBtn('feedback_thanks')}</h3>
       <p class="muted" style="font-size:.85rem;margin-top:-2px">تظهر للمُرسِل في موديل بعد إرسال ملاحظته.</p>
       ${fTextarea('النص', 'tx_fbthanks', feedbackThanks)}
       <button class="btn sm" id="tx_fbthanksSave" style="margin-top:6px">حفظ النص</button></div>
-    <div class="card"><h3>🌿 ترحيب الزائر — عند نجاح التحقق</h3>
+    <div class="card"><h3>🌿 ترحيب الزائر — عند نجاح التحقق ${hintBtn('guest_ok')}</h3>
       <p class="muted" style="font-size:.85rem;margin-top:-2px">يظهر للزائر بعد مطابقة اسمه. اكتب <b>{name}</b> مكان اسم الزائر.</p>
       ${fTextarea('النص', 'tx_gok', guestWelcomeOk)}
       <button class="btn sm" id="tx_gokSave" style="margin-top:6px">حفظ</button></div>
-    <div class="card"><h3>🙏 ترحيب الزائر — عند فشل التحقق</h3>
+    <div class="card"><h3>🙏 ترحيب الزائر — عند فشل التحقق ${hintBtn('guest_fail')}</h3>
       <p class="muted" style="font-size:.85rem;margin-top:-2px">يظهر إذا لم يُطابق الاسم. اكتب <b>{name}</b> مكان اسم الزائر.</p>
       ${fTextarea('النص', 'tx_gfail', guestWelcomeFail)}
       <button class="btn sm" id="tx_gfailSave" style="margin-top:6px">حفظ</button></div>
-    <div class="card"><h3>🎨 تعريف ألوان الحالة</h3>
+    <div class="card"><h3>🎨 تعريف ألوان الحالة ${hintBtn('status_labels')}</h3>
       <p class="muted" style="font-size:.85rem;margin-top:-2px">تظهر دلالة الألوان أسفل قوائم الشجرة (الشجرة/العرض الهرمي/الأعمدة/الذرية). عدّل المسميات كما تريد.</p>
       ${fInput('الاسم بلون عادي يعني', 'tx_alive', statLabels.alive)}
       ${fInput('الاسم بلون رمادي يعني', 'tx_dead', statLabels.dead)}
