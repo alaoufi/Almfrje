@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { almfrjeEnv, almfrjeEnvOk } from '@/lib/almfrje-env';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -8,20 +9,15 @@ export const runtime = 'nodejs';
 // تتطلّب الخدمة service_role (لا يُكشف للمتصفّح)، لذا تُنفَّذ على الخادم فقط بعد
 // التحقّق من أن المُستدعي مديرٌ مفعّل عبر رمز جلسته (access token).
 
-// قاعدة المفارجة المعزولة (مع رجوع للمشتركة) — حتى تستهدف نفس قاعدة بيانات التطبيق.
-function envOk() {
-  return !!((process.env.ALMFRJE_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL)
-    && (process.env.ALMFRJE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY)
-    && (process.env.ALMFRJE_SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY));
-}
-
 async function handle(request: NextRequest) {
-  if (!envOk()) {
+  // قاعدة المفارجة المعزولة (مع رجوع للمشتركة) — حتى تستهدف نفس قاعدة بيانات التطبيق.
+  const env = almfrjeEnv();
+  if (!almfrjeEnvOk(env)) {
     return NextResponse.json({ ok: false, error: 'إعداد الخادم ناقص (SUPABASE_SERVICE_ROLE_KEY)' }, { status: 500 });
   }
-  const url = (process.env.ALMFRJE_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL)!;
-  const anon = (process.env.ALMFRJE_SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)!;
-  const service = (process.env.ALMFRJE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY)!;
+  const url = env.url!;
+  const anon = env.anon!;
+  const service = env.service!;
 
   // ١) تحقّق من هوية المُستدعي عبر رمز الجلسة
   const token = (request.headers.get('authorization') || '').replace(/^Bearer\s+/i, '').trim();
