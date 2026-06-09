@@ -4486,6 +4486,8 @@ function openModal(title, body, onMount, opts) {
 function closeModal() { document.getElementById('modalRoot').innerHTML = ''; }
 // ===== رسالة الترحيب/المبارَكة — تظهر في الجزء الأوسط العلوي فور الدخول =====
 function showGreeting(firstName) {
+  // تظهر مرّة واحدة لكل جلسة تصفّح — لا تتكرّر مع كل تحديث للصفحة (تُصفَّر عند تسجيل دخول فعلي)
+  try { if (sessionStorage.getItem('almfrje_greeted') === '1') return; } catch (e) { /* */ }
   const c = congratsActive();
   let welcomeHtml = '';
   if (isGuestUser() && firstName) {
@@ -4497,6 +4499,7 @@ function showGreeting(firstName) {
     congHtml = `<div class="greet-congrats"><span class="greet-congrats-badge">🎊 تهنئة من الإدارة</span><div class="greet-congrats-text" style="color:${okColor(c.color)}">${esc(c.text)}</div></div>`;
   }
   if (!welcomeHtml && !congHtml) return;
+  try { sessionStorage.setItem('almfrje_greeted', '1'); } catch (e) { /* */ }
   const root = document.getElementById('modalRoot');
   root.innerHTML = `<div class="greet-bg"><div class="greet-card">${welcomeHtml}${congHtml}<button class="btn btn-lg" id="greetOk">🌳 ابدأ التصفّح</button></div></div>`;
   const close = () => { const r = document.getElementById('modalRoot'); if (r) r.innerHTML = ''; };
@@ -4588,6 +4591,7 @@ function guestSessionFresh() {
 }
 async function endGuestSession() { stopPresence(); try { sessionStorage.removeItem('almfrje_guest_ts'); } catch (e) { /* */ } _authUid = null; me = null; try { await sb.auth.signOut(); } catch (e) { /* */ } }
 async function browseAsGuest(msgEl) {
+  try { sessionStorage.removeItem('almfrje_greeted'); } catch (e) { /* دخول فعلي → أظهر الترحيب مرّة */ }
   try {
     let { error } = await sb.auth.signInWithPassword({ email: GUEST_EMAIL, password: GUEST_PASS });
     if (error) {
@@ -4699,6 +4703,7 @@ function renderAuth() {
       if (!loginEmail) { msg.classList.add('err'); msg.textContent = 'بيانات الدخول غير صحيحة'; return; }
       const { error } = await sb.auth.signInWithPassword({ email: loginEmail, password: pinToPass(pin) });
       if (error) throw error;
+      try { sessionStorage.removeItem('almfrje_greeted'); } catch (e2) { /* دخول فعلي → أظهر التهنئة مرّة */ }
     } catch (e) { msg.classList.add('err'); msg.textContent = translateAuthError(e.message); }
   }
 }
