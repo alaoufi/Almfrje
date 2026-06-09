@@ -590,6 +590,7 @@ function render() {
   if (!me || !me.is_active) { renderPending(); return; }
   const { name, arg } = parseHash();
   const r = ROUTES[name] || ROUTES.home;
+  try { view().dataset.screen = name; } catch (e) { /* */ }   // وسم الشاشة (للتنسيقات الخاصة بكل شاشة)
   document.getElementById('screenTitle').textContent = r.t;
   document.getElementById('backBtn').classList.toggle('hidden', !r.back);
   document.querySelectorAll('.nav-item').forEach(b => b.classList.toggle('active', b.dataset.route === '#/' + name));

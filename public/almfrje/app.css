@@ -834,3 +834,8 @@ ul.hier ul.hier > .hier-li::before {
 .home-greet { font-size: .9rem; margin: 2px 0 10px; line-height: 1.7; font-weight: 700; }
 .home-greet .hg-name { font-weight: 800; color: var(--brand); }
 .home-greet .hg-role { color: var(--muted); font-weight: 600; }
+
+/* الصفحة الرئيسية: كل الكتابات غامقة */
+[data-screen="home"] { font-weight: 700; }
+[data-screen="home"] .muted, [data-screen="home"] .hg-role, [data-screen="home"] p,
+[data-screen="home"] small, [data-screen="home"] .li-sub, [data-screen="home"] li { font-weight: 700; }
