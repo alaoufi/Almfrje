@@ -3788,7 +3788,10 @@ function screenTexts() {
         </div></div>
       <div class="greet-congrats" style="margin:10px 0"><span class="greet-congrats-badge">🎊 تهنئة من الإدارة</span><div class="greet-congrats-text" id="congPreview" style="color:${okColor(congrats && congrats.color)}">${esc((congrats && congrats.text) || 'معاينة نص التهنئة')}</div></div>
       <div id="congStatus" class="muted" style="font-size:.82rem;margin:6px 0">${esc(congratsStatusText(congrats))}</div>
-      <button class="btn sm" id="tx_congSave">حفظ التهنئة</button></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn sm" id="tx_congSave">💾 حفظ / تعديل</button>
+        <button class="btn sm danger" id="tx_congDel">🗑️ حذف التهنئة</button>
+      </div></div>
     <div class="card"><h3>✉️ نص بطاقة «ملاحظات الزوار»</h3>
       <p class="muted" style="font-size:.85rem;margin-top:-2px">النص التعريفي في بطاقة إرسال الملاحظة بالرئيسية.</p>
       ${fTextarea('النص', 'tx_fbcard', feedbackCardText)}
@@ -3878,6 +3881,18 @@ function screenTexts() {
         congrats = obj;
         const st = document.getElementById('congStatus'); if (st) st.textContent = congratsStatusText(congrats);
         toast(text ? 'تم حفظ التهنئة' : 'تم إيقاف التهنئة');
+      }
+    });
+    const cDel = document.getElementById('tx_congDel');
+    if (cDel) cDel.addEventListener('click', async () => {
+      if (!(await confirm2('حذف التهنئة وإيقاف ظهورها للجميع؟', { title: 'حذف التهنئة', okText: 'حذف', danger: true }))) return;
+      const ok = await guard(async () => { const { error } = await sb.from('almfrje_settings').upsert({ key: 'congrats', value: null, updated_at: new Date().toISOString() }, { onConflict: 'key' }); if (error) throw error; });
+      if (ok) {
+        congrats = null;
+        if (cInp) cInp.value = '';
+        if (cPrev) { cPrev.textContent = 'معاينة نص التهنئة'; cPrev.style.color = okColor(cCol && cCol.value); }
+        const st = document.getElementById('congStatus'); if (st) st.textContent = congratsStatusText(congrats);
+        toast('تم حذف التهنئة');
       }
     });
   }
