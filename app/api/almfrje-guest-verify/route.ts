@@ -96,6 +96,15 @@ export async function POST(request: NextRequest) {
   };
   // المطابقون الأحياء فقط (الاسم الأول شرط أن يكون من الأحياء — المتوفّى مستثنى).
   const liveMatches = persons.filter((p) => p.status !== 'dead' && matchSubseq(lineageWords(p.id)));
+  // ===== TEMP DIAGNOSTIC (يُزال بعد التشخيص) — يطبع حساب الخادم في سجلّات Vercel، بلا مفاتيح سرّية =====
+  try {
+    const cands = persons
+      .filter((p) => p.status !== 'dead' && normWord(p.name).includes(toks[0]))
+      .slice(0, 25)
+      .map((p) => ({ id: p.id, idType: typeof p.id, name: p.name, father_id: p.father_id, fatherIdType: typeof p.father_id, lineage: lineageWords(p.id), match: matchSubseq(lineageWords(p.id)) }));
+    console.log('GVDIAG ' + JSON.stringify({ supabaseUrl: url, personsLoaded: persons.length, input, toks, liveMatches: liveMatches.length, candidates: cands }));
+  } catch (e) { console.log('GVDIAG_ERR ' + String(e)); }
+  // ===== END TEMP DIAGNOSTIC =====
   // التفرّد: يدخل فقط إن طابق شخصاً حيّاً واحداً تماماً.
   if (liveMatches.length === 1) {
     await bumpVisit(admin, liveMatches[0].branch_id, liveMatches[0].city);
