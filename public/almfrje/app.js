@@ -267,6 +267,14 @@ function congratsStatusText(c) {
   if (now >= w.end) return '✔️ انتهت مدّة عرضها.';
   return '🟢 فعّالة الآن' + (w.end < Infinity ? '، حتى ' + fmtDateTime(w.end) : '، بلا نهاية حتى توقفها');
 }
+// عنوان شارة التهنئة حسب اختيار الإدارة: افتراضي «🎊 تهنئة من الإدارة» / مخصّص / بدون عنوان («»).
+const DEFAULT_CONGRATS_TITLE = '🎊 تهنئة من الإدارة';
+function congratsTitle(c) {
+  const m = (c && c.titleMode) || 'default';
+  if (m === 'none') return '';
+  if (m === 'custom') return (c && c.title) ? String(c.title) : '';
+  return DEFAULT_CONGRATS_TITLE;
+}
 // الصفحة التعريفية (HTML منسّق) — يحرّرها المدير من «التحكم ← الصفحة التعريفية».
 const DEFAULT_ABOUT =
   '<p class="about-eyebrow">نبذة تعريفية</p>' +
@@ -747,7 +755,7 @@ function screenHome() {
     bindGo(); return;
   }
   view().innerHTML = `
-    ${(() => { const c = congratsActive(); return c ? `<div class="congrats-strip"><span class="cs-badge">🎊 تهنئة من الإدارة</span><span class="cs-text" style="color:${okColor(c.color)}">${esc(c.text)}</span></div>` : ''; })()}
+    ${(() => { const c = congratsActive(); if (!c) return ''; const t = congratsTitle(c); return `<div class="congrats-strip">${t ? `<span class="cs-badge">${esc(t)}</span>` : ''}<span class="cs-text" style="color:${okColor(c.color)}">${esc(c.text)}</span></div>`; })()}
     ${bannerText ? `<div class="banner"><button class="about-i banner-i" data-go="#/about" title="نبذة تعريفية عن قبيلة المفارجة" aria-label="نبذة تعريفية">ⓘ</button>${esc(bannerText)}</div>` : ''}
     ${!isGuestUser() && !pwChanged() ? `<div class="notice-pw">🔐 ننصحك بتغيير كلمة المرور الآن لحماية حسابك. <button class="btn sm" id="pwGo" style="margin-top:6px">تغيير كلمة المرور</button> <button class="btn sm outline" id="pwSkip" style="margin-top:6px">لاحقاً</button></div>` : ''}
     <div class="home-greet">أهلاً <span class="hg-name">${esc(currentUserName() || me.full_name || '')}</span>${isGuestUser() ? '' : `<span class="hg-role"> • ${esc(arOf(ROLES, me.role))}</span>`}${isManager() && myBranches().length ? `<span class="hg-role"> (${myBranches().map(b => esc(branchName(b))).join('، ')})</span>` : ''}</div>
@@ -3805,6 +3813,8 @@ function screenTexts() {
     <div class="card"><h3>🎊 تهنئة / مبارَكة المناسبات ${hintBtn('congrats')}</h3>
       <p class="muted" style="font-size:.85rem;margin-top:-2px">رسالة تهنئة من الإدارة تظهر لكل من يدخل <b>فور الدخول</b> (في الجزء الأوسط العلوي) وكشريط مميّز أعلى الرئيسية <b>طوال مدّة العرض</b>. اترك النص فارغاً لإيقافها.</p>
       ${fTextarea('نص التهنئة', 'tx_cong', (congrats && congrats.text) || '')}
+      ${fSelect('عنوان التهنئة', 'tx_cong_title_mode', [{ k: 'default', ar: '🎊 تهنئة من الإدارة (الافتراضي)' }, { k: 'custom', ar: 'عنوان مخصّص (تكتبه)' }, { k: 'none', ar: 'بدون عنوان' }], (congrats && congrats.titleMode) || 'default')}
+      <div class="field" id="tx_cong_title_wrap"><label>العنوان المخصّص</label><input id="tx_cong_title" type="text" value="${esc((congrats && congrats.title) || '')}" placeholder="اكتب عنوان التهنئة"></div>
       <div class="field"><label>لون الخط</label><input type="color" id="tx_cong_color" value="${okColor(congrats && congrats.color)}" style="width:60px;height:38px;padding:2px;border:1px solid var(--line);border-radius:8px;background:var(--card)"></div>
       ${fSelect('وقت النشر', 'tx_cong_mode', [{ k: 'now', ar: 'تُنشر الآن مباشرة' }, { k: 'sched', ar: 'بتوقيت محدّد (يوم وساعة)' }], (congrats && congrats.mode) || 'now')}
       <div class="field" id="tx_cong_start_wrap"><label>تاريخ ووقت بدء النشر</label><input type="datetime-local" id="tx_cong_start" value="${dtLocalValue(congrats && congrats.mode === 'sched' ? congrats.start : null)}" style="width:100%"></div>
@@ -3813,7 +3823,7 @@ function screenTexts() {
           <input id="tx_cong_dur" type="number" min="0" step="1" inputmode="numeric" value="${(congrats && (congrats.durValue != null ? congrats.durValue : (congrats.days != null ? congrats.days : ''))) ?? ''}" style="flex:1" placeholder="مثلاً 6">
           ${(() => { const u = (congrats && congrats.durUnit) ? congrats.durUnit : (congrats && congrats.days != null && congrats.durValue == null ? 'd' : 'h'); return `<select id="tx_cong_unit" style="width:120px"><option value="h" ${u === 'h' ? 'selected' : ''}>ساعة</option><option value="d" ${u === 'd' ? 'selected' : ''}>يوم</option></select>`; })()}
         </div></div>
-      <div class="greet-congrats" style="margin:10px 0"><span class="greet-congrats-badge">🎊 تهنئة من الإدارة</span><div class="greet-congrats-text" id="congPreview" style="color:${okColor(congrats && congrats.color)}">${esc((congrats && congrats.text) || 'معاينة نص التهنئة')}</div></div>
+      <div class="greet-congrats" style="margin:10px 0"><span class="greet-congrats-badge" id="congTitlePreview">🎊 تهنئة من الإدارة</span><div class="greet-congrats-text" id="congPreview" style="color:${okColor(congrats && congrats.color)}">${esc((congrats && congrats.text) || 'معاينة نص التهنئة')}</div></div>
       <div id="congStatus" class="muted" style="font-size:.82rem;margin:6px 0">${esc(congratsStatusText(congrats))}</div>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         <button class="btn sm" id="tx_congSave">💾 حفظ / تعديل</button>
@@ -3886,12 +3896,28 @@ function screenTexts() {
   { // تهنئة المناسبات: معاينة حيّة + إظهار/إخفاء حقل التوقيت بحسب الوضع + حفظ
     const cInp = document.getElementById('tx_cong'), cCol = document.getElementById('tx_cong_color'), cMode = document.getElementById('tx_cong_mode'),
       cStartWrap = document.getElementById('tx_cong_start_wrap'), cPrev = document.getElementById('congPreview');
+    const cTitleMode = document.getElementById('tx_cong_title_mode'), cTitleWrap = document.getElementById('tx_cong_title_wrap'),
+      cTitle = document.getElementById('tx_cong_title'), cTitlePrev = document.getElementById('congTitlePreview');
     const syncMode = () => { if (cStartWrap) cStartWrap.style.display = (cMode && cMode.value === 'sched') ? '' : 'none'; };
+    // عنوان التهنئة المختار الآن (حسب الوضع): افتراضي / مخصّص / بدون
+    const titleNow = () => {
+      const m = cTitleMode ? cTitleMode.value : 'default';
+      if (m === 'none') return '';
+      if (m === 'custom') return (cTitle && cTitle.value.trim()) ? cTitle.value.trim() : '';
+      return DEFAULT_CONGRATS_TITLE;
+    };
+    const syncTitle = () => {
+      const m = cTitleMode ? cTitleMode.value : 'default';
+      if (cTitleWrap) cTitleWrap.style.display = (m === 'custom') ? '' : 'none';
+      if (cTitlePrev) { const t = titleNow(); cTitlePrev.textContent = t || '(بدون عنوان)'; cTitlePrev.style.display = t ? '' : 'none'; }
+    };
     const refresh = () => { if (cPrev) { cPrev.textContent = (cInp.value || '').trim() || 'معاينة نص التهنئة'; cPrev.style.color = okColor(cCol.value); } };
-    syncMode(); refresh();
+    syncMode(); syncTitle(); refresh();
     if (cInp) cInp.addEventListener('input', refresh);
     if (cCol) cCol.addEventListener('input', refresh);
     if (cMode) cMode.addEventListener('change', syncMode);
+    if (cTitleMode) cTitleMode.addEventListener('change', syncTitle);
+    if (cTitle) cTitle.addEventListener('input', syncTitle);
     const cSave = document.getElementById('tx_congSave');
     if (cSave) cSave.addEventListener('click', async () => {
       const text = (cInp.value || '').trim();
@@ -3902,7 +3928,9 @@ function screenTexts() {
       const durValue = durRaw === '' ? null : Math.max(0, parseInt(durRaw, 10) || 0);
       let start = null;
       if (mode === 'sched') { const s = val('tx_cong_start'); if (s) { const d = new Date(s); if (!isNaN(d)) start = d.toISOString(); } }
-      const obj = text ? { text, color, mode, start, durValue, durUnit, savedAt: new Date().toISOString() } : null;
+      const titleMode = (cTitleMode && (cTitleMode.value === 'custom' || cTitleMode.value === 'none')) ? cTitleMode.value : 'default';
+      const title = (cTitle && cTitle.value.trim()) || '';
+      const obj = text ? { text, color, mode, start, durValue, durUnit, titleMode, title, savedAt: new Date().toISOString() } : null;
       const ok = await guard(async () => { const { error } = await sb.from('almfrje_settings').upsert({ key: 'congrats', value: obj, updated_at: new Date().toISOString() }, { onConflict: 'key' }); if (error) throw error; });
       if (ok) {
         congrats = obj;
@@ -4588,7 +4616,7 @@ function showGreeting(firstName) {
   }
   let congHtml = '';
   if (c) {
-    congHtml = `<div class="greet-congrats"><span class="greet-congrats-badge">🎊 تهنئة من الإدارة</span><div class="greet-congrats-text" style="color:${okColor(c.color)}">${esc(c.text)}</div></div>`;
+    congHtml = `<div class="greet-congrats">${congratsTitle(c) ? `<span class="greet-congrats-badge">${esc(congratsTitle(c))}</span>` : ''}<div class="greet-congrats-text" style="color:${okColor(c.color)}">${esc(c.text)}</div></div>`;
   }
   if (!welcomeHtml && !congHtml) return;
   try { sessionStorage.setItem('almfrje_greeted', '1'); } catch (e) { /* */ }
