@@ -2857,8 +2857,10 @@ async function backupFull() {
   showLoading(true);
   try {
     const backup = await buildBackupObject();
-    const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
-    download(`almfrje_backup_${stamp}.json`, JSON.stringify(backup, null, 2), 'application/json');
+    // اسم الملف: «المفرجي» + تاريخ اليوم والوقت (بالتوقيت المحلّي) — مثال: المفرجي_2026-06-10_15-30.json
+    const d = new Date(), p = (n) => String(n).padStart(2, '0');
+    const stamp = `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}_${p(d.getHours())}-${p(d.getMinutes())}`;
+    download(`المفرجي_${stamp}.json`, JSON.stringify(backup, null, 2), 'application/json');
   } catch (e) { toast('تعذّرت النسخة: ' + (e.message || e)); }
   showLoading(false);
 }
