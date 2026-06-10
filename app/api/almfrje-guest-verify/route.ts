@@ -58,13 +58,17 @@ export async function POST(request: NextRequest) {
   // تحميل الأشخاص (صفحات)
   type P = { id: number; name: string; father_id: number | null; status: string; branch_id: number | null; city: string | null };
   const persons: P[] = [];
-  for (let from = 0; from < 50000; from += 1000) {
-    // ترتيب ثابت بالمعرّف: يضمن تحميل كل الأشخاص بلا فجوات/تكرار بين الصفحات (الترقيم
-    // دون ORDER ثابت قد يُسقط صفوفاً فتنكسر سلسلة النسب لمن غاب أبوه/جدّه من الذاكرة).
-    const { data, error } = await admin.from('almfrje_persons').select('id,name,father_id,status,branch_id,city').order('id', { ascending: true }).range(from, from + 999);
+  // تحميلٌ كامل ومرتّب: ترتيب ثابت بالمعرّف (يمنع فجوات/تكرار الترقيم)، مع الخطو بعدد الصفوف
+  // الفعلي المُرجَع والتوقّف عند صفحةٍ فارغة فقط — فيُجلَب كل الأشخاص ولو كان حدّ صفوف الخادم
+  // أقلّ من حجم الصفحة. أي نقصٍ هنا يكسر سلسلة النسب لمن غاب أبوه/جدّه من الذاكرة.
+  const PAGE = 1000;
+  for (let from = 0; from < 200000; ) {
+    const { data, error } = await admin.from('almfrje_persons').select('id,name,father_id,status,branch_id,city').order('id', { ascending: true }).range(from, from + PAGE - 1);
     if (error) break;
-    persons.push(...((data || []) as P[]));
-    if (!data || data.length < 1000) break;
+    const rows = (data || []) as P[];
+    if (rows.length === 0) break;
+    persons.push(...rows);
+    from += rows.length;
   }
   // مفتاحٌ نصّيٌّ موحّد: يطابق id/father_id سواءٌ رجعا أرقاماً أو نصوصاً (أعمدة int8 قد
   // تُرجَع كنصوص)، فلا يفشل بحثُ الأب/الجدّ بسبب اختلاف النوع.
