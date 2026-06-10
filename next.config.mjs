@@ -6,8 +6,9 @@ const nextConfig = {
   },
   async rewrites() {
     return [
-      // المفرجي يُخدَم على المسار alaoufi.me/almfrji (الجذر يبقى صفحة فارغة).
-      { source: '/', destination: '/blank.html' },
+      // المفرجي يُخدَم من جذر الدومين / مباشرةً (ليعمل على almfrje.alaoufi.me دون مسار).
+      // المساران /almfrje و/almfrji يبقيان عاملَين كـ alias لنفس التطبيق (توافق قديم).
+      { source: '/', destination: '/almfrje/index.html' },
       { source: '/almfrji', destination: '/almfrje/index.html' },
       { source: '/almfrji/', destination: '/almfrje/index.html' },
       { source: '/almfrje', destination: '/almfrje/index.html' },
