@@ -915,7 +915,7 @@ async function copyText(s) {
 }
 // مشاركة الموقع: واجهة المشاركة الأصلية للجهاز إن توفّرت، وإلا نسخ الرابط للحافظة.
 async function shareSite() {
-  const url = location.origin + '/almfrje';
+  const url = location.origin;
   try {
     if (navigator.share) { await navigator.share({ title: 'المفارجة — شجرة العائلة', text: 'تصفّح شجرة قبيلة المفارجة', url }); return; }
   } catch (e) { if (e && e.name === 'AbortError') return; /* أُلغيت المشاركة → لا بديل */ }
