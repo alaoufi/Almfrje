@@ -59,12 +59,16 @@ export async function POST(request: NextRequest) {
   type P = { id: number; name: string; father_id: number | null; status: string; branch_id: number | null; city: string | null };
   const persons: P[] = [];
   for (let from = 0; from < 50000; from += 1000) {
-    const { data, error } = await admin.from('almfrje_persons').select('id,name,father_id,status,branch_id,city').range(from, from + 999);
+    // ترتيب ثابت بالمعرّف: يضمن تحميل كل الأشخاص بلا فجوات/تكرار بين الصفحات (الترقيم
+    // دون ORDER ثابت قد يُسقط صفوفاً فتنكسر سلسلة النسب لمن غاب أبوه/جدّه من الذاكرة).
+    const { data, error } = await admin.from('almfrje_persons').select('id,name,father_id,status,branch_id,city').order('id', { ascending: true }).range(from, from + 999);
     if (error) break;
     persons.push(...((data || []) as P[]));
     if (!data || data.length < 1000) break;
   }
-  const byId = new Map<number, P>(persons.map((p) => [p.id, p]));
+  // مفتاحٌ نصّيٌّ موحّد: يطابق id/father_id سواءٌ رجعا أرقاماً أو نصوصاً (أعمدة int8 قد
+  // تُرجَع كنصوص)، فلا يفشل بحثُ الأب/الجدّ بسبب اختلاف النوع.
+  const byId = new Map<string, P>(persons.map((p) => [String(p.id), p]));
   // تطبيع اسم واحد (مطابق لـ normalizeAr في الواجهة): يتجاهل التشكيل/الهمزات/التطويل/المسافات.
   const normWord = (s: string): string =>
     String(s || '')
@@ -75,7 +79,7 @@ export async function POST(request: NextRequest) {
   const lineageWords = (pid: number): string[] => {
     const out: string[] = [];
     let cur: number | null = pid; let guard = 0;
-    while (cur != null && guard++ < 80) { const p = byId.get(cur); if (!p) break; out.push(normWord(p.name)); cur = p.father_id; }
+    while (cur != null && guard++ < 80) { const p = byId.get(String(cur)); if (!p) break; out.push(normWord(p.name)); cur = p.father_id; }
     return out;
   };
   const toks = names.map(normWord).filter(Boolean);
@@ -96,7 +100,7 @@ export async function POST(request: NextRequest) {
     const fullName = (() => {
       const out: string[] = [];
       let cur: number | null = liveMatches[0].id; let guard = 0;
-      while (cur != null && out.length < 4 && guard++ < 20) { const p = byId.get(cur); if (!p) break; out.push(p.name); cur = p.father_id; }
+      while (cur != null && out.length < 4 && guard++ < 20) { const p = byId.get(String(cur)); if (!p) break; out.push(p.name); cur = p.father_id; }
       return out.join(' بن ');
     })();
     return NextResponse.json({ ok: true, branch: liveMatches[0].branch_id, name: fullName });
