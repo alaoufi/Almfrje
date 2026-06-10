@@ -4017,9 +4017,10 @@ async function screenBackups() {
   if (isAdmin()) tabs.push(['backup', '💾 النسخ الاحتياطية']);
   if (canExport()) tabs.push(['export', '📤 التصدير']);
   if (isAdmin()) tabs.push(['restore', '♻️ الاستعادة']);
+  if (isAdmin()) tabs.push(['cloud', '☁️ النسخ السحابية']);
   if (!tabs.find(t => t[0] === dataTab)) dataTab = tabs[0][0];
 
-  let list = [];
+  let list = [], cloudItems = [];
   if (dataTab === 'backup') {
     showLoading(true);
     try {
@@ -4028,6 +4029,14 @@ async function screenBackups() {
         .order('created_at', { ascending: false });
       if (error) throw error; list = data || [];
     } catch (e) { toast('تعذّر تحميل النسخ: ' + (e.message || e)); }
+    showLoading(false);
+  } else if (dataTab === 'cloud') {
+    showLoading(true);
+    try {
+      const r = await cloudApi('list');
+      if (r && r.ok) cloudItems = r.items || [];
+      else if (r && r.error) toast(r.error);
+    } catch (e) { toast('تعذّر تحميل النسخ السحابية'); }
     showLoading(false);
   }
 
@@ -4058,6 +4067,13 @@ async function screenBackups() {
         <input id="rs_file" type="file" accept=".json">
         <button class="btn danger" id="rs_btn" style="margin-top:8px">♻️ استعادة من ملف</button>
       </div>`;
+  } else if (dataTab === 'cloud') {
+    body = `
+      <div class="card"><h3>النسخ السحابية ☁️</h3>
+        <p class="muted" style="font-size:.85rem">نسخة كاملة تُحفظ تلقائياً يومياً في تخزينٍ سحابيّ خاص (يُحتفظ بآخر ٣٠ نسخة). أنشئ نسخة الآن، أو نزّل/استعد من أي نسخة مباشرةً.</p>
+        <button class="btn" id="cl_now">☁️ أنشئ نسخة سحابية الآن</button>
+      </div>
+      <div class="card"><h3>النسخ السحابية المحفوظة (${cloudItems.length})</h3>${cloudItems.length ? cloudItems.map(cloudRow).join('') : noItem()}</div>`;
   }
   view().innerHTML = adminTabBar('backups') + tabsBar + body;
   view().querySelectorAll('[data-dtab]').forEach(b => b.addEventListener('click', () => { dataTab = b.dataset.dtab; screenBackups(); }));
@@ -4070,6 +4086,55 @@ async function screenBackups() {
   view().querySelectorAll('[data-bkdl]').forEach(b => b.addEventListener('click', () => downloadDbBackup(b.dataset.bkdl)));
   view().querySelectorAll('[data-bkrs]').forEach(b => b.addEventListener('click', () => restoreDbBackup(b.dataset.bkrs)));
   view().querySelectorAll('[data-bkdel]').forEach(b => b.addEventListener('click', () => deleteDbBackup(b.dataset.bkdel)));
+  const cn = document.getElementById('cl_now'); if (cn) cn.addEventListener('click', cloudBackupNow);
+  view().querySelectorAll('[data-cldl]').forEach(b => b.addEventListener('click', () => downloadCloud(b.dataset.cldl)));
+  view().querySelectorAll('[data-clrs]').forEach(b => b.addEventListener('click', () => restoreCloud(b.dataset.clrs)));
+}
+// ===== النسخ السحابية (تخزين Supabase عبر /api/almfrje-backup) =====
+function cloudRow(f) {
+  const kb = (f.size != null) ? ' • ' + Math.max(1, Math.round(f.size / 1024)) + ' ك.ب.' : '';
+  return `<div class="row" style="flex-wrap:wrap;gap:6px">
+    <div style="flex:1;min-width:140px">
+      <div class="li-title" style="font-size:.95rem">${esc(f.name)}</div>
+      <div class="li-sub">${f.created_at ? fmtDateTime(f.created_at) : ''}${kb}</div>
+    </div>
+    <div class="btn-row" style="margin:0">
+      <button class="btn sm outline" data-cldl="${esc(f.path)}">⤓ تنزيل</button>
+      <button class="btn sm" data-clrs="${esc(f.path)}">♻️ استعادة</button>
+    </div>
+  </div>`;
+}
+async function cloudApi(action, extra) {
+  const { data: { session } } = await sb.auth.getSession();
+  const token = (session && session.access_token) || '';
+  const res = await fetch('/api/almfrje-backup', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+    body: JSON.stringify(Object.assign({ action }, extra || {})),
+  });
+  return res.json().catch(() => ({ ok: false, error: 'استجابة غير صالحة' }));
+}
+async function cloudBackupNow() {
+  showLoading(true);
+  try {
+    const r = await cloudApi('run');
+    if (r && r.ok) { toast('تم حفظ نسخة سحابية ✓'); screenBackups(); }
+    else toast('تعذّرت النسخة السحابية: ' + ((r && r.error) || ''));
+  } catch (e) { toast('تعذّر الاتصال بالخادم'); }
+  showLoading(false);
+}
+async function downloadCloud(path) {
+  const r = await cloudApi('get', { path });
+  if (r && r.ok && r.url) window.open(r.url, '_blank');
+  else toast('تعذّر التنزيل: ' + ((r && r.error) || ''));
+}
+async function restoreCloud(path) {
+  const r = await cloudApi('get', { path });
+  if (!r || !r.ok || !r.url) { toast('تعذّر جلب النسخة: ' + ((r && r.error) || '')); return; }
+  let backup;
+  try { backup = await (await fetch(r.url)).json(); }
+  catch (e) { toast('تعذّرت قراءة الملف السحابي'); return; }
+  await restoreFromObject(backup);   // يطلب تأكيداً بكتابة «استعادة» ثم يستعيد
 }
 // تصدير الأشخاص CSV (مستقلّ لإعادة الاستخدام)
 function exportCsv() {
