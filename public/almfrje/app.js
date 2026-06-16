@@ -3719,7 +3719,7 @@ function bindGuideToc() {
 }
 function screenGuide() {
   const secs = GUIDE.filter(g => g.role !== 'admin');
-  view().innerHTML = guideHtml(secs, 'دليل الزوّار', 'كتيّب تعليمات ' + siteTitle, 'شرح مفصّل لكل ما يُعرض للزائر في الموقع — يتحدّث مع تطوير الموقع.');
+  view().innerHTML = guideHtml(secs, 'دليل الزوّار', 'دليل استخدام الموقع', 'شرح مفصّل لكل ما يُعرض للزائر في الموقع — يتحدّث مع تطوير الموقع.');
   bindGuideToc();
 }
 function screenGuideAdmin() {
