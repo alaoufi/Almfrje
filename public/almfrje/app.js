@@ -295,6 +295,8 @@ let kids = new Map();          // father_id -> [children]
 let branchById = new Map();
 let childCount = new Map();
 let descCount = new Map();     // إجمالي الذرية
+let branchCountMap = new Map(); // branch_id -> عدد أفراده (يُحسب مرّة في computeCounts)
+let branchRootCache = new Map(); // bid -> جذر الفرع (تخزين، يُمسح في buildIndex)
 
 const isAdmin = () => !!(me && me.role === 'admin' && me.is_active);
 const isManager = () => !!(me && me.role === 'branch_manager' && me.is_active);
@@ -438,17 +440,20 @@ function applyHintOverrides(ov) {
   }
 }
 function buildIndex() {
-  byId = new Map(); kids = new Map(); branchById = new Map();
+  byId = new Map(); kids = new Map(); branchById = new Map(); branchRootCache = new Map();
   C.branches.forEach(b => branchById.set(b.id, b));
-  C.persons.forEach(p => { p._n = normalizeAr(p.name + ' ' + (p.nickname || '')); byId.set(p.id, p); });
+  C.persons.forEach(p => { p._n = normalizeAr(p.name + ' ' + (p.nickname || '')); p._ln = null; byId.set(p.id, p); });
   C.persons.forEach(p => { if (p.father_id != null) { if (!kids.has(p.father_id)) kids.set(p.father_id, []); kids.get(p.father_id).push(p); } });
   const cmp = (a, b) => (a.sort - b.sort) || (a.id - b.id);
   kids.forEach(arr => arr.sort(cmp));
   computeCounts();
 }
 function computeCounts() {
-  childCount = new Map(); descCount = new Map();
-  C.persons.forEach(p => childCount.set(p.id, (kids.get(p.id) || []).length));
+  childCount = new Map(); descCount = new Map(); branchCountMap = new Map();
+  C.persons.forEach(p => {
+    childCount.set(p.id, (kids.get(p.id) || []).length);
+    if (p.branch_id != null) branchCountMap.set(p.branch_id, (branchCountMap.get(p.branch_id) || 0) + 1);
+  });
   const byGenDesc = [...C.persons].sort((a, b) => b.generation - a.generation);
   for (const p of byGenDesc) {
     let s = 0; for (const c of (kids.get(p.id) || [])) s += 1 + (descCount.get(c.id) || 0);
@@ -460,15 +465,17 @@ const branchName = (bid) => bid && branchById.get(bid) ? branchById.get(bid).nam
 // الجذر الفعلي للفرع = الجدّ في الجيل الثاني (رأس الفرع). نصعد بالآباء من أي عضو
 // حتى الجيل الثاني، فلا نعتمد على branch_id الذي قد يكون ناقصاً في بيانات قديمة.
 function branchRoot(bid) {
-  const b = branchById.get(bid); if (!b) return null;
+  if (branchRootCache.has(bid)) return branchRootCache.get(bid);
+  const b = branchById.get(bid); if (!b) { branchRootCache.set(bid, null); return null; }
   // ابدأ من root_id المخزّن إن وُجد، وإلا من أيّ عضو
   let start = b.root_id ? byId.get(b.root_id) : null;
-  if (!start) { const mem = C.persons.filter(p => p.branch_id === bid); if (!mem.length) return null; start = mem[0]; }
+  if (!start) { const mem = C.persons.find(p => p.branch_id === bid); if (!mem) { branchRootCache.set(bid, null); return null; } start = mem; }
   // اصعد بالأب حتى الوصول للجيل الثاني (رأس الفرع) أو الجذر الأعلى
   let cur = start, guard = 0;
   while (cur && cur.generation > 2 && cur.father_id && byId.has(cur.father_id) && guard++ < 60) {
     cur = byId.get(cur.father_id);
   }
+  branchRootCache.set(bid, cur);
   return cur;
 }
 function roots() { return C.persons.filter(p => p.father_id == null || !byId.has(p.father_id)).sort((a, b) => a.generation - b.generation || a.id - b.id); }
@@ -711,7 +718,7 @@ function relationsModal(id) {
 function topAncestor(id) { const ln = lineage(id); return ln.length ? ln[ln.length - 1] : null; }
 // عرض كل الفروع مجمّعةً تحت كل أصل (جذر جيل-١) مع مجموع كل أصل.
 // عدد أفراد الفرع = الأشخاص المنتمون له فعلاً (دقيق دائماً)
-function branchCount(bid) { return C.persons.filter(p => p.branch_id === bid).length; }
+function branchCount(bid) { return branchCountMap.get(bid) || 0; }
 // الفرع «القائم/الحيّ» = أنجب مؤسّسه (له ذرية)، أي فيه أكثر من الجدّ المؤسّس وحده.
 // مثال: «سفران» لم ينجب فليس فرعاً قائماً — لا يُحتسب ولا يُعرض في قائمة الفروع.
 function isLiveBranch(bid) { return branchCount(bid) > 1; }
@@ -778,7 +785,7 @@ function screenHome() {
     <div class="card"><div class="recent-head"><h3 style="margin:0">آخر الإضافات${sinceMs ? ` (${newCount})` : ''} ${hintBtn('recent')}</h3></div>
       ${recent.length ? recent.map(p => `<div class="row click" data-recent="${p.id}"><span class="k">${esc(p.name)}</span><span class="v">${p.created_at ? fmtDate(p.created_at) : esc(branchName(p.branch_id))}</span></div>`).join('') : '<div class="muted" style="padding:6px">لا إضافات جديدة.</div>'}</div>`;
   const q = document.getElementById('q');
-  q.addEventListener('input', () => instantSearch(q.value, document.getElementById('qr')));
+  q.addEventListener('input', debounce(() => instantSearch(q.value, document.getElementById('qr')), 130));
   const pwGo = document.getElementById('pwGo'); if (pwGo) pwGo.addEventListener('click', () => setHash('#/profile'));
   const pwSkip = document.getElementById('pwSkip'); if (pwSkip) pwSkip.addEventListener('click', () => { markPwChanged(); screenHome(); });
   view().querySelectorAll('[data-recent]').forEach(el => el.addEventListener('click', () => recentInfoModal(parseInt(el.dataset.recent, 10))));
@@ -836,11 +843,13 @@ function nameMatch(p, query) {
   if (!toks.length) return true;
   if (!p._n.includes(toks[0])) return false;             // الكلمة الأولى: اسمه نفسه أو لقبه
   if (toks.length === 1) return true;
-  const ln = lineage(p.id).map(x => normalizeAr(x.name));  // هو ثم آباؤه بالترتيب
+  const ln = p._ln || (p._ln = lineage(p.id).map(x => normalizeAr(x.name)));  // مخزَّن: هو ثم آباؤه بالترتيب
   // كل اسم لاحق يطابق الأب المباشر التالي بالترتيب (لا تخطّي أجيال) — أدقّ تصفية.
   for (let i = 1; i < toks.length; i++) { if (!ln[i] || !ln[i].includes(toks[i])) return false; }
   return true;
 }
+// مؤخِّر تنفيذ: يجمّع ضغطات لوحة المفاتيح المتلاحقة في نداءٍ واحد (يخفّف عبء البحث الفوري).
+function debounce(fn, ms) { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; }
 function instantSearch(term, box) {
   const t = normalizeAr(term.trim());
   if (!t) { box.innerHTML = ''; return; }
@@ -1764,6 +1773,17 @@ function screenTree(arg) {
     ${legendHtml()}`;
   treeOpen.add(rootId);
   renderTree(rootId);
+  // تفويض أحداث: مستمعٌ واحد للحاوية بدل ربط كل عقدة في كل رسم (طيٌّ/فتحٌ سلس على الأشجار الكبيرة).
+  const treeBox = document.getElementById('treeBox');
+  treeBox.addEventListener('click', (e) => {
+    const tog = e.target.closest('[data-tog]');
+    if (tog && treeBox.contains(tog)) {
+      e.stopPropagation(); const id = parseInt(tog.dataset.tog, 10);
+      treeOpen.has(id) ? treeOpen.delete(id) : treeOpen.add(id); renderTree(rootId); return;
+    }
+    const op = e.target.closest('[data-open]');
+    if (op && treeBox.contains(op)) openLens(parseInt(op.dataset.open, 10));
+  });
   bindGo();
   bindTrackingBar();
   const sel = document.getElementById('t_root'); if (sel) sel.addEventListener('change', () => setHash('#/tree/' + sel.value));
@@ -1771,14 +1791,10 @@ function screenTree(arg) {
   document.getElementById('t_expand').addEventListener('click', () => { childrenOf(rootId).forEach(c => treeOpen.add(c.id)); renderTree(rootId); });
   document.getElementById('t_collapse').addEventListener('click', () => { treeOpen.clear(); treeOpen.add(rootId); renderTree(rootId); });
 }
+// رسمٌ خفيف: يكتفي بتحديث HTML؛ النقر يُدار بتفويضٍ واحد على الحاوية (لا إعادة ربط لكل عقدة).
 function renderTree(rootId) {
   const box = document.getElementById('treeBox'); if (!box) return;
   box.innerHTML = treeNodeHtml(rootId);
-  box.querySelectorAll('[data-tog]').forEach(b => b.addEventListener('click', (e) => {
-    e.stopPropagation(); const id = parseInt(b.dataset.tog, 10);
-    treeOpen.has(id) ? treeOpen.delete(id) : treeOpen.add(id); renderTree(rootId);
-  }));
-  box.querySelectorAll('[data-open]').forEach(b => b.addEventListener('click', () => openLens(parseInt(b.dataset.open, 10))));
 }
 function treeNodeHtml(id) {
   const p = byId.get(id); if (!p) return '';
@@ -2899,15 +2915,23 @@ async function restoreFromObject(backup) {
     const { error: we } = await sb.rpc('almfrje_admin_wipe_persons'); if (we) throw we;
     // أعِد الإدخال محافظاً على المعرّفات. لتفادي قيود المفاتيح الأجنبية الدائرية:
     //   ١) أدخل الأشخاص بلا father_id/branch_id، والفروع بلا root_id. ٢) ثم حدّث المراجع.
-    const clean = (o, drop = []) => { const r = {}; for (const k in o) { if (!k.startsWith('_') && !drop.includes(k)) r[k] = o[k]; } return r; };
+    // قائمة أعمدة بيضاء مطابقة للمخطّط (lib/almfrje-schema.ts) — تتجاهل أي عمود غير معروف
+    // فلا يفشل الإدخال بعد المسح. عند إضافة عمود للمخطّط، أضِفه هنا أيضاً.
+    const COLS = {
+      almfrje_persons: ['id', 'name', 'father_id', 'branch_id', 'generation', 'sex', 'status', 'birth', 'death', 'phone', 'email', 'city', 'photo_url', 'notes', 'sort', 'created_at', 'created_by', 'created_by_name', 'updated_by_name', 'updated_at', 'work', 'birthplace', 'nickname', 'field_audit'],
+      almfrje_branches: ['id', 'name', 'root_id', 'manager_id', 'notes', 'created_at'],
+      almfrje_documents: ['id', 'person_id', 'kind', 'url', 'label', 'created_at', 'created_by'],
+      almfrje_settings: ['key', 'value', 'updated_at'],
+    };
+    const pick = (table, o, drop = []) => { const r = {}; for (const k of COLS[table]) if (k in o && !drop.includes(k)) r[k] = o[k]; return r; };
     const insChunks = async (table, rows) => {
       for (let i = 0; i < rows.length; i += 300) {
         const { error } = await sb.from(table).insert(rows.slice(i, i + 300)); if (error) throw error;
       }
     };
     const persons = d.persons || [], branches = d.branches || [], docs = d.documents || [];
-    if (persons.length) await insChunks('almfrje_persons', persons.map(p => clean(p, ['father_id', 'branch_id'])));
-    if (branches.length) await insChunks('almfrje_branches', branches.map(b => clean(b, ['root_id'])));
+    if (persons.length) await insChunks('almfrje_persons', persons.map(p => pick('almfrje_persons', p, ['father_id', 'branch_id'])));
+    if (branches.length) await insChunks('almfrje_branches', branches.map(b => pick('almfrje_branches', b, ['root_id'])));
     for (const p of persons) {
       if (p.father_id != null || p.branch_id != null) {
         await sb.from('almfrje_persons').update({ father_id: p.father_id ?? null, branch_id: p.branch_id ?? null }).eq('id', p.id);
@@ -2916,9 +2940,9 @@ async function restoreFromObject(backup) {
     for (const b of branches) {
       if (b.root_id != null) await sb.from('almfrje_branches').update({ root_id: b.root_id }).eq('id', b.id);
     }
-    if (docs.length) await insChunks('almfrje_documents', docs.map(x => clean(x)));
+    if (docs.length) await insChunks('almfrje_documents', docs.map(x => pick('almfrje_documents', x)));
     if (d.settings && d.settings.length) {
-      for (const s of d.settings) { await sb.from('almfrje_settings').upsert(clean(s), { onConflict: 'key' }); }
+      for (const s of d.settings) { await sb.from('almfrje_settings').upsert(pick('almfrje_settings', s), { onConflict: 'key' }); }
     }
   });
   showLoading(false);
