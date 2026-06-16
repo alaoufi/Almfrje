@@ -34,9 +34,9 @@ async function fetchAllRows(db: SupabaseClient, table: string): Promise<any[]> {
 // مصادقة Cron: CRON_SECRET (حين يُضبط) أو ترويسة Vercel Cron.
 function cronAuthorized(request: NextRequest): boolean {
   const secret = process.env.CRON_SECRET;
+  if (!secret) return false;   // فشلٌ آمن: ترويسة x-vercel-cron قابلة للتزوير، فلا نثق بها بلا سرّ
   const auth = (request.headers.get('authorization') || '').replace(/^Bearer\s+/i, '').trim();
-  if (secret) return auth === secret;
-  return request.headers.get('x-vercel-cron') != null;
+  return auth === secret;      // Vercel Cron ترسل Authorization: Bearer ${CRON_SECRET} تلقائياً
 }
 
 // مصادقة مدير مفعّل عبر رمز جلسته (لاستدعاءات التطبيق). يستقبل عميل الخدمة الجاهز.
@@ -86,8 +86,9 @@ async function runBackup(admin: SupabaseClient) {
 
   let deleted = 0;
   try {
-    const { data: files } = await admin.storage.from(BUCKET).list(PREFIX, { limit: 1000, sortBy: { column: 'name', order: 'desc' } });
-    if (files && files.length > KEEP) {
+    const { data } = await admin.storage.from(BUCKET).list(PREFIX, { limit: 1000, sortBy: { column: 'name', order: 'desc' } });
+    const files = (data || []).filter((f) => f.name.endsWith('.json'));
+    if (files.length > KEEP) {
       const old = files.slice(KEEP).map((f) => `${PREFIX}/${f.name}`);
       await admin.storage.from(BUCKET).remove(old); deleted = old.length;
     }

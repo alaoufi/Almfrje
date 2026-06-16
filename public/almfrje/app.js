@@ -2886,6 +2886,9 @@ async function restoreFromObject(backup) {
   if (!isAdmin()) { toast('للمدير فقط'); return; }
   if (!backup || backup.app !== 'almfrje' || !backup.data) { toast('هذا ليس ملف نسخة احتياطية للمفارجة'); return; }
   const d = backup.data;
+  // حماية من فقدان البيانات: لا نمسح الحالي إلا إذا كانت النسخة كاملة وصالحة فعلاً.
+  if (!Array.isArray(d.persons) || d.persons.length === 0) { toast('النسخة لا تحوي أشخاصاً — أُلغيت الاستعادة حمايةً لبياناتك'); return; }
+  if (backup.version != null && Number(backup.version) > 1) { toast('هذه النسخة من إصدارٍ أحدث غير مدعوم — حدّث الموقع أولاً'); return; }
   const np = (d.persons || []).length, nb = (d.branches || []).length;
   if (!(await confirm2(`ستُحذف البيانات الحالية وتُستبدل بـ ${np} شخص و ${nb} فرع من النسخة (${backup.created_at || ''}). متابعة؟`))) return;
   const typedR = await uiPrompt('للتأكيد النهائي اكتب كلمة: استعادة', { title: 'تأكيد الاستعادة', placeholder: 'استعادة', danger: true, okText: 'استعادة' });
