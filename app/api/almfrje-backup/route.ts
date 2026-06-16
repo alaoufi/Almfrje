@@ -39,8 +39,8 @@ function cronAuthorized(request: NextRequest): boolean {
   return request.headers.get('x-vercel-cron') != null;
 }
 
-// مصادقة مدير مفعّل عبر رمز جلسته (لاستدعاءات التطبيق).
-async function callerIsAdmin(request: NextRequest, env: AlmfrjeEnv): Promise<boolean> {
+// مصادقة مدير مفعّل عبر رمز جلسته (لاستدعاءات التطبيق). يستقبل عميل الخدمة الجاهز.
+async function callerIsAdmin(request: NextRequest, env: AlmfrjeEnv, admin: SupabaseClient): Promise<boolean> {
   const token = (request.headers.get('authorization') || '').replace(/^Bearer\s+/i, '').trim();
   if (!token) return false;
   if (process.env.CRON_SECRET && token === process.env.CRON_SECRET) return false; // هذا سرّ Cron لا رمز مستخدم
@@ -48,16 +48,18 @@ async function callerIsAdmin(request: NextRequest, env: AlmfrjeEnv): Promise<boo
     const asUser = createClient(env.url!, env.anon!, { global: { headers: { Authorization: `Bearer ${token}` } }, auth: { persistSession: false, autoRefreshToken: false } });
     const { data } = await asUser.auth.getUser();
     if (!data?.user) return false;
-    const admin = createClient(env.url!, env.service!, { auth: { persistSession: false, autoRefreshToken: false } });
     const { data: m } = await admin.from('almfrje_members').select('role,is_active').eq('user_id', data.user.id).maybeSingle();
     return !!(m && m.role === 'admin' && m.is_active);
   } catch { return false; }
 }
 
+let bucketReady = false;   // كاش ضمن اللمدا الدافئة لتفادي listBuckets في كل نداء
 async function ensureBucket(admin: SupabaseClient) {
+  if (bucketReady) return;
   try {
     const { data: buckets } = await admin.storage.listBuckets();
     if (!buckets?.some((b) => b.name === BUCKET)) await admin.storage.createBucket(BUCKET, { public: false });
+    bucketReady = true;
   } catch { /* قد تنقص صلاحية القائمة — نحاول مباشرةً */ }
 }
 
@@ -87,7 +89,7 @@ async function runBackup(admin: SupabaseClient) {
     const { data: files } = await admin.storage.from(BUCKET).list(PREFIX, { limit: 1000, sortBy: { column: 'name', order: 'desc' } });
     if (files && files.length > KEEP) {
       const old = files.slice(KEEP).map((f) => `${PREFIX}/${f.name}`);
-      if (old.length) { await admin.storage.from(BUCKET).remove(old); deleted = old.length; }
+      await admin.storage.from(BUCKET).remove(old); deleted = old.length;
     }
   } catch { /* تجاهل أخطاء الاحتفاظ */ }
 
@@ -126,12 +128,12 @@ async function handle(request: NextRequest) {
   }
   action = action || 'run';
 
+  const admin = createClient(env.url!, env.service!, { auth: { persistSession: false, autoRefreshToken: false } });
   const cronOK = cronAuthorized(request);
-  const adminOK = cronOK ? false : await callerIsAdmin(request, env);
+  const adminOK = !cronOK && await callerIsAdmin(request, env, admin);
   const deny = () => NextResponse.json({ ok: false, error: 'غير مصرّح' }, { status: 401 });
   const send = (r: any) => { const { status, ...rest } = r; return NextResponse.json(rest, { status }); };
 
-  const admin = createClient(env.url!, env.service!, { auth: { persistSession: false, autoRefreshToken: false } });
   try {
     if (action === 'list') return adminOK ? send(await listBackups(admin)) : deny();
     if (action === 'get') return adminOK ? send(await signBackup(admin, path)) : deny();

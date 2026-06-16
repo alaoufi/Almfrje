@@ -3900,12 +3900,7 @@ function screenTexts() {
       cTitle = document.getElementById('tx_cong_title'), cTitlePrev = document.getElementById('congTitlePreview');
     const syncMode = () => { if (cStartWrap) cStartWrap.style.display = (cMode && cMode.value === 'sched') ? '' : 'none'; };
     // عنوان التهنئة المختار الآن (حسب الوضع): افتراضي / مخصّص / بدون
-    const titleNow = () => {
-      const m = cTitleMode ? cTitleMode.value : 'default';
-      if (m === 'none') return '';
-      if (m === 'custom') return (cTitle && cTitle.value.trim()) ? cTitle.value.trim() : '';
-      return DEFAULT_CONGRATS_TITLE;
-    };
+    const titleNow = () => congratsTitle({ titleMode: cTitleMode ? cTitleMode.value : 'default', title: cTitle ? cTitle.value.trim() : '' });
     const syncTitle = () => {
       const m = cTitleMode ? cTitleMode.value : 'default';
       if (cTitleWrap) cTitleWrap.style.display = (m === 'custom') ? '' : 'none';
@@ -3928,7 +3923,7 @@ function screenTexts() {
       const durValue = durRaw === '' ? null : Math.max(0, parseInt(durRaw, 10) || 0);
       let start = null;
       if (mode === 'sched') { const s = val('tx_cong_start'); if (s) { const d = new Date(s); if (!isNaN(d)) start = d.toISOString(); } }
-      const titleMode = (cTitleMode && (cTitleMode.value === 'custom' || cTitleMode.value === 'none')) ? cTitleMode.value : 'default';
+      const titleMode = (cTitleMode && cTitleMode.value) || 'default';
       const title = (cTitle && cTitle.value.trim()) || '';
       const obj = text ? { text, color, mode, start, durValue, durUnit, titleMode, title, savedAt: new Date().toISOString() } : null;
       const ok = await guard(async () => { const { error } = await sb.from('almfrje_settings').upsert({ key: 'congrats', value: obj, updated_at: new Date().toISOString() }, { onConflict: 'key' }); if (error) throw error; });
