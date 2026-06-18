@@ -2805,50 +2805,68 @@ async function delFeedback(id) {
 }
 
 /* ===== المزيد ===== */
+let moreOpen = new Set([0]);   // المجموعات المفتوحة في «المزيد» (الأولى مفتوحة افتراضياً)
 function screenMore() {
   const r0 = roots()[0];
-  // مجموعات متقاربة — كل مجموعة عنوان وعناصرها [label, action, hint?]
+  // مجموعات متشابهة قابلة للطيّ — كل مجموعة عنوان وعناصرها [label, action, hint?]
   const groups = [];
-  // العرض والتصفّح (للجميع)
-  const browse = [['📊 التقرير الإحصائي', '#/stats']];
-  if (r0) { browse.push(['🌳 العرض الهرمي العام', '#/hierarchy/all', 'hierarchy']); browse.push(['🗒️ نموذج الأعمدة', '#/outline/all', 'outline']); }
-  browse.push(['🕓 خط الأجيال', '#/timeline/all']);
-  browse.push(['🔆 الشجرة الدائرية', '#/radial/all']);
-  browse.push(['🧬 حاسبة صلة القرابة', '#/kinship', 'kinship']);
-  browse.push(['📇 فهرس ذرية شخص', '#pickdesc', 'descendants']);
-  browse.push(['🖨️ نسخة مختصرة للطباعة', '#/printtree']);
-  groups.push(['🔎 العرض والتقارير', browse]);
-  // البيانات (إضافة/تعديل/استيراد)
+
+  // ١) المشجّرات والعروض (للجميع)
+  const trees = [];
+  if (r0) { trees.push(['🌳 العرض الهرمي العام', '#/hierarchy/all', 'hierarchy']); trees.push(['🗒️ نموذج الأعمدة', '#/outline/all', 'outline']); }
+  trees.push(['🕓 خط الأجيال', '#/timeline/all']);
+  trees.push(['🔆 الشجرة الدائرية', '#/radial/all']);
+  trees.push(['📇 فهرس ذرية شخص', '#pickdesc', 'descendants']);
+  trees.push(['🖨️ نسخة مختصرة للطباعة', '#/printtree']);
+  groups.push(['🌳 المشجّرات والعروض', trees]);
+
+  // ٢) التقارير والحاسبات (للجميع)
+  groups.push(['📊 التقارير والحاسبات', [['📊 التقرير الإحصائي', '#/stats'], ['🧬 حاسبة صلة القرابة', '#/kinship', 'kinship']]]);
+
+  // ٣) البيانات (إضافة/تعديل/مراجعة) — لأصحاب الصلاحية
   const data = [];
-  // تعليمات الإدارة — لأصحاب الصلاحية فقط (محجوبة عن الزائر).
-  if (isAdmin() || isManager()) data.push(['📖 تعليمات المدير والمشرف', '#/guideadmin']);
-  // إضافة مولود مباشرة (للمدير ومشرف الفرع فقط — مشرف الفرع ضمن فرعه) — لا تظهر للزوار.
   if (canAdd()) data.push(['👶 إضافة مولود (مباشرة)', '#/person-edit/0', 'add_person']);
   if (isAdmin()) data.push(['📥 استيراد ملف Excel', '#/import', 'import']);
   if (isAdmin() || isManager()) data.push(['✏️ تعديل جماعي', '#/bulk', 'bulk']);
   if (isAdmin() || isManager()) data.push(['📝 تعديل البيانات بالقائمة', '#/grid', 'grid']);
   if (!isGuestUser()) data.push(['👁️ مراجعة البيانات (الأحياء)', '#/review', 'review']);
   if (isAdmin() || isManager()) data.push(['🔁 كشف الأسماء المكرّرة لنفس الأب', '#/dups', 'dups']);
-  if (isAdmin()) data.push(['📨 ملاحظات الزوار الواردة', '#/feedbacks', 'feedbacks']);
-  if (isManager() && !isAdmin()) data.push(['📋 سجل تعديلاتي (تراجع)', '#/audit', 'audit']);
-  // «النسخ والتصدير» للمدير فقط — ضمن لوحة التحكم (مخفيّ عن مشرف الفرع).
   if (data.length) groups.push(['🗂️ البيانات', data]);
-  // لوحة التحكم (للمدير) — مدخل واحد يفتح التبويبات (المستخدمون/النصوص/التعليمات/السجل/السلة/النسخ)
-  if (isAdmin()) groups.push(['⚙️ الإدارة', [['⚙️ لوحة التحكم', '#/members', 'control_panel']]]);
-  // الحساب — حساب الزائر المشترك لا يملك ملفاً شخصياً (لا يغيّر جوال/كلمة مرور الحساب المشترك)
+
+  // ٤) الإدارة (لوحة التحكم/الملاحظات/السجل/التعليمات)
+  const admin = [];
+  if (isAdmin()) admin.push(['⚙️ لوحة التحكم', '#/members', 'control_panel']);
+  if (isAdmin()) admin.push(['📨 ملاحظات الزوار الواردة', '#/feedbacks', 'feedbacks']);
+  if (isManager() && !isAdmin()) admin.push(['📋 سجل تعديلاتي (تراجع)', '#/audit', 'audit']);
+  if (isAdmin() || isManager()) admin.push(['📖 تعليمات المدير والمشرف', '#/guideadmin']);
+  if (admin.length) groups.push(['⚙️ الإدارة', admin]);
+
+  // ٥) حسابي
   const acct = [];
   if (!isGuestUser()) acct.push(['👤 ملفي الشخصي (الجوال/كلمة المرور)', '#/profile', 'profile']);
   if (!alreadyInstalled()) acct.push(['📌 إضافة اختصار الموقع إلى الشاشة', '#install']);
   if (isGuestUser()) acct.push(['🔐 دخول المسؤول / مشرف الفرع', '#adminlogin']);
   if (acct.length) groups.push(['👤 حسابي', acct]);
 
-  view().innerHTML = groups.map(([title, items]) => `
-    <div class="more-group">
-      <div class="more-group-title">${title}</div>
-      ${items.map(([l, h, hint]) => `<div class="card click more-card" data-act="${h}"><div class="li-title">${l}</div>${hint ? hintBtn(hint) : ''}</div>`).join('')}
-    </div>`).join('')
+  view().innerHTML = groups.map(([title, items], gi) => {
+    const open = moreOpen.has(gi);
+    return `<div class="more-group${open ? ' open' : ''}">
+      <button class="more-group-title" data-mg="${gi}"><span class="mg-ico">${open ? '▾' : '▸'}</span><span class="mg-label">${title}</span><span class="mg-count">${items.length}</span></button>
+      <div class="more-group-items">
+        ${items.map(([l, h, hint]) => `<div class="card click more-card" data-act="${h}"><div class="li-title">${l}</div>${hint ? hintBtn(hint) : ''}</div>`).join('')}
+      </div>
+    </div>`;
+  }).join('')
     + `<div class="muted" style="text-align:center;margin-top:14px;font-size:.85rem">${esc(siteTitle)}${sitePowered ? `<br><span style="font-size:.78rem;opacity:.85">${esc(sitePowered)}</span>` : ''}</div>`;
-  view().querySelectorAll('[data-act]').forEach(c => c.addEventListener('click', (e) => {
+
+  // طيّ/فتح في المكان (بلا إعادة رسم) — تبقى مستمعات العناصر والتلميحات سليمة
+  view().querySelectorAll('[data-mg]').forEach(b => b.addEventListener('click', () => {
+    const gi = parseInt(b.dataset.mg, 10), grp = b.closest('.more-group');
+    const open = grp.classList.toggle('open');
+    if (open) moreOpen.add(gi); else moreOpen.delete(gi);
+    const ico = b.querySelector('.mg-ico'); if (ico) ico.textContent = open ? '▾' : '▸';
+  }));
+  view().querySelectorAll('.more-card[data-act]').forEach(c => c.addEventListener('click', (e) => {
     if (e.target.closest('[data-hint]')) return;   // لا تتنقّل عند الضغط على (i)
     if (c.dataset.act === '#pickdesc') pickDescendantStart();
     else if (c.dataset.act === '#install') triggerInstall();
@@ -4674,30 +4692,7 @@ function renderPending() {
   view().innerHTML = `<div class="center-empty"><div style="font-size:3rem">⏳</div>
     <h3>حسابك بانتظار التفعيل</h3>
     <p class="muted">تم إنشاء حسابك. يرجى أن يقوم مدير النظام بتفعيلك ومنحك الدور المناسب، ثم أعد تسجيل الدخول.</p>
-    <div class="muted">${esc((me && me.full_name) || '')}</div>
-    <div style="margin-top:18px"><button class="btn outline" id="claimAdmin">أنا أول مستخدم — فعّلني كمدير</button>
-    <p class="muted" style="font-size:.8rem;margin-top:8px">يعمل فقط إن لم يوجد مدير بعد.</p></div></div>`;
-  const cb = document.getElementById('claimAdmin');
-  if (cb) cb.addEventListener('click', async () => {
-    const reset = () => { cb.disabled = false; cb.textContent = 'أنا أول مستخدم — فعّلني كمدير'; };
-    cb.disabled = true; cb.textContent = '… جارٍ';
-    const tryClaim = async () => await sb.rpc('almfrje_claim_admin');
-    try {
-      let { data: claim, error } = await tryClaim();
-      // إن لم تكن الدالة منشأة بعد، شغّل الإعداد التلقائي ثم أعد المحاولة.
-      if (error && /does not exist|schema cache/i.test(error.message || '')) {
-        cb.textContent = '… تهيئة النظام'; await fetch('/api/almfrje-setup', { method: 'POST' });
-        await new Promise(r => setTimeout(r, 1200));
-        ({ data: claim, error } = await tryClaim());
-      }
-      if (error) throw error;
-      if (claim === 'claimed') { toast('تم تفعيلك كمدير'); const { data: { session } } = await sb.auth.getSession(); if (session) await enterApp(session); }
-      else if (claim === 'exists') { toast('يوجد مدير بالفعل — راجعه للتفعيل'); reset(); }
-      else { toast('تعذّر التفعيل'); reset(); }
-    } catch (e) {
-      toast('تعذّر: ' + (e.message || e)); reset();
-    }
-  });
+    <div class="muted">${esc((me && me.full_name) || '')}</div></div>`;
 }
 
 /* ===== المصادقة (جوال/اسم مستخدم + رقم سري ٤ أرقام) ===== */
