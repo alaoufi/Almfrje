@@ -1581,26 +1581,60 @@ async function persistChildOrder(listEl, fatherId) {
   });
   if (ok) toast('تم حفظ ترتيب الأبناء ✓');
 }
-// شاشة مستقلّة «ترتيب الأبناء» (المزيد ← الإدارة) — اختر الأب ثم رتّب أبناءه بالأسهم.
-let reorderFather = null;
+// شاشة «ترتيب الأبناء» (المزيد ← الإدارة) — شجرة تصفّح: اضغط الاسم لتدخل لأبنائه
+// وتتدرّج حتى تصل للأب المطلوب، ثم رتّب أبناءه بالأسهم. مع بحثٍ للقفز السريع.
+let reorderNav = null;   // الأب الحالي (null = الأصول)
 function screenReorder() {
   if (!(isAdmin() || isManager())) { view().innerHTML = noPerm(); return; }
-  const f = (reorderFather && byId.get(reorderFather.id)) ? byId.get(reorderFather.id) : null;
-  const cs = f ? childrenOf(f.id) : [];
+  const tops = () => (!isAdmin() && isManager()) ? myBranches().map(bid => branchRoot(bid)).filter(Boolean) : roots();
   view().innerHTML = `
     <div class="card">
       <h3>↕️ ترتيب الأبناء</h3>
-      <p class="muted" style="font-size:.85rem">اختر الأب ثم رتّب أبناءه بالسهمين ▲▼. الترتيب يبقى ضمن إخوته فقط ولا يتجاوز الأب، ويُحفظ تلقائياً.</p>
-      <div class="field"><label>الأب</label><button class="btn outline" id="ro_pick" style="margin-top:0">${f ? '👤 ' + esc(f.name) + ' <span class="muted" style="font-weight:normal">(جيل ' + f.generation + ')</span>' : '🔍 اختر الأب'}</button></div>
+      <p class="muted" style="font-size:.85rem">اضغط الاسم لتدخل لأبنائه وتتدرّج للأسفل حتى تصل للأب المطلوب، ثم رتّب أبناءه بالسهمين ▲▼ (يبقى ضمن إخوته فقط ويُحفظ تلقائياً). أو ابحث للقفز السريع.</p>
+      <div class="search"><input id="ro_q" placeholder="ابحث بالاسم للقفز مباشرة…"></div>
     </div>
-    ${f ? `<div class="card"><h3>الأبناء (${cs.length})</h3>${
-      cs.length > 1
-        ? `<div id="childList" class="reorder-list">${cs.map(c => `<div class="row child-row" data-reorder-id="${c.id}"><span class="reorder-arrows"><button class="reorder-up" data-up="${c.id}" aria-label="تحريك لأعلى">▲</button><button class="reorder-down" data-down="${c.id}" aria-label="تحريك لأسفل">▼</button></span><span class="k">${esc(c.name)}</span><span class="v">${descCount.get(c.id) || 0} ذرية</span></div>`).join('')}</div>`
-        : (cs.length === 1 ? '<div class="muted" style="padding:6px">لهذا الأب ابنٌ واحد — لا حاجة للترتيب.</div>' : '<div class="muted" style="padding:6px">لا أبناء لهذا الشخص.</div>')
-    }</div>` : ''}`;
-  const pickBtn = document.getElementById('ro_pick');
-  if (pickBtn) pickBtn.addEventListener('click', () => pickPerson('اختر الأب', (pp) => { if (pp) { reorderFather = pp; screenReorder(); } }, (!isAdmin() && isManager()) ? (x => inMyBranch(x)) : null));
-  if (f && cs.length > 1) bindChildArrows(document.getElementById('childList'), f.id);
+    <div id="ro_body"></div>`;
+  const q = document.getElementById('ro_q'), body = document.getElementById('ro_body');
+  const renderBrowse = () => {
+    const cur = (reorderNav && byId.get(reorderNav.id)) ? byId.get(reorderNav.id) : null;
+    const list = cur ? childrenOf(cur.id) : tops();
+    const crumb = cur ? lineage(cur.id).slice().reverse() : [];
+    const canOrder = !!cur && list.length > 1 && (isAdmin() || inMyBranch(cur));
+    body.innerHTML = `
+      <div class="card">
+        <div class="anc-bar">
+          <button class="btn sm outline" id="ro_top" ${!cur ? 'disabled' : ''}>⌂ القمة</button>
+          ${cur ? '<button class="btn sm outline" id="ro_up">↑ للأعلى</button>' : ''}
+        </div>
+        ${cur ? `<div class="anc-crumb">${crumb.map(x => `<span class="anc-cl" data-rogo="${x.id}">${esc(x.name)}</span>`).join(' › ')}</div>` : '<div class="muted" style="margin-bottom:6px">اختر الأصل ثم تدرّج لأبنائه:</div>'}
+        <h3 style="margin:.2rem 0 .4rem">${cur ? '👤 ' + esc(cur.name) + ' — الأبناء (' + list.length + ')' : 'الأصول'}</h3>
+        ${canOrder ? '<div class="reorder-hint"><b>↕️ رتّب بالأسهم ▲▼</b> (ضمن إخوته فقط)، واضغط الاسم للدخول لأبنائه.</div>'
+          : (cur && list.length === 1 ? '<div class="muted" style="padding:4px 0 8px">ابنٌ واحد — اضغط اسمه للدخول لأبنائه.</div>'
+          : (cur && list.length && !canOrder ? '<div class="muted" style="padding:4px 0 8px">اضغط الاسم للدخول لأبنائه.</div>' : ''))}
+        <div id="childList" class="${canOrder ? 'reorder-list' : ''}">
+          ${list.length ? list.map(c => {
+            const kc = childCount.get(c.id) || 0;
+            return `<div class="row child-row"${canOrder ? ` data-reorder-id="${c.id}"` : ''}>${canOrder ? `<span class="reorder-arrows"><button class="reorder-up" data-up="${c.id}" aria-label="أعلى">▲</button><button class="reorder-down" data-down="${c.id}" aria-label="أسفل">▼</button></span>` : ''}<span class="k"><a href="#" data-rointo="${c.id}" style="color:var(--brand);text-decoration:none">${esc(c.name)}</a></span><span class="v">${kc ? kc + ' ابن ›' : (descCount.get(c.id) || 0) + ' ذرية'}</span></div>`;
+          }).join('') : '<div class="muted" style="padding:6px">لا أبناء.</div>'}
+        </div>
+      </div>`;
+    const top = document.getElementById('ro_top'); if (top) top.addEventListener('click', () => { reorderNav = null; renderBrowse(); });
+    const up = document.getElementById('ro_up'); if (up) up.addEventListener('click', () => { reorderNav = (cur && cur.father_id) ? byId.get(cur.father_id) : null; renderBrowse(); });
+    body.querySelectorAll('[data-rointo]').forEach(a => a.addEventListener('click', (e) => { e.preventDefault(); reorderNav = byId.get(parseInt(a.dataset.rointo, 10)); renderBrowse(); }));
+    body.querySelectorAll('[data-rogo]').forEach(s => s.addEventListener('click', () => { reorderNav = byId.get(parseInt(s.dataset.rogo, 10)); renderBrowse(); }));
+    if (canOrder) bindChildArrows(document.getElementById('childList'), cur.id);
+  };
+  const renderSearch = () => {
+    let listP = C.persons;
+    if (!isAdmin() && isManager()) listP = listP.filter(inMyBranch);
+    listP = listP.filter(p => nameMatch(p, q.value)).slice(0, 40);
+    body.innerHTML = `<div class="card"><h3>نتائج البحث</h3>${listP.length
+      ? listP.map(p => `<div class="card click" data-rojump="${p.id}" style="margin:6px 0;padding:10px"><div class="li-title">${esc(p.name)}</div><div class="li-sub">${esc(lineageShort(p.id))}${(childCount.get(p.id) || 0) ? ' • ' + childCount.get(p.id) + ' ابن' : ''}</div></div>`).join('')
+      : '<div class="muted" style="padding:8px">لا نتائج — امسح البحث للتصفّح</div>'}</div>`;
+    body.querySelectorAll('[data-rojump]').forEach(c => c.addEventListener('click', () => { reorderNav = byId.get(parseInt(c.dataset.rojump, 10)); q.value = ''; renderBrowse(); }));
+  };
+  q.addEventListener('input', debounce(() => (q.value.trim() ? renderSearch() : renderBrowse()), 130));
+  renderBrowse();
 }
 function addDocModal(p) {
   openModal('إضافة صورة / وثيقة', `
@@ -3798,7 +3832,7 @@ const GUIDE = [
     { t: 'تعديل جماعي', fn: 'تعديل حقلٍ واحد لمجموعة دفعة واحدة.', brief: 'اختر الجدّ والجيل ثم الحقل وقيمته وطبّق على المحدّدين.', det: 'مناسب لتوحيد قيمة (مدينة/حالة…) لعدد كبير سريعاً.' },
     { t: 'تعديل البيانات بالقائمة', fn: 'تعديل كل فرد على حدة ضمن جدٍّ واحد.', brief: 'اختر الجدّ ثم الحقول، وعدّل قيمة كل فرد ثم احفظ.', det: 'يُعرض الأحياء فقط، ويُسجَّل من قام بالتعديل (يُرجع إليه في سجل التعديلات). مشرف الفرع ضمن فرعه فقط.' },
     { t: 'مراجعة البيانات', fn: 'مراجعة دقّة البيانات دون تعديل.', brief: 'اختر الجدّ ثم راجع ذرّيته.', det: 'مرشّحات: الأحياء/المتوفّون/الكل، وقائمة مختصرة (الاسم متسلسلاً + الحالة) أو مفصّلة. تغيير الجدّ بالضغط على اسمه دون البدء من جديد.' },
-    { t: 'ترتيب الأبناء', fn: 'ترتيب أبناء أبٍ واحد بالأسهم.', brief: 'المزيد ← الإدارة ← «↕️ ترتيب الأبناء»: اختر الأب ثم رتّب أبناءه بالسهمين ▲▼.', det: 'الترتيب يبقى ضمن إخوته فقط ولا يتجاوز الأب، ويُحفظ تلقائياً مع تسجيله في سجل التعديلات. متاح أيضاً من بطاقة «الأبناء» داخل ملف الأب. للمصرّح لهم فقط (مشرف الفرع ضمن فرعه).' },
+    { t: 'ترتيب الأبناء', fn: 'ترتيب أبناء أبٍ واحد بالأسهم.', brief: 'المزيد ← الإدارة ← «↕️ ترتيب الأبناء»: اضغط الاسم لتدخل لأبنائه وتتدرّج حتى الأب المطلوب، ثم رتّب بالسهمين ▲▼ (أو ابحث للقفز).', det: 'الترتيب يبقى ضمن إخوته فقط ولا يتجاوز الأب، ويُحفظ تلقائياً مع تسجيله في سجل التعديلات. الشاشة شجرة تصفّح: الضغط على الاسم يدخل لأبنائه، ومسار التنقّل و«القمة/للأعلى» للرجوع. متاح أيضاً من بطاقة «الأبناء» داخل ملف الأب. للمصرّح لهم فقط (مشرف الفرع ضمن فرعه).' },
     { t: 'كشف الأسماء المكرّرة', fn: 'إظهار تكرار اسمٍ لأكثر من ابنٍ لنفس الأب.', brief: 'قائمة بالحالات المتشابهة لمراجعتها.', det: 'لا يُحتسب التكرار إن كان أحد المتشابهين متوفّى؛ فقط عند كونهما حيَّيْن.' },
   ]},
   { sec: '⚙️ لوحة التحكم (لمدير النظام)', role: 'admin', items: [
