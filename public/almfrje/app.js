@@ -3864,8 +3864,11 @@ const GUIDE = [
     { t: 'دليل الزوّار (هذا الكتيّب)', fn: 'شرح مفصّل لكل ما يُعرض للزائر.', brief: 'زر 📖 في أعلى الشاشة.', det: 'يغطّي كل ما يراه الزائر (المشجرات والإحصائيات والفروع والمتواجدون…) ويتحدّث مع تطوير الموقع.' },
   ]},
 ];
-function guideHtml(sections, eyebrow, title, sub) {
+function guideHtml(sections, eyebrow, title, sub, highlights) {
   const toc = sections.map((g, i) => `<button class="guide-toc-link" data-gsec="${i}">${g.sec}</button>`).join('');
+  const hi = (highlights && highlights.length)
+    ? `<div class="guide-new"><div class="guide-new-t">✨ أبرز الميزات الجديدة</div>${highlights.map(h => `<div class="guide-new-i">${esc(h)}</div>`).join('')}</div>`
+    : '';
   const body = sections.map((g, i) => `
     <section class="guide-sec" data-gsecid="${i}">
       <h3 class="guide-sec-h">${g.sec}</h3>
@@ -3882,6 +3885,7 @@ function guideHtml(sections, eyebrow, title, sub) {
       <h2>${esc(title)}</h2>
       <hr>
       <p style="text-align:center;color:var(--muted);font-size:.9rem;margin:0 0 14px">${esc(sub)}</p>
+      ${hi}
       <div class="guide-toc">${toc}</div>
       ${body}
     </div></div>`;
@@ -3893,7 +3897,10 @@ function bindGuideToc() {
 }
 function screenGuide() {
   const secs = GUIDE.filter(g => g.role !== 'admin');
-  view().innerHTML = guideHtml(secs, 'دليل الزوّار', 'دليل استخدام الموقع', 'شرح مفصّل لكل ما يُعرض للزائر في الموقع — يتحدّث مع تطوير الموقع.');
+  const hi = ['📤 مشاركة الموقع بضغطة من أعلى الشاشة', '🔎 اختيار أي شخص ببحثٍ أو تصفّحٍ هرمي (جيلاً بعد جيل)', '☰ قائمة «المزيد» مرتّبة في مجموعات قابلة للطيّ', '🌳 لوحة تعريفٍ عائمة وتصميمٌ عصري ثلاثي الأبعاد'];
+  if (isAdmin() || isManager()) hi.push('↕️ ترتيب الأبناء بالأسهم (ضمن الأب فقط)', '🔐 صلاحيات دقيقة لكل مشرف داخل فروعه');
+  if (isAdmin()) hi.push('☁️ نسخ احتياطية سحابية تلقائية واستعادة من داخل التطبيق', '🎁 تهنئة الإدارة بعنوانٍ قابل للتخصيص');
+  view().innerHTML = guideHtml(secs, 'دليل الزوّار', 'دليل استخدام الموقع', 'شرح مفصّل لكل ما يُعرض للزائر في الموقع — يتحدّث مع تطوير الموقع.', hi);
   bindGuideToc();
 }
 function screenGuideAdmin() {
