@@ -218,6 +218,7 @@ let onlineByBranch = {};           // تفصيلهم حسب الفرع
 let _presenceTimer = null;
 const DEFAULT_BANNER = 'المفرجي قبيلة من ولد حسين من الصواعد من عوف من حرب';
 let bannerText = DEFAULT_BANNER;
+let bannerSize = '';   // حجم خطّ لوحة التعريف (يحدّده المدير)؛ فارغ = الافتراضي
 const DEFAULT_FB_THANKS = 'شكراً لك 🌿\nتم إرسال ملاحظتك، وهي محل اهتمامنا.';
 let feedbackThanks = DEFAULT_FB_THANKS;
 const DEFAULT_GUEST_OK = 'مرحباً بك يا ابن العم {name} 🌿\nداخل مكانك وبين ربعك وجماعتك.. نسعد بوجودك';
@@ -414,6 +415,7 @@ async function loadSettings() {
     statLabels = Object.assign({ ...LABELS_DEFAULT }, (map.status_labels && typeof map.status_labels === 'object') ? map.status_labels : {});
     recentSince = typeof map.recent_since === 'string' ? map.recent_since : '';
     bannerText = typeof map.banner_text === 'string' ? map.banner_text : DEFAULT_BANNER;
+    bannerSize = (typeof map.banner_size === 'string' && /^[0-9.]+rem$/.test(map.banner_size)) ? map.banner_size : '';
     feedbackThanks = typeof map.feedback_thanks === 'string' && map.feedback_thanks ? map.feedback_thanks : DEFAULT_FB_THANKS;
     guestWelcomeOk = typeof map.guest_welcome_ok === 'string' && map.guest_welcome_ok ? map.guest_welcome_ok : DEFAULT_GUEST_OK;
     guestWelcomeFail = typeof map.guest_welcome_fail === 'string' && map.guest_welcome_fail ? map.guest_welcome_fail : DEFAULT_GUEST_FAIL;
@@ -763,7 +765,15 @@ function screenHome() {
   }
   view().innerHTML = `
     ${(() => { const c = congratsActive(); if (!c) return ''; const t = congratsTitle(c); return `<div class="congrats-strip">${t ? `<span class="cs-badge">${esc(t)}</span>` : ''}<span class="cs-text" style="color:${okColor(c.color)}">${esc(c.text)}</span></div>`; })()}
-    ${bannerText ? `<div class="banner"><button class="about-i banner-i" data-go="#/about" title="نبذة تعريفية عن قبيلة المفارجة" aria-label="نبذة تعريفية">ⓘ</button>${esc(bannerText)}</div>` : ''}
+    ${bannerText ? (() => {
+      const long = bannerText.length > 160;
+      const sz = /^[0-9.]+rem$/.test(bannerSize) ? ` style="font-size:${bannerSize}"` : '';
+      return `<div class="banner"${sz}>
+        <button class="about-i banner-i" data-go="#/about" title="نبذة تعريفية عن قبيلة المفارجة" aria-label="نبذة تعريفية">ⓘ</button>
+        <div class="banner-text${long ? ' clamp' : ''}">${esc(bannerText)}</div>
+        ${long ? '<button class="banner-more" data-go="#/about">المزيد…</button>' : ''}
+      </div>`;
+    })() : ''}
     ${!isGuestUser() && !pwChanged() ? `<div class="notice-pw">🔐 ننصحك بتغيير كلمة المرور الآن لحماية حسابك. <button class="btn sm" id="pwGo" style="margin-top:6px">تغيير كلمة المرور</button> <button class="btn sm outline" id="pwSkip" style="margin-top:6px">لاحقاً</button></div>` : ''}
     <div class="home-greet">أهلاً <span class="hg-name">${esc(currentUserName() || me.full_name || '')}</span>${isGuestUser() ? '' : `<span class="hg-role"> • ${esc(arOf(ROLES, me.role))}</span>`}${isManager() && myBranches().length ? `<span class="hg-role"> (${myBranches().map(b => esc(branchName(b))).join('، ')})</span>` : ''}</div>
     <div class="card" style="border:2px solid var(--brand);background:color-mix(in srgb, var(--brand) 7%, transparent)">
@@ -3651,7 +3661,7 @@ const GUIDE = [
     { t: 'دخول الزائر بالنسب', fn: 'تمكين أبناء القبيلة من تصفّح الشجرة دون إنشاء حساب.', brief: 'يكتب الزائر اسمه ثم أباه ثم جدّه، فيُطابَق تلقائياً بالشجرة ويدخل بمجرد أن يتميّز اسمه.', det: 'يلزم ثلاثة أسماء على الأقل بالترتيب (أنت ثم أبوك ثم جدّك). يُسمح بالدخول فقط عند مطابقة شخصٍ حيٍّ واحدٍ غير مكرّر؛ المتوفّى أو من لم يعقب لا يُحتسب من الأحياء. عند النجاح يظهر ترحيب باسمك الرباعي كما هو مسجّل في القاعدة، ويُنسب دخولك لفرعك. الزائر يتصفّح ويبحث فقط (لا يضيف ولا يعدّل).' },
   ]},
   { sec: '🏠 الرئيسية', items: [
-    { t: 'نص الرئيسية (البانر)', fn: 'كلمة تعريفية تظهر أعلى الصفحة للجميع.', brief: 'نصّ يحدّده المدير من التحكم ← النصوص.', det: 'يظهر في صندوق ملوّن أعلى الرئيسية، وبزاويته زر ⓘ يفتح النبذة التعريفية للقبيلة.' },
+    { t: 'نص الرئيسية (البانر)', fn: 'كلمة تعريفية تظهر أعلى الصفحة للجميع.', brief: 'نصّ يحدّده المدير من التحكم ← النصوص، ويتحكّم بحجم خطّه.', det: 'يظهر في صندوقٍ عائمٍ ملوّن أعلى الرئيسية. يحدّد المدير نصّه وحجم خطّه، وإن طال النصّ يُقصَر تلقائياً مع زرّ «المزيد…» يفتح صفحة النبذة التعريفية ثلاثية الأبعاد. وبزاوية الصندوق زر ⓘ يفتح النبذة أيضاً.' },
     { t: 'رسالة الترحيب بعد الدخول', fn: 'ترحيب شخصي فور دخولك.', brief: 'تظهر مرّة في الجزء الأوسط العلوي عند الدخول.', det: 'يظهر للزائر ترحيبٌ باسمه فور مطابقته بالشجرة. تظهر مرّة واحدة لكل جلسة تصفّح ولا تتكرّر مع تحديث الصفحة، وتعود عند دخولٍ جديد.' },
     { t: 'تهنئة المناسبات (مبارَكة)', fn: 'رسالة تهنئة من الإدارة في المناسبات.', brief: 'تظهر فور الدخول وكشريط ذهبي أعلى الرئيسية.', det: 'تكتبها الإدارة بلونٍ مميّز وتُنشَر فوراً أو بموعدٍ محدّد ولمدّةٍ معيّنة (بالساعات أو الأيام). تظهر النافذة مرّة لكل جلسة، ويبقى الشريط الذهبي أعلى الرئيسية ظاهراً طوال مدّة العرض. ويمكن للإدارة اختيار عنوان الشريط: الافتراضي «🎊 تهنئة من الإدارة»، أو عنوان مخصّص تكتبه، أو بدون عنوان.' },
     { t: 'الإحصائيات (المربّعات الأربعة)', fn: 'أرقام سريعة عن الشجرة.', brief: 'إجمالي الأفراد، الفروع، الأجيال، الزوّار.', det: 'إجمالي الأفراد = كل الأسماء المسجّلة في الشجرة. الفروع = الفروع القائمة فقط (التي أنجب مؤسّسها). الأجيال = أطول سلسلة نسبٍ من الجذر إلى الأحدث. الزوّار = إجمالي كل من دخل الموقع (زائر/مشرف/مدير).' },
@@ -3866,9 +3876,10 @@ function screenTexts() {
       ${fInput('النص', 'tx_gprompt', guestPrompt)}
       <button class="btn sm" id="tx_gpromptSave" style="margin-top:6px">حفظ</button></div>
     <div class="card"><h3>📝 نص الرئيسية ${hintBtn('banner')}</h3>
-      <p class="muted" style="font-size:.85rem;margin-top:-2px">يظهر أعلى الصفحة الرئيسية للجميع.</p>
+      <p class="muted" style="font-size:.85rem;margin-top:-2px">يظهر أعلى الصفحة الرئيسية للجميع. النص الطويل يُقصَر تلقائياً مع زرّ «المزيد…» يفتح صفحة النبذة.</p>
       ${fTextarea('النص', 'tx_banner', bannerText)}
-      <button class="btn sm" id="tx_bannerSave" style="margin-top:6px">حفظ النص</button></div>
+      ${fSelect('حجم الخط', 'tx_banner_size', [{ k: '', ar: 'افتراضي' }, { k: '0.95rem', ar: 'صغير' }, { k: '1.05rem', ar: 'متوسط' }, { k: '1.2rem', ar: 'كبير' }, { k: '1.35rem', ar: 'كبير جداً' }], bannerSize)}
+      <button class="btn sm" id="tx_bannerSave" style="margin-top:6px">حفظ</button></div>
     <div class="card"><h3>💬 رسالة الشكر بعد إرسال ملاحظة ${hintBtn('feedback_thanks')}</h3>
       <p class="muted" style="font-size:.85rem;margin-top:-2px">تظهر للمُرسِل في موديل بعد إرسال ملاحظته.</p>
       ${fTextarea('النص', 'tx_fbthanks', feedbackThanks)}
@@ -3986,8 +3997,12 @@ function screenTexts() {
   });
   document.getElementById('tx_bannerSave').addEventListener('click', async () => {
     const txt = val('tx_banner').trim();
-    const ok = await guard(async () => { const { error } = await sb.from('almfrje_settings').upsert({ key: 'banner_text', value: txt, updated_at: new Date().toISOString() }, { onConflict: 'key' }); if (error) throw error; });
-    if (ok) { bannerText = txt; toast('تم حفظ النص'); }
+    const size = /^[0-9.]+rem$/.test(val('tx_banner_size')) ? val('tx_banner_size') : '';
+    const ok = await guard(async () => {
+      let { error } = await sb.from('almfrje_settings').upsert({ key: 'banner_text', value: txt, updated_at: new Date().toISOString() }, { onConflict: 'key' }); if (error) throw error;
+      ({ error } = await sb.from('almfrje_settings').upsert({ key: 'banner_size', value: size, updated_at: new Date().toISOString() }, { onConflict: 'key' })); if (error) throw error;
+    });
+    if (ok) { bannerText = txt; bannerSize = size; toast('تم الحفظ'); }
   });
   document.getElementById('tx_fbthanksSave').addEventListener('click', async () => {
     const txt = val('tx_fbthanks').trim() || DEFAULT_FB_THANKS;
