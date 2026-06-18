@@ -2823,20 +2823,16 @@ function screenMore() {
   // ٢) التقارير والحاسبات (للجميع)
   groups.push(['📊 التقارير والحاسبات', [['📊 التقرير الإحصائي', '#/stats'], ['🧬 حاسبة صلة القرابة', '#/kinship', 'kinship']]]);
 
-  // ٣) البيانات (إضافة/تعديل/مراجعة) — لأصحاب الصلاحية
-  const data = [];
-  if (canAdd()) data.push(['👶 إضافة مولود (مباشرة)', '#/person-edit/0', 'add_person']);
-  if (isAdmin()) data.push(['📥 استيراد ملف Excel', '#/import', 'import']);
-  if (isAdmin() || isManager()) data.push(['✏️ تعديل جماعي', '#/bulk', 'bulk']);
-  if (isAdmin() || isManager()) data.push(['📝 تعديل البيانات بالقائمة', '#/grid', 'grid']);
-  if (!isGuestUser()) data.push(['👁️ مراجعة البيانات (الأحياء)', '#/review', 'review']);
-  if (isAdmin() || isManager()) data.push(['🔁 كشف الأسماء المكرّرة لنفس الأب', '#/dups', 'dups']);
-  if (data.length) groups.push(['🗂️ البيانات', data]);
-
-  // ٤) الإدارة (لوحة التحكم/الملاحظات/السجل/التعليمات)
+  // ٣) الإدارة (للمصرّح لهم فقط) — أدوات البيانات + لوحة التحكم والملاحظات والسجل والتعليمات مجمّعة
   const admin = [];
   if (isAdmin()) admin.push(['⚙️ لوحة التحكم', '#/members', 'control_panel']);
   if (isAdmin()) admin.push(['📨 ملاحظات الزوار الواردة', '#/feedbacks', 'feedbacks']);
+  if (canAdd()) admin.push(['👶 إضافة مولود (مباشرة)', '#/person-edit/0', 'add_person']);
+  if (isAdmin()) admin.push(['📥 استيراد ملف Excel', '#/import', 'import']);
+  if (isAdmin() || isManager()) admin.push(['✏️ تعديل جماعي', '#/bulk', 'bulk']);
+  if (isAdmin() || isManager()) admin.push(['📝 تعديل البيانات بالقائمة', '#/grid', 'grid']);
+  if (!isGuestUser()) admin.push(['👁️ مراجعة البيانات (الأحياء)', '#/review', 'review']);
+  if (isAdmin() || isManager()) admin.push(['🔁 كشف الأسماء المكرّرة لنفس الأب', '#/dups', 'dups']);
   if (isManager() && !isAdmin()) admin.push(['📋 سجل تعديلاتي (تراجع)', '#/audit', 'audit']);
   if (isAdmin() || isManager()) admin.push(['📖 تعليمات المدير والمشرف', '#/guideadmin']);
   if (admin.length) groups.push(['⚙️ الإدارة', admin]);
