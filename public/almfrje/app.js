@@ -597,6 +597,7 @@ const ROUTES = {
   bulk: { t: 'تعديل جماعي', back: true, fn: screenBulkEdit },
   grid: { t: 'تعديل البيانات بالقائمة', back: true, fn: screenGridEdit },
   review: { t: 'مراجعة البيانات', back: true, fn: screenGridReview },
+  reorder: { t: 'ترتيب الأبناء', back: true, fn: screenReorder },
   audit: { t: 'سجل التعديلات', back: true, fn: screenAudit },
   hints: { t: 'تعديل التعليمات', back: true, fn: screenHints },
   texts: { t: 'النصوص', back: true, fn: screenTexts },
@@ -1579,6 +1580,27 @@ async function persistChildOrder(listEl, fatherId) {
     await auditLog('edit', fatherId, 'إعادة ترتيب الأبناء');
   });
   if (ok) toast('تم حفظ ترتيب الأبناء ✓');
+}
+// شاشة مستقلّة «ترتيب الأبناء» (المزيد ← الإدارة) — اختر الأب ثم رتّب أبناءه بالأسهم.
+let reorderFather = null;
+function screenReorder() {
+  if (!(isAdmin() || isManager())) { view().innerHTML = noPerm(); return; }
+  const f = (reorderFather && byId.get(reorderFather.id)) ? byId.get(reorderFather.id) : null;
+  const cs = f ? childrenOf(f.id) : [];
+  view().innerHTML = `
+    <div class="card">
+      <h3>↕️ ترتيب الأبناء</h3>
+      <p class="muted" style="font-size:.85rem">اختر الأب ثم رتّب أبناءه بالسهمين ▲▼. الترتيب يبقى ضمن إخوته فقط ولا يتجاوز الأب، ويُحفظ تلقائياً.</p>
+      <div class="field"><label>الأب</label><button class="btn outline" id="ro_pick" style="margin-top:0">${f ? '👤 ' + esc(f.name) + ' <span class="muted" style="font-weight:normal">(جيل ' + f.generation + ')</span>' : '🔍 اختر الأب'}</button></div>
+    </div>
+    ${f ? `<div class="card"><h3>الأبناء (${cs.length})</h3>${
+      cs.length > 1
+        ? `<div id="childList" class="reorder-list">${cs.map(c => `<div class="row child-row" data-reorder-id="${c.id}"><span class="reorder-arrows"><button class="reorder-up" data-up="${c.id}" aria-label="تحريك لأعلى">▲</button><button class="reorder-down" data-down="${c.id}" aria-label="تحريك لأسفل">▼</button></span><span class="k">${esc(c.name)}</span><span class="v">${descCount.get(c.id) || 0} ذرية</span></div>`).join('')}</div>`
+        : (cs.length === 1 ? '<div class="muted" style="padding:6px">لهذا الأب ابنٌ واحد — لا حاجة للترتيب.</div>' : '<div class="muted" style="padding:6px">لا أبناء لهذا الشخص.</div>')
+    }</div>` : ''}`;
+  const pickBtn = document.getElementById('ro_pick');
+  if (pickBtn) pickBtn.addEventListener('click', () => pickPerson('اختر الأب', (pp) => { if (pp) { reorderFather = pp; screenReorder(); } }, (!isAdmin() && isManager()) ? (x => inMyBranch(x)) : null));
+  if (f && cs.length > 1) bindChildArrows(document.getElementById('childList'), f.id);
 }
 function addDocModal(p) {
   openModal('إضافة صورة / وثيقة', `
@@ -2883,6 +2905,7 @@ function screenMore() {
   if (isAdmin()) admin.push(['📥 استيراد ملف Excel', '#/import', 'import']);
   if (isAdmin() || isManager()) admin.push(['✏️ تعديل جماعي', '#/bulk', 'bulk']);
   if (isAdmin() || isManager()) admin.push(['📝 تعديل البيانات بالقائمة', '#/grid', 'grid']);
+  if (isAdmin() || isManager()) admin.push(['↕️ ترتيب الأبناء', '#/reorder']);
   if (!isGuestUser()) admin.push(['👁️ مراجعة البيانات (الأحياء)', '#/review', 'review']);
   if (isAdmin() || isManager()) admin.push(['🔁 كشف الأسماء المكرّرة لنفس الأب', '#/dups', 'dups']);
   if (isManager() && !isAdmin()) admin.push(['📋 سجل تعديلاتي (تراجع)', '#/audit', 'audit']);
@@ -3775,6 +3798,7 @@ const GUIDE = [
     { t: 'تعديل جماعي', fn: 'تعديل حقلٍ واحد لمجموعة دفعة واحدة.', brief: 'اختر الجدّ والجيل ثم الحقل وقيمته وطبّق على المحدّدين.', det: 'مناسب لتوحيد قيمة (مدينة/حالة…) لعدد كبير سريعاً.' },
     { t: 'تعديل البيانات بالقائمة', fn: 'تعديل كل فرد على حدة ضمن جدٍّ واحد.', brief: 'اختر الجدّ ثم الحقول، وعدّل قيمة كل فرد ثم احفظ.', det: 'يُعرض الأحياء فقط، ويُسجَّل من قام بالتعديل (يُرجع إليه في سجل التعديلات). مشرف الفرع ضمن فرعه فقط.' },
     { t: 'مراجعة البيانات', fn: 'مراجعة دقّة البيانات دون تعديل.', brief: 'اختر الجدّ ثم راجع ذرّيته.', det: 'مرشّحات: الأحياء/المتوفّون/الكل، وقائمة مختصرة (الاسم متسلسلاً + الحالة) أو مفصّلة. تغيير الجدّ بالضغط على اسمه دون البدء من جديد.' },
+    { t: 'ترتيب الأبناء', fn: 'ترتيب أبناء أبٍ واحد بالأسهم.', brief: 'المزيد ← الإدارة ← «↕️ ترتيب الأبناء»: اختر الأب ثم رتّب أبناءه بالسهمين ▲▼.', det: 'الترتيب يبقى ضمن إخوته فقط ولا يتجاوز الأب، ويُحفظ تلقائياً مع تسجيله في سجل التعديلات. متاح أيضاً من بطاقة «الأبناء» داخل ملف الأب. للمصرّح لهم فقط (مشرف الفرع ضمن فرعه).' },
     { t: 'كشف الأسماء المكرّرة', fn: 'إظهار تكرار اسمٍ لأكثر من ابنٍ لنفس الأب.', brief: 'قائمة بالحالات المتشابهة لمراجعتها.', det: 'لا يُحتسب التكرار إن كان أحد المتشابهين متوفّى؛ فقط عند كونهما حيَّيْن.' },
   ]},
   { sec: '⚙️ لوحة التحكم (لمدير النظام)', role: 'admin', items: [
