@@ -1439,7 +1439,7 @@ async function screenPerson(arg) {
       <div class="stat a"><div class="n">${grand.length}</div><div class="l">الأحفاد</div></div>
       <div class="stat g"><div class="n">${descCount.get(id) || 0}</div><div class="l">إجمالي الذرية</div></div>
     </div>
-    <div class="card"><h3>الأبناء (${cs.length})</h3>${cs.length > 1 && canEditPerson(p) ? '<div class="reorder-hint">↕️ لإعادة ترتيب الإخوة: اسحب الابن من المقبض <b>⠿</b> لأعلى/أسفل (أو اضغط مطوّلاً ثم اسحب). الترتيب يبقى بين إخوته فقط ولا يتجاوز الأب.</div>' : ''}<div id="childList" class="${cs.length > 1 && canEditPerson(p) ? 'reorder-list' : ''}">${cs.length ? cs.map(c => `<div class="row child-row"${cs.length > 1 && canEditPerson(p) ? ` data-reorder-id="${c.id}"` : ''}>${cs.length > 1 && canEditPerson(p) ? '<span class="reorder-grip">⠿</span>' : ''}<span class="k"><a href="#/person/${c.id}" style="color:var(--brand);text-decoration:none">${esc(c.name)}</a></span><span class="v">${descCount.get(c.id) || 0} ذرية</span></div>`).join('') : noItem()}</div></div>
+    <div class="card"><h3>الأبناء (${cs.length})</h3>${cs.length > 1 && canEditPerson(p) ? '<div class="reorder-hint"><b>↕️ ترتيب الأبناء</b> — رتّب بالسهمين ▲▼ لكل ابن. يبقى ضمن إخوته فقط ولا يتجاوز الأب.</div>' : ''}<div id="childList" class="${cs.length > 1 && canEditPerson(p) ? 'reorder-list' : ''}">${cs.length ? cs.map(c => `<div class="row child-row"${cs.length > 1 && canEditPerson(p) ? ` data-reorder-id="${c.id}"` : ''}>${cs.length > 1 && canEditPerson(p) ? `<span class="reorder-arrows"><button class="reorder-up" data-up="${c.id}" aria-label="تحريك لأعلى">▲</button><button class="reorder-down" data-down="${c.id}" aria-label="تحريك لأسفل">▼</button></span>` : ''}<span class="k"><a href="#/person/${c.id}" style="color:var(--brand);text-decoration:none">${esc(c.name)}</a></span><span class="v">${descCount.get(c.id) || 0} ذرية</span></div>`).join('') : noItem()}</div></div>
     ${showDocs ? `<div class="card"><h3>الوثائق والصور (${docs.length})</h3>
       ${docs.length ? docs.map(d => `<div class="row"><span class="k">${d.kind === 'photo' ? '🖼️' : d.kind === 'pdf' ? '📄' : '📎'} <a href="${esc(d.url)}" target="_blank" rel="noopener" style="color:var(--brand);text-decoration:none">${esc(d.label || 'ملف')}</a></span>${canDelete() ? `<button class="btn sm danger" data-ddel="${d.id}">حذف</button>` : ''}</div>`).join('') : noItem()}
       ${canEditPerson(p) ? `<button class="btn outline" id="addDoc" style="margin-top:8px">➕ إضافة صورة/وثيقة</button>` : ''}
@@ -1457,7 +1457,11 @@ async function screenPerson(arg) {
   const as = document.getElementById('addSon'); if (as) as.addEventListener('click', () => { presetFather = p; setHash('#/person-edit/0'); });
   const pr = document.getElementById('printP'); if (pr) pr.addEventListener('click', () => window.print());
   const ad = document.getElementById('addDoc'); if (ad) ad.addEventListener('click', () => addDocModal(p));
-  if (cs.length > 1 && canEditPerson(p)) enableReorder(document.getElementById('childList'), cs.map(c => c.id), id);
+  if (cs.length > 1 && canEditPerson(p)) {
+    const childList = document.getElementById('childList');
+    bindChildArrows(childList, id);                              // الترتيب الدقيق بالأسهم ▲▼
+    enableReorder(childList, cs.map(c => c.id), id);             // وسحبٌ مطوّل اختياري
+  }
   view().querySelectorAll('[data-ddel]').forEach(b => b.addEventListener('click', async () => {
     if (!(await confirm2('حذف هذا الملف؟'))) return;
     const ok = await guard(async () => { const { error } = await sb.from('almfrje_documents').delete().eq('id', b.dataset.ddel); if (error) throw error; });
@@ -1527,6 +1531,54 @@ async function commitReorder(order, fatherId) {
   if (ok) toast('تم حفظ الترتيب');
   await loadAll();
   screenPerson(String(fatherId));
+}
+// ترتيب الأبناء بالأسهم ▲▼ — دقيق، يبقى ضمن الأب فقط، ويُحفظ مؤجَّلاً (يجمّع الضغطات المتتالية).
+function bindChildArrows(listEl, fatherId) {
+  if (!listEl) return;
+  const persist = debounce(() => persistChildOrder(listEl, fatherId), 650);
+  const setState = () => {
+    const rs = [...listEl.querySelectorAll('[data-reorder-id]')];
+    rs.forEach((r, i) => {
+      const up = r.querySelector('.reorder-up'), dn = r.querySelector('.reorder-down');
+      if (up) up.disabled = (i === 0);
+      if (dn) dn.disabled = (i === rs.length - 1);
+    });
+  };
+  const move = (childId, dir) => {
+    const rs = [...listEl.querySelectorAll('[data-reorder-id]')];
+    const idx = rs.findIndex(r => parseInt(r.dataset.reorderId, 10) === childId);
+    const j = idx + dir;
+    if (idx < 0 || j < 0 || j >= rs.length) return;
+    if (dir < 0) listEl.insertBefore(rs[idx], rs[j]); else listEl.insertBefore(rs[j], rs[idx]);
+    // حدّث الترتيب محلياً فوراً (ضمن الأب فقط) ثم احفظ مؤجَّلاً
+    const order = [...listEl.querySelectorAll('[data-reorder-id]')].map(r => parseInt(r.dataset.reorderId, 10));
+    order.forEach((cid, i) => { const c = byId.get(cid); if (c) c.sort = i + 1; });
+    const arr = kids.get(fatherId); if (arr) arr.sort((a, b) => (a.sort - b.sort) || (a.id - b.id));
+    setState();
+    persist();
+  };
+  listEl.querySelectorAll('.reorder-up, .reorder-down').forEach(b => {
+    b.addEventListener('pointerdown', e => e.stopPropagation());   // لا يبدأ سحباً
+    b.addEventListener('click', (e) => {
+      e.preventDefault(); e.stopPropagation();
+      if (b.disabled) return;
+      const up = b.classList.contains('reorder-up');
+      move(parseInt(up ? b.dataset.up : b.dataset.down, 10), up ? -1 : 1);
+    });
+  });
+  setState();
+}
+async function persistChildOrder(listEl, fatherId) {
+  const order = [...listEl.querySelectorAll('[data-reorder-id]')].map(r => parseInt(r.dataset.reorderId, 10));
+  if (!order.length) return;
+  const who = (me && (me.full_name || me.username)) || '';
+  const ok = await guard(async () => {
+    for (let i = 0; i < order.length; i++) {
+      const { error } = await sb.from('almfrje_persons').update({ sort: i + 1, updated_by_name: who, updated_at: new Date().toISOString() }).eq('id', order[i]); if (error) throw error;
+    }
+    await auditLog('edit', fatherId, 'إعادة ترتيب الأبناء');
+  });
+  if (ok) toast('تم حفظ ترتيب الأبناء ✓');
 }
 function addDocModal(p) {
   openModal('إضافة صورة / وثيقة', `
@@ -3719,7 +3771,7 @@ const GUIDE = [
   ]},
   { sec: '🗂️ البيانات (للمدير ومشرف الفرع)', role: 'admin', items: [
     { t: 'إضافة مولود (مباشرة)', fn: 'إضافة فرد جديد للشجرة.', brief: 'تختار الأب وتكتب الاسم (وسنة الولادة والمدينة اختياري).', det: 'يُحدَّد الفرع تلقائياً من فرع الأب. مشرف الفرع يضيف ضمن فرعه فقط.' },
-    { t: 'تعديل بيانات الشخص', fn: 'تحديث بيانات فرد.', brief: 'من ملف الشخص ← «تعديل».', det: 'سنة الوفاة تظهر للمتوفّى فقط. ويمكن إعادة ترتيب الإخوة بالسحب من المقبض ⠿ (ضمن الإخوة فقط دون تجاوز الأب). الحذف لمدير النظام فقط مع حفظ نسخة في سلة المحذوفات.' },
+    { t: 'تعديل بيانات الشخص', fn: 'تحديث بيانات فرد.', brief: 'من ملف الشخص ← «تعديل».', det: 'سنة الوفاة تظهر للمتوفّى فقط. ويمكن «ترتيب الأبناء» بالسهمين ▲▼ لكل ابن من ملف الأب (دقيق، يبقى ضمن الإخوة فقط دون تجاوز الأب)، ويُحفظ تلقائياً. الحذف لمدير النظام فقط مع حفظ نسخة في سلة المحذوفات.' },
     { t: 'تعديل جماعي', fn: 'تعديل حقلٍ واحد لمجموعة دفعة واحدة.', brief: 'اختر الجدّ والجيل ثم الحقل وقيمته وطبّق على المحدّدين.', det: 'مناسب لتوحيد قيمة (مدينة/حالة…) لعدد كبير سريعاً.' },
     { t: 'تعديل البيانات بالقائمة', fn: 'تعديل كل فرد على حدة ضمن جدٍّ واحد.', brief: 'اختر الجدّ ثم الحقول، وعدّل قيمة كل فرد ثم احفظ.', det: 'يُعرض الأحياء فقط، ويُسجَّل من قام بالتعديل (يُرجع إليه في سجل التعديلات). مشرف الفرع ضمن فرعه فقط.' },
     { t: 'مراجعة البيانات', fn: 'مراجعة دقّة البيانات دون تعديل.', brief: 'اختر الجدّ ثم راجع ذرّيته.', det: 'مرشّحات: الأحياء/المتوفّون/الكل، وقائمة مختصرة (الاسم متسلسلاً + الحالة) أو مفصّلة. تغيير الجدّ بالضغط على اسمه دون البدء من جديد.' },
