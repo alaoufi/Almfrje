@@ -906,6 +906,9 @@ ul.hier ul.hier > .hier-li::before {
 
 /* ===== شاشة «إرسال ملاحظات» — تصميم عصري ثلاثي الأبعاد بخطوط غامقة مميّزة ===== */
 .fb-screen { font-weight: 700; }
+.fb-screen .field { margin-bottom: 8px; }
+.fb-screen .grid2 { gap: 8px; }
+.fb-screen .field input, .fb-screen .field textarea { line-height: 1.4; }
 .fb-screen .card {
   border: 1px solid color-mix(in srgb, var(--brand) 22%, var(--line));
   border-radius: 18px;

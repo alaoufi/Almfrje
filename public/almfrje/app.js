@@ -2763,15 +2763,15 @@ function renderFbDynamic(subject) {
   fbFather = null;
   if (subject === 'إضافة مولود') {
     wrap.innerHTML = `
-      <div class="field"><label>والد المولود — اكتب اسمه ثم اسم أبيه لتقليص القائمة *</label>
-        <input id="fb_fsearch" type="text" placeholder="مثال: سالم خالد">
+      <div class="field">
+        <input id="fb_fsearch" type="text" placeholder="والد المولود: اكتب اسمه ثم اسم أبيه (مثال: سالم خالد) *">
         <div id="fb_fresults" style="max-height:200px;overflow:auto"></div>
         <div id="fb_fselected" class="muted" style="margin-top:6px"></div>
       </div>
-      <div class="field"><label>اسم المولود *</label><input id="fb_baby_name" type="text" placeholder="اكتب اسم المولود"></div>
+      <div class="field"><input id="fb_baby_name" type="text" placeholder="اسم المولود *"></div>
       <div class="grid2">
-        <div class="field"><label>سنة الولادة (اختياري)</label><input id="fb_baby_birth" type="text" placeholder="مثال: 1440هـ"></div>
-        <div class="field"><label>المدينة (اختياري)</label><input id="fb_baby_city" type="text" placeholder="اختياري"></div>
+        <div class="field"><input id="fb_baby_birth" type="text" placeholder="سنة الولادة (اختياري) — مثال 1448هـ"></div>
+        <div class="field"><input id="fb_baby_city" type="text" placeholder="المدينة (اختياري)"></div>
       </div>`;
     const fs = document.getElementById('fb_fsearch');
     fs.addEventListener('input', () => fbPickerSearch(fs.value, document.getElementById('fb_fresults'), true, (p) => {
@@ -2784,8 +2784,8 @@ function renderFbDynamic(subject) {
     const branchOpts = C.branches.slice().sort((a, b) => String(a.name).localeCompare(String(b.name), 'ar'))
       .map(b => `<option value="${b.id}">${esc(b.name)}</option>`).join('');
     wrap.innerHTML = `
-      <div class="field"><label>الفرع</label><select id="fb_branch"><option value="">— اختر الفرع —</option>${branchOpts}</select></div>
-      <div class="field"><label>الخطأ — ما هو الخطأ؟</label><textarea id="fb_error" rows="3" placeholder="صِف الخطأ والتصحيح المقترح (اختياري)"></textarea></div>`;
+      <div class="field"><select id="fb_branch"><option value="">— اختر الفرع (اختياري) —</option>${branchOpts}</select></div>
+      <div class="field"><textarea id="fb_error" rows="3" placeholder="صِف الخطأ والتصحيح المقترح (اختياري)"></textarea></div>`;
   } else {
     if (det) det.placeholder = subject === 'اقتراح' ? 'اكتب اقتراحك هنا' : 'اكتب التفاصيل هنا';
     wrap.innerHTML = '';
