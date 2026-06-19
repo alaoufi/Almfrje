@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
   const phone = String(b.phone || '').replace(/\D/g, '');
   const username = b.username ? String(b.username).trim() : '';
   const pin = String(b.pin || '').trim();
-  const role = ['admin', 'branch_manager', 'viewer'].includes(String(b.role)) ? String(b.role) : 'viewer';
+  const role = ['admin', 'general_manager', 'branch_manager', 'viewer'].includes(String(b.role)) ? String(b.role) : 'viewer';
   const branch_ids = Array.isArray(b.branch_ids) ? (b.branch_ids as unknown[]).map((x) => Number(x)).filter((x) => Number.isFinite(x) && x > 0) : [];
   // تنقية الصلاحيات: قيم منطقية فقط لمفاتيح معروفة الشكل (تُستخدم لاحقاً في almfrje_perm).
   const perms: Record<string, boolean> = {};

@@ -28,6 +28,9 @@ export const ALMFRJE_SCHEMA_SQL = `
         ON public.almfrje_members (lower(username)) WHERE username IS NOT NULL AND username <> '';
       -- إشراف على عدّة فروع: مصفوفة معرّفات الفروع (تُضاف على القواعد القائمة أيضاً)
       ALTER TABLE public.almfrje_members ADD COLUMN IF NOT EXISTS branch_ids jsonb not null default '[]'::jsonb;
+      -- توسيع أدوار العضو لتشمل «مشرف عام» (تُطبَّق على القواعد القائمة أيضاً)
+      ALTER TABLE public.almfrje_members DROP CONSTRAINT IF EXISTS almfrje_members_role_check;
+      ALTER TABLE public.almfrje_members ADD CONSTRAINT almfrje_members_role_check CHECK (role IN ('admin','general_manager','branch_manager','viewer'));
 
       -- 3) الأشخاص (الشجرة)
       CREATE TABLE IF NOT EXISTS public.almfrje_persons (

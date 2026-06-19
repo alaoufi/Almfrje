@@ -26,7 +26,7 @@ function legendHtml() {
     </div></div>`;
 }
 const WORK = [{ k: '', ar: 'لم تحدد' }, { k: 'employee', ar: 'موظف' }, { k: 'retired', ar: 'متقاعد' }];
-const ROLES = [{ k: 'admin', ar: 'مدير النظام' }, { k: 'branch_manager', ar: 'مشرف فرع' }, { k: 'viewer', ar: 'زائر' }];
+const ROLES = [{ k: 'admin', ar: 'مدير النظام' }, { k: 'general_manager', ar: 'مشرف عام' }, { k: 'branch_manager', ar: 'مشرف فرع' }, { k: 'viewer', ar: 'زائر' }];
 // مسمّيات الحالة (تظهر في تعريف الألوان أسفل الرئيسية) — قابلة للتعديل من لوحة التحكم ← النصوص.
 const LABELS_DEFAULT = { alive: 'موجود', dead: 'متوفّى', noissue: 'توفي ولم يعقب' };
 let statLabels = { ...LABELS_DEFAULT };
@@ -185,6 +185,11 @@ function uiDialog({ title, message, okText = 'تأكيد', cancelText = 'إلغ�
 function confirm2(message, opts = {}) {
   return uiDialog({ title: opts.title || 'تأكيد', message, okText: opts.okText || 'متابعة', danger: opts.danger !== false, ...opts });
 }
+// تذكير المسؤولية للمشرف عند أي إضافة/تعديل (يُسجَّل باسمه) — المدير لا يُذكَّر.
+async function responsibilityOk() {
+  if (isAdmin()) return true;
+  return await confirm2('هذا التعديل أو الإضافة سيُسجَّل باسمك وعلى مسؤوليتك. تأكّد من صحّة المعلومة قبل اعتمادها.', { title: 'تأكيد المسؤولية', okText: 'أعتمد على مسؤوليتي', danger: false });
+}
 // إدخال نصّي أنيق (يستبدل prompt) — يُرجع النص أو null
 function uiPrompt(message, opts = {}) {
   return uiDialog({ title: opts.title || '', message, okText: opts.okText || 'تأكيد', danger: !!opts.danger, input: { placeholder: opts.placeholder || '' } });
@@ -300,7 +305,9 @@ let branchCountMap = new Map(); // branch_id -> عدد أفراده (يُحسب 
 let branchRootCache = new Map(); // bid -> جذر الفرع (تخزين، يُمسح في buildIndex)
 
 const isAdmin = () => !!(me && me.role === 'admin' && me.is_active);
-const isManager = () => !!(me && me.role === 'branch_manager' && me.is_active);
+// «مشرف عام» = مشرف على كل الفروع (بصلاحيات يحدّدها المدير)؛ يندرج تحت isManager بنطاقٍ كامل.
+const isGeneralManager = () => !!(me && me.role === 'general_manager' && me.is_active);
+const isManager = () => !!(me && (me.role === 'branch_manager' || me.role === 'general_manager') && me.is_active);
 const isViewer = () => !!(me && me.role === 'viewer');
 // حساب الزائر المدمج المشترك (للتصفّح بلا تسجيل) — يُميَّز باسم المستخدم 'guest'.
 const isGuestUser = () => !!(me && me.username === 'guest');
@@ -316,7 +323,10 @@ function myBranches() {
   if (!me) return [];
   const arr = Array.isArray(me.branch_ids) ? me.branch_ids.map(Number) : [];
   if (me.branch_id) arr.push(Number(me.branch_id));
-  return [...new Set(arr.filter(Boolean))];
+  const set = [...new Set(arr.filter(Boolean))];
+  // مشرف عام بلا فروعٍ محدّدة = كل الفروع؛ ومع تحديد فروع = يقتصر عليها (كالمشرف الفرعي).
+  if (me.role === 'general_manager' && set.length === 0) return C.branches.map(b => Number(b.id));
+  return set;
 }
 const myBranch = () => { const b = myBranches(); return b.length ? b[0] : null; };
 const myPerm = (k) => !!(me && me.perms && me.perms[k]);
@@ -786,7 +796,7 @@ function screenHome() {
       </div>`;
     })() : ''}
     ${!isGuestUser() && !pwChanged() ? `<div class="notice-pw">🔐 ننصحك بتغيير كلمة المرور الآن لحماية حسابك. <button class="btn sm" id="pwGo" style="margin-top:6px">تغيير كلمة المرور</button> <button class="btn sm outline" id="pwSkip" style="margin-top:6px">لاحقاً</button></div>` : ''}
-    <div class="home-greet">أهلاً <span class="hg-name">${esc(currentUserName() || me.full_name || '')}</span>${isGuestUser() ? '' : `<span class="hg-role"> • ${esc(arOf(ROLES, me.role))}</span>`}${isManager() && myBranches().length ? `<span class="hg-role"> (${myBranches().map(b => esc(branchName(b))).join('، ')})</span>` : ''}</div>
+    <div class="home-greet">أهلاً <span class="hg-name">${esc(currentUserName() || me.full_name || '')}</span>${isGuestUser() ? '' : `<span class="hg-role"> • ${esc(arOf(ROLES, me.role))}</span>`}${isManager() && myBranches().length ? `<span class="hg-role"> (${(isGeneralManager() && !(Array.isArray(me.branch_ids) && me.branch_ids.length) && !me.branch_id) ? 'كل الفروع' : myBranches().map(b => esc(branchName(b))).join('، ')})</span>` : ''}</div>
     <div class="card" style="border:2px solid var(--brand);background:color-mix(in srgb, var(--brand) 7%, transparent)">
       <h3 style="margin:0 0 4px">📝 ملاحظات الزوار ${hintBtn('feedback_send')}</h3>
       <p class="muted" style="margin:0 0 8px;font-size:.88rem">${esc(feedbackCardText)}</p>
@@ -2458,13 +2468,14 @@ async function saveBirth(name) {
   if (sameNameSiblings(father, name).some(c => c.status !== 'dead')) { toast('يوجد ابن حيّ بنفس الاسم لنفس الأب — اختر اسماً مختلفاً'); return; }
   const generation = father ? (father.generation + 1) : 1;
   let branch_id = father ? father.branch_id : null;
-  if (isManager() && branch_id == null) branch_id = myBranch();
+  if (isManager() && !isGeneralManager() && branch_id == null) branch_id = myBranch();
   const who = (me && (me.full_name || me.username || me.phone)) || '';
   const obj = {
     name, father_id: father ? father.id : null, branch_id, generation,
     status: 'alive', birth: val('p_birth').trim(), city: val('p_city').trim(),
     created_by_name: who,
   };
+  if (!(await responsibilityOk())) return;
   const ok = await guard(async () => {
     const { data: ins, error } = await sb.from('almfrje_persons').insert(obj).select('id').single(); if (error) throw error;
     await auditLog('add', ins && ins.id, name);
@@ -2486,7 +2497,7 @@ async function savePerson(id, existing) {
   // الفرع: يرث فرع الأب؛ إن كان الأب هو الأصل (جيل 1) فالفرع يُحدَّد لاحقاً من الإدارة.
   // مشرف الفرع يضيف ضمن فروعه فقط — يرث الفرع من الأب (المقيَّد أصلاً باختيار أب من فرعه).
   let branch_id = father ? (father.generation === 1 ? (father.branch_id || null) : father.branch_id) : null;
-  if (isManager() && branch_id == null) branch_id = myBranch();
+  if (isManager() && !isGeneralManager() && branch_id == null) branch_id = myBranch();
   const photofile = document.getElementById('p_photofile').files[0];
   let photo_url = val('p_photo').trim();
   const who = (me && (me.full_name || me.username || me.phone)) || '';
@@ -2497,6 +2508,7 @@ async function savePerson(id, existing) {
     city: val('p_city').trim(), phone: val('p_phone').trim(), email: val('p_email').trim(), notes: val('p_notes').trim(),
   };
   if (existing && !(await confirm2('حفظ التعديل على هذا الشخص؟ النسخة السابقة تبقى في سلة المحذوفات.'))) return;
+  if (!(await responsibilityOk())) return;
   const ok = await guard(async () => {
     if (photofile) photo_url = await uploadFile(photofile, 'photos');
     obj.photo_url = photo_url;
@@ -3847,7 +3859,7 @@ const GUIDE = [
     { t: 'كشف الأسماء المكرّرة', fn: 'إظهار تكرار اسمٍ لأكثر من ابنٍ لنفس الأب.', brief: 'قائمة بالحالات المتشابهة لمراجعتها.', det: 'لا يُحتسب التكرار إن كان أحد المتشابهين متوفّى؛ فقط عند كونهما حيَّيْن.' },
   ]},
   { sec: '⚙️ لوحة التحكم (لمدير النظام)', role: 'admin', items: [
-    { t: 'المستخدمون والصلاحيات', fn: 'إدارة الحسابات والأدوار والصلاحيات الدقيقة.', brief: 'إضافة/تفعيل/إيقاف المستخدمين، وتحديد أدوارهم وفروعهم وصلاحياتهم.', det: 'لمشرف الفرع تُحدَّد فروعه وصلاحياته داخلها: إضافة مولود، تأكيد إضافة مولود، تعديل ترتيب الأبناء، تعديل الملف الشخصي (الجوال/الحالة/الحالة الوظيفية/المدينة…). كل إجراء يُسجَّل باسم من قام به ووقته. ومن هنا أيضاً «فتح الموقع للزوّار» وتحديد ما يُخفى عن الزائر.' },
+    { t: 'المستخدمون والصلاحيات', fn: 'إدارة الحسابات والأدوار والصلاحيات الدقيقة.', brief: 'إضافة/تفعيل/إيقاف المستخدمين، وتحديد أدوارهم وفروعهم وصلاحياتهم.', det: 'الأدوار: مدير النظام (كل شيء) • مشرف عام (كل الفروع أو فروعٍ تحدّدها) • مشرف فرع (فروعه المحدّدة) • زائر (تصفّح). للمشرفَين تُحدَّد الفروع والصلاحيات داخلها: إضافة مولود، تأكيد إضافة مولود، تعديل ترتيب الأبناء، تعديل الملف الشخصي (الجوال/الحالة/الحالة الوظيفية/المدينة…). يطّلع المشرف على فروعه ويتّخذ الإجراء فيها بكامل المسؤولية، ويُذكَّر عند الحفظ بأنّ ما يُضيفه/يعدّله مسجَّلٌ باسمه. كل إجراء يُسجَّل باسم من قام به ووقته. أدوات إدارة الموقع للمدير وحده. ومن هنا أيضاً «فتح الموقع للزوّار» وما يُخفى عن الزائر.' },
     { t: 'الفروع والمشرفون', fn: 'تعريف الفروع وتعيين مشرفيها.', brief: 'عيّن أي جدٍّ كفرع وحدّد مشرفيه.', det: 'الفرع = جدّ وكل ذرّيته. كل مشرف يرى ويضيف في فرعه فقط.' },
     { t: 'النصوص', fn: 'تحرير نصوص الواجهة الظاهرة للجميع.', brief: 'عنوان الموقع وسطر «powered by» وكلمة المناسبات وتهنئة المناسبات وبطاقة الملاحظات ودعوة الزائر ورسالة الشكر وترحيب الزائر وألوان الحالة.', det: 'وفيها إحصائيات الزيارات (الإجمالي/حسب الفرع/حسب المنطقة) وتصفير الزيارات وتصفير «آخر الإضافات». «كلمة المناسبات» تظهر تحت عنوان شاشة الدخول بخط غامق ولونٍ تختاره. و«تهنئة/مبارَكة المناسبات» رسالةٌ من الإدارة تظهر بعد الدخول مباشرةً وكشريطٍ ذهبي أعلى الرئيسية: تختار نصّها ولون خطّها، ووقت نشرها (فوري أو بتوقيتٍ محدّد بيومٍ وساعة)، ومدّة عرضها (بالساعات أو الأيام، أو دائمة)، وعنوان شريطها (الافتراضي «🎊 تهنئة من الإدارة» أو عنوان مخصّص أو بدون عنوان)، مع تعديلها أو حذفها في أي وقت.' },
     { t: 'الصفحة التعريفية', fn: 'تحرير صفحة «نبذة تعريفية».', brief: 'محرّر نصٍّ غني بأدوات تنسيق الخطوط.', det: 'غامق/مائل/تسطير، حجم ولون الخط، المحاذاة، نقاط، عنوان، مع معاينة وحفظ واسترجاع الافتراضي.' },
@@ -4580,27 +4592,32 @@ function memberBranchSet(m) {
   if (m.branch_id) s.add(Number(m.branch_id));
   return s;
 }
-const ROLE_HINT = { admin: 'صلاحيات كاملة على كل الأقسام والإدارة.', branch_manager: 'يعمل ضمن فروعه فقط، حسب الصلاحيات التي تحدّدها له أدناه (إضافة مولود/تأكيده/ترتيب الأبناء/تعديل الملف). الحذف للمدير فقط.', viewer: 'تصفّح فقط.' };
+const ROLE_HINT = {
+  admin: 'صلاحيات كاملة على كل الأقسام والإدارة.',
+  general_manager: 'مشرف على كل الفروع (أو فروعٍ تحدّدها أدناه): يطّلع ويتّخذ الإجراء فيها بكامل المسؤولية، حسب الصلاحيات المؤشّرة. أدوات إدارة الموقع للمدير فقط.',
+  branch_manager: 'يعمل ضمن فروعه المحدّدة فقط: يطّلع ويتّخذ الإجراء فيها بكامل المسؤولية، حسب الصلاحيات المؤشّرة. الحذف وأدوات الإدارة للمدير فقط.',
+  viewer: 'تصفّح فقط.',
+};
 function memberCardBody(m) {
   const roleOpts = ROLES.map(r => `<option value="${r.k}" ${m.role === r.k ? 'selected' : ''}>${r.ar}</option>`).join('');
   const bset = memberBranchSet(m);
   const branchChks = C.branches.length
     ? C.branches.map(b => `<label class="perm-chk"><input type="checkbox" data-mbranch="${b.id}" data-uid="${m.user_id}" ${bset.has(Number(b.id)) ? 'checked' : ''}><span>${esc(b.name)}</span></label>`).join('')
     : '<div class="muted">لا فروع بعد.</div>';
-  const showBranches = m.role === 'branch_manager';
+  const showSup = m.role === 'branch_manager' || m.role === 'general_manager';   // المشرفان: فروع + صلاحيات
   const pset = (m.perms && typeof m.perms === 'object') ? m.perms : {};
-  const noPerms = Object.keys(pset).length === 0;   // مشرف قديم/جديد بلا تحديد = الكل مفعّل
+  const noPerms = Object.keys(pset).length === 0;   // مشرف بلا تحديد = الكل مفعّل
   const permChks = MGR_PERMS.map(([k, l]) => `<label class="perm-chk"><input type="checkbox" data-mperm="${k}" data-uid="${m.user_id}" ${(noPerms || pset[k]) ? 'checked' : ''}><span>${l}</span></label>`).join('');
   return `
     <div class="li-sub">${m.phone ? '📱 ' + esc(m.phone) : 'بلا جوال'}${m.phone && m.username ? ' • ' : ''}${m.username ? '@' + esc(m.username) : ''} <span class="badge ${m.is_active ? '' : 'off'}">${m.is_active ? 'مفعّل' : 'موقوف'}</span></div>
     <div class="field" style="margin-top:8px"><label>الدور</label><select data-role="${m.user_id}">${roleOpts}</select></div>
     <div class="perm-note" data-rolehint="${m.user_id}" style="margin:-4px 0 8px">${ROLE_HINT[m.role] || ''}</div>
-    <div class="perm-box" data-branchbox="${m.user_id}" style="${showBranches ? '' : 'display:none'}">
-      <div class="perm-title">الفروع التي يشرف عليها:</div>
+    <div class="perm-box" data-branchbox="${m.user_id}" style="${showSup ? '' : 'display:none'}">
+      <div class="perm-title">الفروع التي يشرف عليها <span class="muted" style="font-weight:normal">(للمشرف العام: اتركها فارغة = كل الفروع)</span>:</div>
       ${branchChks}
     </div>
-    <div class="perm-box" data-permbox="${m.user_id}" style="${showBranches ? '' : 'display:none'}">
-      <div class="perm-title">صلاحياته (داخل فروعه):</div>
+    <div class="perm-box" data-permbox="${m.user_id}" style="${showSup ? '' : 'display:none'}">
+      <div class="perm-title">صلاحياته:</div>
       ${permChks}
     </div>
     <div class="btn-row">
@@ -4616,24 +4633,25 @@ function bindMemberCard(m) {
   // إظهار/إخفاء صندوق الفروع وتلميح الدور حسب الدور المختار
   const roleSel = q(`[data-role="${m.user_id}"]`);
   if (roleSel) roleSel.addEventListener('change', () => {
-    const show = roleSel.value === 'branch_manager';
-    const box = q(`[data-branchbox="${m.user_id}"]`); if (box) box.style.display = show ? '' : 'none';
-    const pbox = q(`[data-permbox="${m.user_id}"]`); if (pbox) pbox.style.display = show ? '' : 'none';
-    const hint = q(`[data-rolehint="${m.user_id}"]`); if (hint) hint.textContent = ROLE_HINT[roleSel.value] || '';
+    const r = roleSel.value, sup = (r === 'branch_manager' || r === 'general_manager');
+    const box = q(`[data-branchbox="${m.user_id}"]`); if (box) box.style.display = sup ? '' : 'none';
+    const pbox = q(`[data-permbox="${m.user_id}"]`); if (pbox) pbox.style.display = sup ? '' : 'none';
+    const hint = q(`[data-rolehint="${m.user_id}"]`); if (hint) hint.textContent = ROLE_HINT[r] || '';
   });
   const tg = q(`[data-toggle="${m.user_id}"]`); if (tg) tg.addEventListener('click', async () => { const ok = await guard(async () => { await updMember(m.user_id, { is_active: !m.is_active }); }); if (ok) { await loadAll(); screenMembers(); } });
   const sv = q(`[data-save="${m.user_id}"]`); if (sv) sv.addEventListener('click', async () => {
     const role = q(`[data-role="${m.user_id}"]`).value;
-    const isMgr = role === 'branch_manager';
+    const isSup = role === 'branch_manager' || role === 'general_manager';
     const branch_ids = [];
-    if (isMgr) view().querySelectorAll(`input[data-mbranch][data-uid="${m.user_id}"]`).forEach(cb => { if (cb.checked) branch_ids.push(parseInt(cb.dataset.mbranch, 10)); });
+    if (isSup) view().querySelectorAll(`input[data-mbranch][data-uid="${m.user_id}"]`).forEach(cb => { if (cb.checked) branch_ids.push(parseInt(cb.dataset.mbranch, 10)); });
     const perms = {};
-    if (isMgr) view().querySelectorAll(`input[data-mperm][data-uid="${m.user_id}"]`).forEach(cb => { perms[cb.dataset.mperm] = cb.checked; });
+    if (isSup) view().querySelectorAll(`input[data-mperm][data-uid="${m.user_id}"]`).forEach(cb => { perms[cb.dataset.mperm] = cb.checked; });
+    if (role === 'branch_manager' && !branch_ids.length) { toast('اختر فرعاً واحداً على الأقل لمشرف الفرع'); return; }
     const ok = await guard(async () => { await updMember(m.user_id, {
       role,
-      branch_ids: isMgr ? branch_ids : [],
-      branch_id: isMgr && branch_ids.length ? branch_ids[0] : null,   // توافق مع القديم
-      perms: isMgr ? perms : {},
+      branch_ids: isSup ? branch_ids : [],
+      branch_id: isSup && branch_ids.length ? branch_ids[0] : null,   // توافق مع القديم
+      perms: isSup ? perms : {},
     }); });
     if (ok) { toast('تم الحفظ'); await loadAll(); screenMembers(); }
   });
@@ -4697,8 +4715,8 @@ function addUserModal() {
     ${pinField('الرقم السري (٤ أرقام فأكثر)', 'nu_pin')}
     <div class="field"><label>الدور</label><select id="nu_role">${roleOpts}</select></div>
     <div id="nu_mgrbox">
-      <div class="perm-box"><div class="perm-title">الفروع التي يشرف عليها (يضيف فيها فقط):</div>${branchChks}</div>
-      <div class="perm-box"><div class="perm-title">صلاحياته (داخل فروعه):</div>${permChksNew}</div>
+      <div class="perm-box"><div class="perm-title">الفروع التي يشرف عليها <span class="muted" style="font-weight:normal">(للمشرف العام: اتركها فارغة = كل الفروع)</span>:</div>${branchChks}</div>
+      <div class="perm-box"><div class="perm-title">صلاحياته:</div>${permChksNew}</div>
     </div>
     <div id="nu_rolenote" class="muted" style="font-size:.85rem;margin:6px 0"></div>
     <button class="btn" id="nu_save">إنشاء الحساب وتفعيله</button>`, () => {
@@ -4707,7 +4725,7 @@ function addUserModal() {
     const roleNote = document.getElementById('nu_rolenote');
     const syncRole = () => {
       const r = roleSel.value;
-      mgrBox.style.display = (r === 'branch_manager') ? '' : 'none';
+      mgrBox.style.display = (r === 'branch_manager' || r === 'general_manager') ? '' : 'none';
       roleNote.textContent = ROLE_HINT[r] || '';
     };
     roleSel.addEventListener('change', syncRole); syncRole();
@@ -4721,11 +4739,12 @@ function addUserModal() {
       if (!full_name) { toast('أدخل الاسم'); return; }
       if (phone.length < 7) { toast('أدخل رقم جوال صحيح'); return; }
       if (!PIN_RE.test(pin)) { toast('الرقم السري ٤ أرقام على الأقل'); return; }
-      const isMgr = role === 'branch_manager';
+      const isSup = role === 'branch_manager' || role === 'general_manager';
       const branch_ids = [];
-      if (isMgr) document.querySelectorAll('input[data-nubranch]').forEach(cb => { if (cb.checked) branch_ids.push(parseInt(cb.dataset.nubranch, 10)); });
+      if (isSup) document.querySelectorAll('input[data-nubranch]').forEach(cb => { if (cb.checked) branch_ids.push(parseInt(cb.dataset.nubranch, 10)); });
       const perms = {};
-      if (isMgr) document.querySelectorAll('input[data-nuperm]').forEach(cb => { perms[cb.dataset.nuperm] = cb.checked; });
+      if (isSup) document.querySelectorAll('input[data-nuperm]').forEach(cb => { perms[cb.dataset.nuperm] = cb.checked; });
+      if (role === 'branch_manager' && !branch_ids.length) { toast('اختر فرعاً واحداً على الأقل لمشرف الفرع'); return; }
       if (role === 'admin' && !(await confirm2('إنشاء مستخدم بصلاحية مدير نظام كاملة؟'))) return;
       const ok = await guard(async () => {
         // الإنشاء من جهة الخادم (مفتاح خدمي، بريد مؤكَّد تلقائياً) — لا يتأثّر بإعداد «تأكيد البريد».
@@ -5090,6 +5109,10 @@ async function enterApp(session) {
   showLoading(true);
   let { data: mem } = await sb.from('almfrje_members').select('*').eq('user_id', session.user.id).maybeSingle();
   me = mem || { user_id: session.user.id, full_name: '', role: 'viewer', is_active: false, perms: {} };
+  // المدير: شغّل ترقية المخطّط بتوكنه (idempotent) فتُطبَّق تحديثات البنية الجديدة تلقائياً (مثل دور «مشرف عام»).
+  if (me.role === 'admin' && me.is_active) {
+    try { fetch('/api/almfrje-setup', { method: 'POST', headers: { Authorization: 'Bearer ' + session.access_token } }).catch(() => {}); } catch (e) { /* تجاهل */ }
+  }
   // تبنٍّ تلقائي لصلاحية المدير لأول مستخدم (يعالج فخّ «بانتظار التفعيل»).
   if (!me.is_active) {
     try {
