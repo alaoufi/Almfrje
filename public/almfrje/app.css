@@ -14,6 +14,7 @@ html[data-theme="dark"] {
 }
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 html, body { margin: 0; padding: 0; }
+html, body { overflow-x: hidden; }   /* حارس: يمنع تجاوز أي صفحة عرضَ الشاشة (التمرير الأفقي المقصود يبقى داخل حاوياته) */
 body {
   font-family: "Segoe UI", Tahoma, "Noto Naskh Arabic", system-ui, sans-serif;
   background: var(--bg); color: var(--text); line-height: 1.6;
@@ -879,10 +880,12 @@ ul.hier ul.hier > .hier-li::before {
 }
 
 /* ===== حاسبة صلة القرابة ===== */
-.kin-slot { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--radius); background: color-mix(in srgb, var(--brand) 4%, var(--card)); }
-.kin-slot-l { font-size: .78rem; font-weight: 800; color: var(--brand); flex: 0 0 70px; }
-.kin-slot-body { flex: 1; min-width: 0; }
-.kin-slot-p b { font-weight: 800; word-break: break-word; }
+.kin-slot { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 10px; padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--radius); background: color-mix(in srgb, var(--brand) 4%, var(--card)); }
+.kin-slot-l { font-size: .78rem; font-weight: 800; color: var(--brand); flex: 0 0 auto; }
+.kin-slot-body { flex: 1 1 130px; min-width: 0; }
+.kin-slot .btn { flex: 0 0 auto; }
+.kin-slot-p b { font-weight: 800; overflow-wrap: anywhere; }
+.kin-chain, .kin-rel { overflow-wrap: anywhere; }
 .kin-vs { text-align: center; color: var(--muted); font-size: 1.1rem; margin: 6px 0; }
 .kin-card { border-color: color-mix(in srgb, var(--brand) 30%, var(--line)); }
 .kin-rel { font-size: 1.15rem; font-weight: 800; color: var(--brand); line-height: 1.5; }
