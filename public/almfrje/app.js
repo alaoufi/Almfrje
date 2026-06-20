@@ -834,7 +834,7 @@ function screenHome() {
       <span class="doc-card-arrow">‹</span>
     </div>
     <div class="card" style="border:2px solid var(--brand);background:color-mix(in srgb, var(--brand) 7%, transparent)">
-      <h3 style="margin:0 0 4px">📝 ملاحظات الزوار ${hintBtn('feedback_send')}</h3>
+      <h3 style="margin:0 0 4px">📝 ملاحظتك تهمنا ${hintBtn('feedback_send')}</h3>
       <p class="muted" style="margin:0 0 8px;font-size:.88rem">${esc(feedbackCardText)}</p>
       <button class="btn" data-go="#/feedback">✉️ أرسل ملاحظة للإدارة</button>
       ${isAdmin() && (C.feedbackPending || 0) > 0 ? `<button class="btn outline" data-go="#/feedbacks" style="margin-top:8px">📨 عرض الملاحظات الواردة (${C.feedbackPending})</button>` : ''}
