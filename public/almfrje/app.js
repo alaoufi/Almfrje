@@ -228,6 +228,8 @@ let bannerSize = '';   // حجم خطّ لوحة التعريف (يحدّده ا
 const DEFAULT_DOC_TITLE = 'وثيقة لزمة ولد حسين عام ١١٧٣ هـ';
 const DEFAULT_DOC_CAPTION = 'لزمة ولد حسين في فارع الناصبية سنة ١١٧٣هـ — وردت فيها رؤوس الفروع، ولزيم المفارجة منها سفران المفرجي.';
 let docTitle = DEFAULT_DOC_TITLE, docCaption = DEFAULT_DOC_CAPTION;
+// قسم الوثائق: مصفوفة [{title,url,text}] — يديرها المدير (إضافة/تعديل/حذف).
+let tribeDocs = [];
 // نصّ المشاركة (زرّ المشاركة) — قابل للتعديل من «النصوص»
 const DEFAULT_SHARE_TITLE = 'المفارجة — شجرة العائلة';
 const DEFAULT_SHARE_TEXT = 'تصفّح شجرة قبيلة المفارجة';
@@ -448,6 +450,7 @@ async function loadSettings() {
     bannerSize = (typeof map.banner_size === 'string' && /^[0-9.]+rem$/.test(map.banner_size)) ? map.banner_size : '';
     docTitle = (typeof map.doc_title === 'string' && map.doc_title) ? map.doc_title : DEFAULT_DOC_TITLE;
     docCaption = (typeof map.doc_caption === 'string') ? map.doc_caption : DEFAULT_DOC_CAPTION;
+    tribeDocs = Array.isArray(map.tribe_docs) ? map.tribe_docs.filter(d => d && d.url) : [{ title: docTitle, url: '/almfrje/lazma-1173.jpg', text: docCaption }];
     shareTitle = (typeof map.share_title === 'string' && map.share_title) ? map.share_title : DEFAULT_SHARE_TITLE;
     shareText = (typeof map.share_text === 'string' && map.share_text) ? map.share_text : DEFAULT_SHARE_TEXT;
     feedbackThanks = typeof map.feedback_thanks === 'string' && map.feedback_thanks ? map.feedback_thanks : DEFAULT_FB_THANKS;
@@ -644,7 +647,8 @@ const ROUTES = {
   feedbacks: { t: 'ملاحظات الزوار', back: true, fn: screenFeedbacks },
   trash: { t: 'سلة المحذوفات', back: true, fn: screenTrash },
   about: { t: 'نبذة تعريفية', back: true, fn: screenAbout },
-  document: { t: 'وثيقة لزمة ولد حسين', back: true, fn: screenDocument },
+  document: { t: 'الوثائق', back: true, fn: screenDocuments },
+  documents: { t: 'الوثائق', back: true, fn: screenDocuments },
   aboutedit: { t: 'الصفحة التعريفية', back: true, fn: screenAboutEdit },
   guide: { t: 'دليل الزوّار', back: true, fn: screenGuide },
   guideadmin: { t: 'تعليمات الإدارة', back: true, fn: screenGuideAdmin },
@@ -828,14 +832,14 @@ function screenHome() {
     })() : ''}
     ${!isGuestUser() && !pwChanged() ? `<div class="notice-pw">🔐 ننصحك بتغيير كلمة المرور الآن لحماية حسابك. <button class="btn sm" id="pwGo" style="margin-top:6px">تغيير كلمة المرور</button> <button class="btn sm outline" id="pwSkip" style="margin-top:6px">لاحقاً</button></div>` : ''}
     <div class="home-greet">أهلاً <span class="hg-name">${esc(currentUserName() || me.full_name || '')}</span>${isGuestUser() ? '' : `<span class="hg-role"> • ${esc(arOf(ROLES, me.role))}</span>`}${isManager() && myBranches().length ? `<span class="hg-role"> (${(isGeneralManager() && !(Array.isArray(me.branch_ids) && me.branch_ids.length) && !me.branch_id) ? 'كل الفروع' : myBranches().map(b => esc(branchName(b))).join('، ')})</span>` : ''}</div>
-    <div class="card doc-card click" data-go="#/document">
-      <img class="doc-thumb" src="/almfrje/lazma-1173-thumb.jpg" alt="وثيقة لزمة ولد حسين" loading="lazy">
+    ${tribeDocs.length ? `<div class="card doc-card click" data-go="#/documents">
+      <img class="doc-thumb" src="${esc((tribeDocs[0] && tribeDocs[0].url) || '/almfrje/lazma-1173-thumb.jpg')}" alt="وثائق القبيلة" loading="lazy">
       <div class="doc-card-body">
-        <div class="li-title">📜 ${esc(docTitle)}</div>
-        <div class="li-sub muted">اضغط لعرض الوثيقة كاملة</div>
+        <div class="li-title">📜 وثائق القبيلة${tribeDocs.length > 1 ? ` (${tribeDocs.length})` : ''}</div>
+        <div class="li-sub muted">اضغط لعرض الوثائق وتفريغ نصوصها</div>
       </div>
       <span class="doc-card-arrow">‹</span>
-    </div>
+    </div>` : ''}
     <div class="card" style="border:2px solid var(--brand);background:color-mix(in srgb, var(--brand) 7%, transparent)">
       <h3 style="margin:0 0 4px">📝 ${esc(feedbackCardTitle)} ${hintBtn('feedback_send')}</h3>
       <p class="muted" style="margin:0 0 8px;font-size:.88rem">${esc(feedbackCardText)}</p>
@@ -3885,31 +3889,78 @@ function screenAbout() {
     <div class="about-wrap"><div class="about-card"><div class="about-body">${sanitizeHtml(aboutHtml)}</div></div></div>`;
   bindGo();
 }
-// عرض وثيقة لزمة ولد حسين (صفحة عرضٍ ثلاثية الأبعاد احترافية)
-function screenDocument() {
+// قسم الوثائق — كل وثيقة: صورة (تُعرض كاملةً بالضغط) + تفريغ نصّها تحتها (يُخفى إن فُرّغ).
+function screenDocuments() {
+  const admin = isAdmin();
+  const docs = tribeDocs || [];
   view().innerHTML = `
-    <div class="doc-wrap">
-      <div class="doc-3d">
+    ${admin ? `<div class="btn-row no-print" style="justify-content:flex-end;margin-bottom:8px"><button class="btn sm" id="doc_add">➕ إضافة وثيقة</button></div>` : ''}
+    ${docs.length ? docs.map((d, i) => `
+      <div class="doc-wrap"><div class="doc-3d">
         <div class="doc-eyebrow">وثيقة تاريخية</div>
-        <h2 class="doc-title">${esc(docTitle)}</h2>
-        <div class="doc-frame"><img id="docImg" src="/almfrje/lazma-1173.jpg" alt="${esc(docTitle)}" loading="lazy"></div>
-        <div class="doc-actions no-print"><button class="btn" id="docZoom">🔍 عرض كامل الوثيقة</button></div>
-        ${docCaption ? `<div class="doc-text">${esc(docCaption)}</div>` : ''}
-      </div>
-    </div>`;
-  const z = document.getElementById('docZoom'); if (z) z.addEventListener('click', openDocFull);
-  const img = document.getElementById('docImg'); if (img) img.addEventListener('click', openDocFull);
+        ${d.title ? `<h2 class="doc-title">${esc(d.title)}</h2>` : ''}
+        <div class="doc-frame"><img class="doc-img" data-docfull="${i}" src="${esc(d.url)}" alt="${esc(d.title || 'وثيقة')}" loading="lazy"></div>
+        <div class="doc-actions no-print"><button class="btn sm outline" data-docfull="${i}">🔍 عرض كامل الوثيقة</button>${admin ? `<button class="btn sm outline" data-docedit="${i}">✎ تعديل</button><button class="btn sm danger" data-docdel="${i}">🗑 حذف</button>` : ''}</div>
+        ${d.text ? `<div class="doc-text">${esc(d.text)}</div>` : ''}
+      </div></div>`).join('') : '<div class="center-empty">لا توجد وثائق بعد.</div>'}`;
+  view().querySelectorAll('[data-docfull]').forEach(el => el.addEventListener('click', () => { const d = docs[+el.dataset.docfull]; if (d) openDocFull(d.url, d.title); }));
+  if (admin) {
+    const a = document.getElementById('doc_add'); if (a) a.addEventListener('click', () => docEditModal(-1));
+    view().querySelectorAll('[data-docedit]').forEach(b => b.addEventListener('click', () => docEditModal(+b.dataset.docedit)));
+    view().querySelectorAll('[data-docdel]').forEach(b => b.addEventListener('click', () => docDelete(+b.dataset.docdel)));
+  }
 }
-// عرض الوثيقة بالحجم الكامل داخل التطبيق (طبقة فوق الصفحة) مع سهم رجوع.
-function openDocFull() {
-  const root = document.getElementById('modalRoot'); if (!root) return;
+// عرض وثيقة بالحجم الكامل داخل التطبيق (طبقة فوق الصفحة) مع سهم رجوع.
+function openDocFull(url, title) {
+  const root = document.getElementById('modalRoot'); if (!root || !url) return;
   root.innerHTML = `<div class="doc-full" id="docFull">
     <div class="doc-full-bar"><button class="doc-full-back" id="docFullBack">‹ رجوع</button></div>
-    <img src="/almfrje/lazma-1173.jpg" alt="${esc(docTitle)}">
+    <img src="${esc(url)}" alt="${esc(title || 'وثيقة')}">
   </div>`;
   const close = () => { root.innerHTML = ''; };
   document.getElementById('docFullBack').addEventListener('click', close);
   document.getElementById('docFull').addEventListener('click', (e) => { if (e.target.id === 'docFull') close(); });
+}
+async function saveTribeDocs(arr) {
+  const { error } = await sb.from('almfrje_settings').upsert({ key: 'tribe_docs', value: arr, updated_at: new Date().toISOString() }, { onConflict: 'key' });
+  if (error) throw error;
+  tribeDocs = arr;
+}
+// إضافة/تعديل وثيقة (للمدير): عنوان + صورة (رفع) + تفريغ النص.
+function docEditModal(idx) {
+  if (!isAdmin()) return;
+  const d = (idx >= 0 && tribeDocs[idx]) ? tribeDocs[idx] : { title: '', url: '', text: '' };
+  openModal(idx >= 0 ? 'تعديل وثيقة' : 'إضافة وثيقة', `
+    ${fInput('العنوان', 'd_title', d.title || '')}
+    <div class="field"><label>صورة الوثيقة${d.url ? ' (اتركها لإبقاء الحالية)' : ''}</label><input id="d_file" type="file" accept="image/*"></div>
+    ${d.url ? `<div class="muted" style="font-size:.8rem;margin:-4px 0 8px">الحالية: <a href="${esc(d.url)}" target="_blank" rel="noopener" style="color:var(--brand)">عرض الصورة</a></div>` : ''}
+    ${fTextarea('تفريغ النص (اتركه فارغاً ليُخفى تحت الوثيقة)', 'd_text', d.text || '')}
+    <button class="btn" id="d_save">💾 حفظ</button>`, () => {
+    document.getElementById('d_save').addEventListener('click', async () => {
+      const title = val('d_title').trim();
+      const text = val('d_text').trim();
+      const file = document.getElementById('d_file').files[0];
+      let url = d.url || '';
+      if (!file && !url) { toast('أضف صورة الوثيقة'); return; }
+      showLoading(true);
+      const ok = await guard(async () => {
+        if (file) url = await uploadFile(file, 'docs');
+        const arr = tribeDocs.slice();
+        const item = { title, url, text };
+        if (idx >= 0) arr[idx] = item; else arr.push(item);
+        await saveTribeDocs(arr);
+      });
+      showLoading(false);
+      if (ok) { toast('تم حفظ الوثيقة'); closeModal(); screenDocuments(); }
+    });
+  });
+}
+async function docDelete(idx) {
+  if (!isAdmin() || idx < 0 || !tribeDocs[idx]) return;
+  if (!(await confirm2('حذف هذه الوثيقة؟', { title: 'حذف وثيقة', okText: 'حذف', danger: true }))) return;
+  const arr = tribeDocs.slice(); arr.splice(idx, 1);
+  const ok = await guard(async () => { await saveTribeDocs(arr); });
+  if (ok) { toast('تم الحذف'); screenDocuments(); }
 }
 
 /* ===== دليل الموقع (كتيّب تعليمات مفصّل) =====
@@ -4150,11 +4201,9 @@ function screenTexts() {
       ${fTextarea('النص', 'tx_banner', bannerText)}
       ${fSelect('حجم الخط', 'tx_banner_size', [{ k: '', ar: 'افتراضي' }, { k: '0.95rem', ar: 'صغير' }, { k: '1.05rem', ar: 'متوسط' }, { k: '1.2rem', ar: 'كبير' }, { k: '1.35rem', ar: 'كبير جداً' }], bannerSize)}
       <button class="btn sm" id="tx_bannerSave" style="margin-top:6px">حفظ</button></div>
-    <div class="card"><h3>📜 وثيقة لزمة ولد حسين</h3>
-      <p class="muted" style="font-size:.85rem;margin-top:-2px">عنوان الوثيقة (يظهر بالرئيسية) ووصفها (يظهر أسفل الصورة في صفحة العرض).</p>
-      ${fInput('العنوان', 'tx_doc_title', docTitle)}
-      ${fTextarea('الوصف', 'tx_doc_caption', docCaption)}
-      <button class="btn sm" id="tx_docSave" style="margin-top:6px">حفظ</button></div>
+    <div class="card"><h3>📜 قسم الوثائق</h3>
+      <p class="muted" style="font-size:.85rem;margin-top:-2px">إدارة الوثائق (إضافة صورة + تفريغ نصّها) من القسم المخصّص.</p>
+      <button class="btn sm outline" data-go="#/documents" style="margin-top:6px">فتح قسم الوثائق</button></div>
     <div class="card"><h3>📤 نصّ المشاركة</h3>
       <p class="muted" style="font-size:.85rem;margin-top:-2px">العنوان والنص يظهران معاً في رسالة المشاركة (زرّ المشاركة). <b>ملاحظة:</b> «بطاقة المعاينة» الصغيرة في واتساب لها عنوانٌ ثابت في الترويسة (لا يُعدَّل من هنا).</p>
       ${fInput('العنوان', 'tx_share_title', shareTitle)}
@@ -4288,15 +4337,6 @@ function screenTexts() {
     });
     if (ok) { bannerText = txt; bannerSize = size; toast('تم الحفظ'); }
   });
-  { const ds = document.getElementById('tx_docSave'); if (ds) ds.addEventListener('click', async () => {
-    const t = val('tx_doc_title').trim() || DEFAULT_DOC_TITLE;
-    const c = val('tx_doc_caption').trim();
-    const ok = await guard(async () => {
-      let { error } = await sb.from('almfrje_settings').upsert({ key: 'doc_title', value: t, updated_at: new Date().toISOString() }, { onConflict: 'key' }); if (error) throw error;
-      ({ error } = await sb.from('almfrje_settings').upsert({ key: 'doc_caption', value: c, updated_at: new Date().toISOString() }, { onConflict: 'key' })); if (error) throw error;
-    });
-    if (ok) { docTitle = t; docCaption = c; toast('تم الحفظ'); }
-  }); }
   { const ss = document.getElementById('tx_shareSave'); if (ss) ss.addEventListener('click', async () => {
     const t = val('tx_share_title').trim() || DEFAULT_SHARE_TITLE;
     const x = val('tx_share_text').trim() || DEFAULT_SHARE_TEXT;
