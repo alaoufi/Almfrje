@@ -635,7 +635,7 @@ const ROUTES = {
   texts: { t: 'النصوص', back: true, fn: screenTexts },
   backups: { t: 'النسخ والتصدير', back: true, fn: screenBackups },
   profile: { t: 'ملفي الشخصي', back: true, fn: screenProfile },
-  stats: { t: 'التقرير الإحصائي', back: true, fn: screenStats },
+  stats: { t: 'الإحصائيات', back: true, fn: screenStats },
   dups: { t: 'الأسماء المكرّرة', back: true, fn: screenDuplicates },
   feedback: { t: 'إرسال ملاحظة للإدارة', back: true, fn: screenFeedback },
   feedbacks: { t: 'ملاحظات الزوار', back: true, fn: screenFeedbacks },
@@ -2735,19 +2735,31 @@ function screenStats() {
   const total = C.persons.length;
   const alive = C.persons.filter(p => p.status === 'alive').length;
   const dead = total - alive;                                  // كل المتوفين (يشمل من لم يعقب)
-  // من توفّي ولم يعقب = متوفّى وبلا ذرية (إحصائية منفردة، لكنه ضمن المتوفين أعلاه)
   const deadNoIssue = C.persons.filter(p => p.status === 'dead' && (descCount.get(p.id) || 0) === 0).length;
   const deadWithIssue = dead - deadNoIssue;
+  const mg = maxGen();
+  // عدد كل جيل (الإجمالي + الأحياء)
+  const genTot = {}, genAlive = {};
+  C.persons.forEach(p => { const g = p.generation || 1; genTot[g] = (genTot[g] || 0) + 1; if (p.status === 'alive') genAlive[g] = (genAlive[g] || 0) + 1; });
+  const genRows = [];
+  for (let g = 1; g <= mg; g++) genRows.push(`<div class="row"><span class="k">الجيل ${g}</span><span class="v">${genTot[g] || 0} فرد${(genAlive[g] || 0) ? ' • ' + genAlive[g] + ' حيّ' : ''}</span></div>`);
   const branchSizes = C.branches.map(b => ({ b, n: branchCount(b.id) })).sort((x, y) => y.n - x.n);
+  const vb = visitStats.byBranch || {}, vc = visitStats.byCity || {};
+  const vbRows = Object.keys(vb).length ? Object.entries(vb).sort((a, b) => b[1] - a[1]).map(([bid, n]) => row('🗂️ ' + esc(branchName(Number(bid))), n)).join('') : '<div class="muted" style="font-size:.85rem;padding:4px 0">لا زيارات مسجّلة بعد.</div>';
+  const vcRows = Object.keys(vc).length ? Object.entries(vc).sort((a, b) => b[1] - a[1]).map(([c, n]) => row('📍 ' + esc(c), n)).join('') : '<div class="muted" style="font-size:.85rem;padding:4px 0">لا مناطق مسجّلة بعد.</div>';
   view().innerHTML = `
-    <div class="card"><h3>إحصاءات عامة</h3>
-      ${row('إجمالي الأفراد', total)}${row('إجمالي الفروع', C.branches.length)}${row('عدد الأجيال', maxGen())}
+    <div class="card"><h3>📊 إحصاءات عامة</h3>
+      ${row('إجمالي الأفراد', total)}${row('إجمالي الفروع', C.branches.length)}${row('عدد الأجيال', mg)}
       ${row('الأحياء', alive)}
       ${row('<span class="status-dot died" style="margin:0 0 0 6px"></span> المتوفون (الإجمالي)', '<b>' + dead + '</b>')}</div>
-    <div class="card"><h3>تفصيل المتوفين</h3>
+    <div class="card"><h3>👥 عدد كل جيل</h3>${genRows.join('') || noItem()}</div>
+    <div class="card"><h3>🕊️ تفصيل المتوفين</h3>
       ${row('<span class="status-dot died" style="margin:0 0 0 6px"></span> متوفّى وله ذرية', deadWithIssue)}
       ${row('<span class="status-dot died-noissue" style="margin:0 0 0 6px"></span> لم يعقب', '<b class="died-noissue-txt">' + deadNoIssue + '</b>')}</div>
-    <div class="card"><h3>الفروع حسب العدد</h3>${branchSizes.length ? branchSizes.map(x => row(esc(x.b.name), x.n)).join('') : noItem()}</div>
+    <div class="card"><h3>🗂️ الفروع حسب العدد</h3>${branchSizes.length ? branchSizes.map(x => row(esc(x.b.name), x.n)).join('') : noItem()}</div>
+    <div class="card"><h3>🚶 الزيارات</h3>${row('إجمالي الزوّار', visitStats.total || 0)}
+      <div class="li-sub" style="margin-top:8px;font-weight:800;color:var(--text)">حسب الفرع</div>${vbRows}
+      <div class="li-sub" style="margin-top:10px;font-weight:800;color:var(--text)">حسب المنطقة (المدينة)</div>${vcRows}</div>
     ${canExport() ? `<button class="btn outline no-print" id="prn">🖨️ طباعة / PDF</button>` : ''}`;
   const prn = document.getElementById('prn'); if (prn) prn.addEventListener('click', () => window.print());
 }
@@ -2981,7 +2993,10 @@ function screenMore() {
   // مجموعات متشابهة قابلة للطيّ — كل مجموعة عنوان وعناصرها [label, action, hint?]
   const groups = [];
 
-  // ١) المشجّرات والعروض (للجميع)
+  // ١) الإحصائيات — تصنيف رئيسي أعلى القائمة (يجمع كل الإحصاءات)
+  groups.push(['📊 الإحصائيات', [['📈 الإحصائيات الكاملة (أفراد • أجيال • فروع • زيارات)', '#/stats']]]);
+
+  // ٢) المشجّرات والعروض (للجميع)
   const trees = [];
   if (r0) { trees.push(['🌳 العرض الهرمي العام', '#/hierarchy/all', 'hierarchy']); trees.push(['🗒️ نموذج الأعمدة', '#/outline/all', 'outline']); }
   trees.push(['🕓 خط الأجيال', '#/timeline/all']);
@@ -2990,8 +3005,8 @@ function screenMore() {
   trees.push(['🖨️ نسخة مختصرة للطباعة', '#/printtree']);
   groups.push(['🌳 المشجّرات والعروض', trees]);
 
-  // ٢) التقارير والحاسبات (للجميع)
-  groups.push(['📊 التقارير والحاسبات', [['📊 التقرير الإحصائي', '#/stats'], ['🧬 حاسبة صلة القرابة', '#/kinship', 'kinship']]]);
+  // ٣) الحاسبات (للجميع)
+  groups.push(['🧮 الحاسبات', [['🧬 حاسبة صلة القرابة', '#/kinship', 'kinship']]]);
 
   // ٣) الإدارة (للمصرّح لهم فقط) — أدوات البيانات + لوحة التحكم والملاحظات والسجل والتعليمات مجمّعة
   const admin = [];
