@@ -224,6 +224,10 @@ let _presenceTimer = null;
 const DEFAULT_BANNER = 'المفرجي قبيلة من ولد حسين من الصواعد من عوف من حرب';
 let bannerText = DEFAULT_BANNER;
 let bannerSize = '';   // حجم خطّ لوحة التعريف (يحدّده المدير)؛ فارغ = الافتراضي
+// وثيقة لزمة ولد حسين — عنوان ووصف قابلان للتعديل من «النصوص»
+const DEFAULT_DOC_TITLE = 'وثيقة لزمة ولد حسين عام ١١٧٣ هـ';
+const DEFAULT_DOC_CAPTION = 'لزمة ولد حسين في فارع الناصبية سنة ١١٧٣هـ — وردت فيها رؤوس الفروع، ولزيم المفارجة منها سفران المفرجي.';
+let docTitle = DEFAULT_DOC_TITLE, docCaption = DEFAULT_DOC_CAPTION;
 const DEFAULT_FB_THANKS = 'شكراً لك 🌿\nتم إرسال ملاحظتك، وهي محل اهتمامنا.';
 let feedbackThanks = DEFAULT_FB_THANKS;
 const DEFAULT_GUEST_OK = 'مرحباً بك يا ابن العم {name} 🌿\nداخل مكانك وبين ربعك وجماعتك.. نسعد بوجودك';
@@ -436,6 +440,8 @@ async function loadSettings() {
     recentSince = typeof map.recent_since === 'string' ? map.recent_since : '';
     bannerText = typeof map.banner_text === 'string' ? map.banner_text : DEFAULT_BANNER;
     bannerSize = (typeof map.banner_size === 'string' && /^[0-9.]+rem$/.test(map.banner_size)) ? map.banner_size : '';
+    docTitle = (typeof map.doc_title === 'string' && map.doc_title) ? map.doc_title : DEFAULT_DOC_TITLE;
+    docCaption = (typeof map.doc_caption === 'string') ? map.doc_caption : DEFAULT_DOC_CAPTION;
     feedbackThanks = typeof map.feedback_thanks === 'string' && map.feedback_thanks ? map.feedback_thanks : DEFAULT_FB_THANKS;
     guestWelcomeOk = typeof map.guest_welcome_ok === 'string' && map.guest_welcome_ok ? map.guest_welcome_ok : DEFAULT_GUEST_OK;
     guestWelcomeFail = typeof map.guest_welcome_fail === 'string' && map.guest_welcome_fail ? map.guest_welcome_fail : DEFAULT_GUEST_FAIL;
@@ -801,7 +807,7 @@ function screenHome() {
     <div class="card doc-card click" data-go="#/document">
       <img class="doc-thumb" src="/almfrje/lazma-1173-thumb.jpg" alt="وثيقة لزمة ولد حسين" loading="lazy">
       <div class="doc-card-body">
-        <div class="li-title">📜 وثيقة لزمة ولد حسين عام ١١٧٣ هـ</div>
+        <div class="li-title">📜 ${esc(docTitle)}</div>
         <div class="li-sub muted">اضغط لعرض الوثيقة كاملة</div>
       </div>
       <span class="doc-card-arrow">‹</span>
@@ -3813,10 +3819,10 @@ function screenDocument() {
     <div class="doc-wrap">
       <div class="doc-3d">
         <div class="doc-eyebrow">وثيقة تاريخية</div>
-        <h2 class="doc-title">وثيقة لزمة ولد حسين عام ١١٧٣ هـ</h2>
-        <div class="doc-frame"><img id="docImg" src="/almfrje/lazma-1173.jpg" alt="وثيقة لزمة ولد حسين عام 1173هـ" loading="lazy"></div>
+        <h2 class="doc-title">${esc(docTitle)}</h2>
+        <div class="doc-frame"><img id="docImg" src="/almfrje/lazma-1173.jpg" alt="${esc(docTitle)}" loading="lazy"></div>
         <div class="doc-actions no-print"><button class="btn" id="docZoom">🔍 فتح بالحجم الكامل</button></div>
-        <p class="doc-note muted">لزمة المفارجة من ولد حسين في فارع الناصبية سنة ١١٧٣هـ — وردت فيها رؤوس الفروع، ولزيمهم سفران المفرجي.</p>
+        ${docCaption ? `<p class="doc-note muted">${esc(docCaption)}</p>` : ''}
       </div>
     </div>`;
   const open = () => window.open('/almfrje/lazma-1173.jpg', '_blank');
@@ -4061,6 +4067,11 @@ function screenTexts() {
       ${fTextarea('النص', 'tx_banner', bannerText)}
       ${fSelect('حجم الخط', 'tx_banner_size', [{ k: '', ar: 'افتراضي' }, { k: '0.95rem', ar: 'صغير' }, { k: '1.05rem', ar: 'متوسط' }, { k: '1.2rem', ar: 'كبير' }, { k: '1.35rem', ar: 'كبير جداً' }], bannerSize)}
       <button class="btn sm" id="tx_bannerSave" style="margin-top:6px">حفظ</button></div>
+    <div class="card"><h3>📜 وثيقة لزمة ولد حسين</h3>
+      <p class="muted" style="font-size:.85rem;margin-top:-2px">عنوان الوثيقة (يظهر بالرئيسية) ووصفها (يظهر أسفل الصورة في صفحة العرض).</p>
+      ${fInput('العنوان', 'tx_doc_title', docTitle)}
+      ${fTextarea('الوصف', 'tx_doc_caption', docCaption)}
+      <button class="btn sm" id="tx_docSave" style="margin-top:6px">حفظ</button></div>
     <div class="card"><h3>💬 رسالة الشكر بعد إرسال ملاحظة ${hintBtn('feedback_thanks')}</h3>
       <p class="muted" style="font-size:.85rem;margin-top:-2px">تظهر للمُرسِل في موديل بعد إرسال ملاحظته.</p>
       ${fTextarea('النص', 'tx_fbthanks', feedbackThanks)}
@@ -4185,6 +4196,15 @@ function screenTexts() {
     });
     if (ok) { bannerText = txt; bannerSize = size; toast('تم الحفظ'); }
   });
+  { const ds = document.getElementById('tx_docSave'); if (ds) ds.addEventListener('click', async () => {
+    const t = val('tx_doc_title').trim() || DEFAULT_DOC_TITLE;
+    const c = val('tx_doc_caption').trim();
+    const ok = await guard(async () => {
+      let { error } = await sb.from('almfrje_settings').upsert({ key: 'doc_title', value: t, updated_at: new Date().toISOString() }, { onConflict: 'key' }); if (error) throw error;
+      ({ error } = await sb.from('almfrje_settings').upsert({ key: 'doc_caption', value: c, updated_at: new Date().toISOString() }, { onConflict: 'key' })); if (error) throw error;
+    });
+    if (ok) { docTitle = t; docCaption = c; toast('تم الحفظ'); }
+  }); }
   document.getElementById('tx_fbthanksSave').addEventListener('click', async () => {
     const txt = val('tx_fbthanks').trim() || DEFAULT_FB_THANKS;
     const ok = await guard(async () => { const { error } = await sb.from('almfrje_settings').upsert({ key: 'feedback_thanks', value: txt, updated_at: new Date().toISOString() }, { onConflict: 'key' }); if (error) throw error; });
