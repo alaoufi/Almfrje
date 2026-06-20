@@ -49,6 +49,12 @@ main { padding: 14px; max-width: 820px; margin: 0 auto; }
 .title-lg { font-size: 1.5rem; font-weight: 800; color: var(--brand); margin: 4px 0 2px; }
 
 /* Stats */
+.vstats { padding: 14px 16px; }
+.vstats summary { cursor: pointer; list-style: none; display: flex; align-items: center; gap: 9px; font-weight: 800; color: var(--brand); font-size: 1.02rem; }
+.vstats summary::-webkit-details-marker { display: none; }
+.vstats summary::before { content: '▸'; color: var(--gold); font-size: .9rem; }
+.vstats[open] summary::before { content: '▾'; }
+.vstats-total { margin-inline-start: auto; background: var(--brand-l); color: var(--brand-d); border-radius: 999px; padding: 1px 11px; font-size: .82rem; font-weight: 800; }
 .stats { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin: 12px 0; }
 .stat {
   border-radius: 16px; padding: 16px 12px; text-align: center;

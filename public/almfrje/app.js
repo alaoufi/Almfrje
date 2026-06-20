@@ -782,6 +782,21 @@ function branchGroupsHtml() {
 }
 
 /* ===== لوحة التحكم ===== */
+// بطاقة إحصائيات الزيارات (للجميع) — تفصيل حسب الفرع والمنطقة، بلا أزرار تصفير (التصفير في الإدارة).
+function visitStatsCardHtml() {
+  const vb = visitStats.byBranch || {}, vc = visitStats.byCity || {};
+  const branchRows = Object.keys(vb).length
+    ? Object.entries(vb).sort((a, b) => b[1] - a[1]).map(([bid, n]) => `<div class="row"><span class="k">🗂️ ${esc(branchName(Number(bid)))}</span><span class="v">${n}</span></div>`).join('')
+    : '<div class="muted" style="font-size:.85rem;padding:4px 0">لا زيارات مسجّلة بعد.</div>';
+  const cityRows = Object.keys(vc).length
+    ? Object.entries(vc).sort((a, b) => b[1] - a[1]).map(([c, n]) => `<div class="row"><span class="k">📍 ${esc(c)}</span><span class="v">${n}</span></div>`).join('')
+    : '<div class="muted" style="font-size:.85rem;padding:4px 0">لا مناطق مسجّلة بعد.</div>';
+  return `<details class="card vstats">
+    <summary>📊 إحصائيات الزيارات<span class="vstats-total">${visitStats.total || 0}</span></summary>
+    <div class="li-sub" style="margin-top:10px;font-weight:800;color:var(--text)">حسب الفرع</div>${branchRows}
+    <div class="li-sub" style="margin-top:10px;font-weight:800;color:var(--text)">حسب المنطقة (المدينة)</div>${cityRows}
+  </details>`;
+}
 function screenHome() {
   const total = C.persons.length;
   // «آخر الإضافات»: ما أُضيف بعد آخر تصفير حدّده المدير (recentSince). إن لم يُصفَّر، تُعرض الأحدث.
@@ -833,6 +848,7 @@ function screenHome() {
       <div class="stat k"><div class="n" id="visitsTotal">${visitStats.total || 0}</div><div class="l">الزوّار</div></div>
     </div>
     <div class="online-home" id="onlineHome">${onlineHomeHtml()}</div>
+    ${visitStatsCardHtml()}
     ${branchGroupsHtml()}
     <div class="card"><div class="recent-head"><h3 style="margin:0">آخر الإضافات${sinceMs ? ` (${newCount})` : ''} ${hintBtn('recent')}</h3></div>
       ${recent.length ? recent.map(p => `<div class="row click" data-recent="${p.id}"><span class="k">${esc(p.name)}</span><span class="v">${p.created_at ? fmtDate(p.created_at) : esc(branchName(p.branch_id))}</span></div>`).join('') : '<div class="muted" style="padding:6px">لا إضافات جديدة.</div>'}</div>
