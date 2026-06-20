@@ -984,7 +984,8 @@ async function copyText(s) {
 }
 // مشاركة الموقع: واجهة المشاركة الأصلية للجهاز إن توفّرت، وإلا نسخ الرابط للحافظة.
 async function shareSite() {
-  const url = location.origin;
+  // واتساب يخزّن معاينة كل رابط؛ بصمة الإصدار تُجبره على قراءة المعاينة الحديثة (تُرفع عند تغيير العنوان/الوصف).
+  const url = location.origin + '/?v=2';
   const msg = [shareTitle, shareText].filter(Boolean).join('\n');   // واتساب يعرض النصّ فقط — فندمج العنوان معه
   try {
     if (navigator.share) { await navigator.share({ title: shareTitle, text: msg, url }); return; }
