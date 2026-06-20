@@ -30,16 +30,18 @@ export async function POST(request: NextRequest) {
   const { data: mem } = await admin.from('almfrje_members').select('role,is_active,branch_id,branch_ids,full_name,username').eq('user_id', who.user.id).maybeSingle();
   if (!mem || !mem.is_active) return NextResponse.json({ ok: false, error: 'الحساب غير مفعّل' }, { status: 403 });
   const isAdmin = mem.role === 'admin';
-  const isMgr = mem.role === 'branch_manager';
+  const isGen = mem.role === 'general_manager';                    // مشرف عام (كل الفروع أو فروعٍ محدّدة)
+  const isMgr = mem.role === 'branch_manager' || isGen;
   if (!isAdmin && !isMgr) return NextResponse.json({ ok: false, error: 'غير مصرّح' }, { status: 403 });
   const myBranches = new Set<number>([
     ...(Array.isArray(mem.branch_ids) ? (mem.branch_ids as unknown[]).map((x) => Number(x)) : []),
     ...(mem.branch_id ? [Number(mem.branch_id)] : []),
   ].filter((x) => Number.isFinite(x) && x > 0));
+  const allBranches = isGen && myBranches.size === 0;              // مشرف عام بلا فروعٍ محدّدة = كل الفروع
   const whoName = mem.full_name || mem.username || '';
 
   type Row = { id: number; subject: string; branch_id: number | null; details: string; status: string };
-  const canTouch = (r: Row) => isAdmin || (isMgr && ['إضافة مولود', 'ملاحظة'].includes(r.subject) && r.branch_id != null && myBranches.has(Number(r.branch_id)));
+  const canTouch = (r: Row) => isAdmin || (isMgr && ['إضافة مولود', 'ملاحظة'].includes(r.subject) && (allBranches || (r.branch_id != null && myBranches.has(Number(r.branch_id)))));
 
   let body: { action?: string; id?: number };
   try { body = await request.json(); } catch { body = {}; }
@@ -81,7 +83,7 @@ export async function POST(request: NextRequest) {
     if (!o || o.kind !== 'newborn' || !o.father_id || !o.name) return NextResponse.json({ ok: false, error: 'بيانات الطلب غير صالحة' }, { status: 400 });
     const { data: father } = await admin.from('almfrje_persons').select('id,name,branch_id,generation').eq('id', o.father_id).maybeSingle();
     if (!father) return NextResponse.json({ ok: false, error: 'لم يُعثر على والد المولود في الشجرة' }, { status: 400 });
-    if (isMgr && !myBranches.has(Number(father.branch_id))) return NextResponse.json({ ok: false, error: 'الأب خارج فرعك المصرّح به' }, { status: 403 });
+    if (isMgr && !allBranches && !myBranches.has(Number(father.branch_id))) return NextResponse.json({ ok: false, error: 'الأب خارج فرعك المصرّح به' }, { status: 403 });
     const { data: sibs } = await admin.from('almfrje_persons').select('name,status').eq('father_id', father.id);
     const nn = normAr(o.name);
     if ((sibs || []).some((c: { name: string; status: string }) => c.status !== 'dead' && normAr(c.name) === nn)) {

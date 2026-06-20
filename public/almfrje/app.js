@@ -662,6 +662,7 @@ function render() {
   document.getElementById('screenTitle').textContent = r.t;
   document.getElementById('backBtn').classList.toggle('hidden', !r.back);
   document.querySelectorAll('.nav-item').forEach(b => b.classList.toggle('active', b.dataset.route === '#/' + name));
+  updateMoreBadge();
   document.querySelectorAll('.fab').forEach(f => f.remove());
   window.scrollTo(0, 0);
   r.fn(arg);
@@ -845,7 +846,7 @@ function screenHome() {
       <p class="muted" style="margin:0 0 8px;font-size:.88rem">${esc(feedbackCardText)}</p>
       <button class="btn" data-go="#/feedback">✉️ أرسل ملاحظة للإدارة</button>
       ${isAdmin() && (C.feedbackPending || 0) > 0 ? `<button class="btn outline" data-go="#/feedbacks" style="margin-top:8px">📨 عرض الملاحظات الواردة (${C.feedbackPending})</button>` : ''}
-      ${!isAdmin() && isManager() && (C.feedbackPending || 0) > 0 ? `<button class="btn outline" data-go="#/feedbacks" style="margin-top:8px">📨 طلبات وملاحظات فرعك (${C.feedbackPending})</button>` : ''}
+      ${!isAdmin() && isManager() && (C.feedbackPending || 0) > 0 ? `<button class="btn outline" data-go="#/feedbacks" style="margin-top:8px">📨 طلبات وملاحظات تخصّك (${C.feedbackPending})</button>` : ''}
     </div>
     <div class="search"><input id="q" placeholder="ابحث بالاسم أو اللقب…"></div><div id="qr"></div>
     <div class="stats">
@@ -5045,8 +5046,15 @@ function buildNav() {
   const tabs = [['#/home', '🏠', 'الرئيسية'], ['#/search', '🔍', 'البحث'], ['#/tree', '🌳', 'الشجرة'], ['#/about', 'ℹ️', 'نبذة تعريفية'], ['#/more', '☰', 'المزيد']];
   const nav = document.getElementById('bottomnav');
   nav.style.gridTemplateColumns = `repeat(${tabs.length},1fr)`;
-  nav.innerHTML = tabs.map(([r, i, l]) => `<button class="nav-item" data-route="${r}"><span>${i}</span>${l}</button>`).join('');
+  nav.innerHTML = tabs.map(([r, i, l]) => `<button class="nav-item" data-route="${r}"><span class="nav-ico">${i}${r === '#/more' ? '<span class="nav-badge" id="moreBadge" hidden></span>' : ''}</span>${l}</button>`).join('');
   nav.querySelectorAll('.nav-item').forEach(b => b.addEventListener('click', () => setHash(b.dataset.route)));
+  updateMoreBadge();
+}
+// شارة عدد الملاحظات التي تخصّ المدير/المشرف (ضمن صلاحياته) على تبويب «المزيد».
+function updateMoreBadge() {
+  const el = document.getElementById('moreBadge'); if (!el) return;
+  const n = (isAdmin() || isManager()) ? (C.feedbackPending || 0) : 0;
+  if (n > 0) { el.textContent = n > 99 ? '99+' : String(n); el.hidden = false; } else { el.hidden = true; }
 }
 const normPhone = (s) => (s || '').replace(/\D/g, '');
 const phoneToEmail = (p) => `${p}@almfrje.app`;
