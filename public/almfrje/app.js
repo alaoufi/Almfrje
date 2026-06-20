@@ -243,11 +243,13 @@ const DEFAULT_SITE_TITLE = 'قاعدة بيانات قبيلة المفارجة'
 const DEFAULT_SITE_POWERED = 'powered by Mohamad Shaman almfrji';
 const DEFAULT_HOME_HERO = 'شجرة المفارجة';
 const DEFAULT_FB_CARD = 'لاحظت خطأً في اسم أو نسب؟ أو لديك إضافة أو تصحيح؟ أرسل ملاحظتك للإدارة وستُراجَع.';
+const DEFAULT_FB_CARD_TITLE = 'ملاحظتك تهمنا';
 const DEFAULT_GUEST_PROMPT = 'اكتب اسمك ثم أباك ثم جدّك للدخول';
 let siteTitle = DEFAULT_SITE_TITLE;
 let sitePowered = DEFAULT_SITE_POWERED;
 let homeHero = DEFAULT_HOME_HERO;
 let feedbackCardText = DEFAULT_FB_CARD;
+let feedbackCardTitle = DEFAULT_FB_CARD_TITLE;
 let guestPrompt = DEFAULT_GUEST_PROMPT;
 // كلمة المناسبات: تظهر تحت عنوان شاشة الدخول بخط غامق، نصّها ولونها من «التحكم ← النصوص».
 let occasionText = '';
@@ -455,6 +457,7 @@ async function loadSettings() {
     sitePowered = typeof map.site_powered === 'string' ? map.site_powered : DEFAULT_SITE_POWERED;
     homeHero = typeof map.home_hero === 'string' && map.home_hero ? map.home_hero : DEFAULT_HOME_HERO;
     feedbackCardText = typeof map.feedback_card_text === 'string' && map.feedback_card_text ? map.feedback_card_text : DEFAULT_FB_CARD;
+    feedbackCardTitle = typeof map.feedback_card_title === 'string' && map.feedback_card_title ? map.feedback_card_title : DEFAULT_FB_CARD_TITLE;
     guestPrompt = typeof map.guest_prompt === 'string' && map.guest_prompt ? map.guest_prompt : DEFAULT_GUEST_PROMPT;
     aboutHtml = typeof map.about_html === 'string' && map.about_html ? map.about_html : DEFAULT_ABOUT;
     occasionText = typeof map.occasion_text === 'string' ? map.occasion_text : '';
@@ -834,7 +837,7 @@ function screenHome() {
       <span class="doc-card-arrow">‹</span>
     </div>
     <div class="card" style="border:2px solid var(--brand);background:color-mix(in srgb, var(--brand) 7%, transparent)">
-      <h3 style="margin:0 0 4px">📝 ملاحظتك تهمنا ${hintBtn('feedback_send')}</h3>
+      <h3 style="margin:0 0 4px">📝 ${esc(feedbackCardTitle)} ${hintBtn('feedback_send')}</h3>
       <p class="muted" style="margin:0 0 8px;font-size:.88rem">${esc(feedbackCardText)}</p>
       <button class="btn" data-go="#/feedback">✉️ أرسل ملاحظة للإدارة</button>
       ${isAdmin() && (C.feedbackPending || 0) > 0 ? `<button class="btn outline" data-go="#/feedbacks" style="margin-top:8px">📨 عرض الملاحظات الواردة (${C.feedbackPending})</button>` : ''}
@@ -4111,10 +4114,11 @@ function screenTexts() {
         <button class="btn sm" id="tx_congSave">💾 حفظ / تعديل</button>
         <button class="btn sm danger" id="tx_congDel">🗑️ حذف التهنئة</button>
       </div></div>
-    <div class="card"><h3>✉️ نص بطاقة «ملاحظات الزوار» ${hintBtn('feedback_card')}</h3>
-      <p class="muted" style="font-size:.85rem;margin-top:-2px">النص التعريفي في بطاقة إرسال الملاحظة بالرئيسية.</p>
+    <div class="card"><h3>✉️ بطاقة «ملاحظتك تهمنا» ${hintBtn('feedback_card')}</h3>
+      <p class="muted" style="font-size:.85rem;margin-top:-2px">عنوان البطاقة ونصّها التعريفي في الرئيسية (لإرسال الملاحظة).</p>
+      ${fInput('العنوان', 'tx_fbcard_title', feedbackCardTitle)}
       ${fTextarea('النص', 'tx_fbcard', feedbackCardText)}
-      <button class="btn sm" id="tx_fbcardSave" style="margin-top:6px">حفظ النص</button></div>
+      <button class="btn sm" id="tx_fbcardSave" style="margin-top:6px">حفظ</button></div>
     <div class="card"><h3>🚪 دعوة الزائر للدخول ${hintBtn('guest_prompt')}</h3>
       <p class="muted" style="font-size:.85rem;margin-top:-2px">يظهر للزائر فوق حقل كتابة الاسم في شاشة الدخول.</p>
       ${fInput('النص', 'tx_gprompt', guestPrompt)}
@@ -4241,8 +4245,12 @@ function screenTexts() {
   }
   document.getElementById('tx_fbcardSave').addEventListener('click', async () => {
     const t = val('tx_fbcard').trim() || DEFAULT_FB_CARD;
-    const ok = await guard(async () => { const { error } = await sb.from('almfrje_settings').upsert({ key: 'feedback_card_text', value: t, updated_at: new Date().toISOString() }, { onConflict: 'key' }); if (error) throw error; });
-    if (ok) { feedbackCardText = t; toast('تم حفظ النص'); }
+    const ti = val('tx_fbcard_title').trim() || DEFAULT_FB_CARD_TITLE;
+    const ok = await guard(async () => {
+      let { error } = await sb.from('almfrje_settings').upsert({ key: 'feedback_card_text', value: t, updated_at: new Date().toISOString() }, { onConflict: 'key' }); if (error) throw error;
+      ({ error } = await sb.from('almfrje_settings').upsert({ key: 'feedback_card_title', value: ti, updated_at: new Date().toISOString() }, { onConflict: 'key' })); if (error) throw error;
+    });
+    if (ok) { feedbackCardText = t; feedbackCardTitle = ti; toast('تم الحفظ'); }
   });
   document.getElementById('tx_gpromptSave').addEventListener('click', async () => {
     const t = val('tx_gprompt').trim() || DEFAULT_GUEST_PROMPT;
