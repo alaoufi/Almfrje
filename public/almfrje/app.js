@@ -3893,13 +3893,23 @@ function screenDocument() {
         <div class="doc-eyebrow">وثيقة تاريخية</div>
         <h2 class="doc-title">${esc(docTitle)}</h2>
         <div class="doc-frame"><img id="docImg" src="/almfrje/lazma-1173.jpg" alt="${esc(docTitle)}" loading="lazy"></div>
-        <div class="doc-actions no-print"><button class="btn" id="docZoom">🔍 فتح بالحجم الكامل</button></div>
-        ${docCaption ? `<p class="doc-note muted">${esc(docCaption)}</p>` : ''}
+        <div class="doc-actions no-print"><button class="btn" id="docZoom">🔍 عرض كامل الوثيقة</button></div>
+        ${docCaption ? `<div class="doc-text">${esc(docCaption)}</div>` : ''}
       </div>
     </div>`;
-  const open = () => window.open('/almfrje/lazma-1173.jpg', '_blank');
-  const z = document.getElementById('docZoom'); if (z) z.addEventListener('click', open);
-  const img = document.getElementById('docImg'); if (img) img.addEventListener('click', open);
+  const z = document.getElementById('docZoom'); if (z) z.addEventListener('click', openDocFull);
+  const img = document.getElementById('docImg'); if (img) img.addEventListener('click', openDocFull);
+}
+// عرض الوثيقة بالحجم الكامل داخل التطبيق (طبقة فوق الصفحة) مع سهم رجوع.
+function openDocFull() {
+  const root = document.getElementById('modalRoot'); if (!root) return;
+  root.innerHTML = `<div class="doc-full" id="docFull">
+    <div class="doc-full-bar"><button class="doc-full-back" id="docFullBack">‹ رجوع</button></div>
+    <img src="/almfrje/lazma-1173.jpg" alt="${esc(docTitle)}">
+  </div>`;
+  const close = () => { root.innerHTML = ''; };
+  document.getElementById('docFullBack').addEventListener('click', close);
+  document.getElementById('docFull').addEventListener('click', (e) => { if (e.target.id === 'docFull') close(); });
 }
 
 /* ===== دليل الموقع (كتيّب تعليمات مفصّل) =====

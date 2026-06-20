@@ -120,6 +120,13 @@ html.dark .br-online { color: #4cd07d; }
 .doc-frame:hover, .doc-frame:active { transform: rotateX(0deg) translateY(-4px); }
 .doc-frame img { display: block; max-width: 100%; height: auto; cursor: zoom-in; }
 .doc-actions { margin-top: 16px; }
+.doc-text { white-space: pre-wrap; text-align: right; line-height: 2; font-size: .95rem; font-weight: 600; color: var(--text); margin-top: 16px; padding-top: 14px; border-top: 1px solid color-mix(in srgb, var(--gold) 32%, var(--line)); }
+/* عرض الوثيقة كاملةً (طبقة فوق الصفحة) + سهم رجوع */
+.doc-full { position: fixed; inset: 0; z-index: 60; background: rgba(15,17,23,.96); overflow: auto; -webkit-overflow-scrolling: touch; padding-bottom: 30px; }
+.doc-full-bar { position: sticky; top: 0; display: flex; padding: 10px 14px; background: linear-gradient(180deg, rgba(0,0,0,.6), transparent); }
+.doc-full-back { background: rgba(255,255,255,.18); color: #fff; border: 0; border-radius: 10px; padding: 9px 18px; font: inherit; font-weight: 800; font-size: 1rem; cursor: pointer; box-shadow: inset 0 0 0 1px rgba(255,255,255,.4); }
+.doc-full-back:active { transform: translateY(1px); }
+.doc-full img { display: block; width: 100%; max-width: 920px; height: auto; margin: 8px auto 0; border-radius: 6px; }
 .doc-note { margin: 12px auto 0; max-width: 640px; font-size: .85rem; line-height: 1.9; }
 @media (prefers-reduced-motion: reduce) { .doc-frame { transform: none; } }
 .about-wrap { perspective: 1200px; padding: 14px 6px 28px; }
