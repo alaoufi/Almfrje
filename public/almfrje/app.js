@@ -2751,6 +2751,12 @@ function screenStats() {
   const vb = visitStats.byBranch || {}, vc = visitStats.byCity || {};
   const vbRows = Object.keys(vb).length ? Object.entries(vb).sort((a, b) => b[1] - a[1]).map(([bid, n]) => row('🗂️ ' + esc(branchName(Number(bid))), n)).join('') : '<div class="muted" style="font-size:.85rem;padding:4px 0">لا زيارات مسجّلة بعد.</div>';
   const vcRows = Object.keys(vc).length ? Object.entries(vc).sort((a, b) => b[1] - a[1]).map(([c, n]) => row('📍 ' + esc(c), n)).join('') : '<div class="muted" style="font-size:.85rem;padding:4px 0">لا مناطق مسجّلة بعد.</div>';
+  // إثراءات: أكثر الأسماء شيوعاً • أكبر البيوت (الأكثر ذرّية) • التوزيع حسب المدينة
+  const nameFreq = {}, cityFreq = {};
+  C.persons.forEach(p => { const n = (p.name || '').trim(); if (n) nameFreq[n] = (nameFreq[n] || 0) + 1; const c = (p.city || '').trim(); if (c) cityFreq[c] = (cityFreq[c] || 0) + 1; });
+  const topNames = Object.entries(nameFreq).sort((a, b) => b[1] - a[1]).slice(0, 10);
+  const topCities = Object.entries(cityFreq).sort((a, b) => b[1] - a[1]).slice(0, 10);
+  const topDesc = C.persons.map(p => ({ p, n: descCount.get(p.id) || 0 })).filter(x => x.n > 0).sort((a, b) => b.n - a.n).slice(0, 8);
   view().innerHTML = `
     <div class="card"><h3>📊 إحصاءات عامة</h3>
       ${row('إجمالي الأفراد', total)}${row('إجمالي الفروع', C.branches.length)}${row('عدد الأجيال', mg)}
@@ -2761,6 +2767,9 @@ function screenStats() {
       ${row('<span class="status-dot died" style="margin:0 0 0 6px"></span> متوفّى وله ذرية', deadWithIssue)}
       ${row('<span class="status-dot died-noissue" style="margin:0 0 0 6px"></span> لم يعقب', '<b class="died-noissue-txt">' + deadNoIssue + '</b>')}</div>
     <div class="card"><h3>🗂️ الفروع حسب العدد</h3>${branchSizes.length ? branchSizes.map(x => row(esc(x.b.name), x.n)).join('') : noItem()}</div>
+    <div class="card"><h3>🌿 أكبر البيوت (الأكثر ذرّيةً)</h3>${topDesc.length ? topDesc.map(x => `<div class="row"><span class="k">${esc(x.p.name)} <span class="muted" style="font-weight:400;font-size:.78rem">${esc(lineageShort(x.p.id, 4))}</span></span><span class="v">${x.n} فرد</span></div>`).join('') : noItem()}</div>
+    <div class="card"><h3>🔤 أكثر الأسماء شيوعاً</h3>${topNames.length ? topNames.map(([n, c]) => row(esc(n), c)).join('') : noItem()}</div>
+    <div class="card"><h3>🏙️ التوزيع حسب المدينة</h3>${topCities.length ? topCities.map(([c, n]) => row('📍 ' + esc(c), n)).join('') : noItem()}</div>
     <div class="card"><h3>🚶 الزيارات</h3>${row('إجمالي الزوّار', visitStats.total || 0)}
       <div class="li-sub" style="margin-top:8px;font-weight:800;color:var(--text)">حسب الفرع</div>${vbRows}
       <div class="li-sub" style="margin-top:10px;font-weight:800;color:var(--text)">حسب المنطقة (المدينة)</div>${vcRows}</div>
