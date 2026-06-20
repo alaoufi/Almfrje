@@ -3008,7 +3008,7 @@ function screenMore() {
       </div>
     </div>`;
   }).join('')
-    + `<div class="muted" style="text-align:center;margin-top:14px;font-size:.85rem">${esc(siteTitle)}${sitePowered ? `<br><span style="font-size:.78rem;opacity:.85">${esc(sitePowered)}</span>` : ''}</div>`;
+    + (sitePowered ? `<div class="muted" style="text-align:center;margin-top:14px;font-size:.8rem;opacity:.85">${esc(sitePowered)}</div>` : '');
 
   // طيّ/فتح في المكان (بلا إعادة رسم) — تبقى مستمعات العناصر والتلميحات سليمة
   view().querySelectorAll('[data-mg]').forEach(b => b.addEventListener('click', () => {
