@@ -847,6 +847,7 @@ function screenHome() {
       <div class="stat g"><div class="n">${maxGen()}</div><div class="l">الأجيال</div></div>
       <div class="stat k"><div class="n" id="visitsTotal">${visitStats.total || 0}</div><div class="l">الزوّار</div></div>
     </div>
+    <button class="btn outline" data-go="#/stats" style="margin:0 0 12px">📈 التقرير الإحصائي الكامل</button>
     <div class="online-home" id="onlineHome">${onlineHomeHtml()}</div>
     ${visitStatsCardHtml()}
     ${branchGroupsHtml()}
