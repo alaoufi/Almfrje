@@ -2495,6 +2495,11 @@ async function abwConfirmSave() {
     if (!(await confirm2(`⚠️ يوجد بالفعل «${name}» (متوفّى) ابناً لنفس الأب.\nتسمية مولود جديد باسم متوفّى مسموحة — لكن تأكّد أنه ليس تكراراً بالخطأ.`, { title: 'اسم مكرّر لمتوفّى', okText: 'متابعة', danger: true }))) return;
     if (!(await confirm2(`تأكيد نهائي: إضافة «${name}» رغم وجود «${name}» (متوفّى) تحت نفس الأب؟`, { title: 'تأكيد التكرار', okText: 'نعم، أضف', danger: true }))) return;
   }
+  // قاعدة: لا يحمل الابن اسم والده الحيّ. (مع والدٍ متوفٍّ: تحذير ويُقبل.)
+  if (editFather && normalizeAr(name) === normalizeAr(editFather.name)) {
+    if (editFather.status !== 'dead') { toast('لا يصحّ أن يحمل المولود اسم والده الحيّ «' + editFather.name + '» — اختر اسماً مختلفاً'); return; }
+    if (!(await confirm2(`⚠️ اسم المولود مطابق لاسم والده «${esc(editFather.name)}» (متوفّى). مسموح، لكن تأكّد أنه مقصود.`, { title: 'اسم مطابق للوالد', okText: 'متابعة', danger: true }))) return;
+  }
   // عرض سلسلة النسب الكاملة للموافقة النهائية
   const okConfirm = await confirm2(`تأكيد إضافة:\n${[name].concat(lineage(editFather ? editFather.id : 0).map(x => x.name)).join(' بن ')}`, { title: 'مراجعة النسب', okText: 'حفظ المولود', danger: false });
   if (!okConfirm) return;
@@ -2508,8 +2513,9 @@ async function saveBirth(name) {
     if (!father) { toast('اختر الأب أولاً'); return; }
     if (!inMyBranch(father)) { toast('الأب خارج فرعك المصرّح به — لا يمكن الإضافة'); return; }
   }
-  // حارس نهائي: يُمنع فقط تطابق الاسم مع أخٍ حيّ (التكرار على متوفّى مسموح بعد تأكيد المعالج)
+  // حارس نهائي: يُمنع تطابق الاسم مع أخٍ حيّ، أو مع اسم الوالد الحيّ.
   if (sameNameSiblings(father, name).some(c => c.status !== 'dead')) { toast('يوجد ابن حيّ بنفس الاسم لنفس الأب — اختر اسماً مختلفاً'); return; }
+  if (father && father.status !== 'dead' && normalizeAr(name) === normalizeAr(father.name)) { toast('لا يصحّ أن يحمل المولود اسم والده الحيّ — اختر اسماً مختلفاً'); return; }
   const generation = father ? (father.generation + 1) : 1;
   let branch_id = father ? father.branch_id : null;
   if (isManager() && !isGeneralManager() && branch_id == null) branch_id = myBranch();
@@ -2537,6 +2543,7 @@ async function savePerson(id, existing) {
   // (تغيير الحالة لمتوفّى دون تغيير الاسم لا يُفحص؛ والمتوفّى لا يُحسب تكراراً — يجوز تكرار اسم متوفّى.)
   const nameChanged = !existing || normalizeAr(existing.name) !== normalizeAr(name);
   if (nameChanged && sameNameSiblings(father, name, existing ? existing.id : undefined).some(c => c.status !== 'dead')) { toast('يوجد ابن حيّ بنفس الاسم لنفس الأب — اختر اسماً مختلفاً'); return; }
+  if (nameChanged && father && father.status !== 'dead' && normalizeAr(name) === normalizeAr(father.name)) { toast('لا يصحّ أن يحمل الابن اسم والده الحيّ — اختر اسماً مختلفاً'); return; }
   const generation = father ? (father.generation + 1) : 1;
   // الفرع: يرث فرع الأب؛ إن كان الأب هو الأصل (جيل 1) فالفرع يُحدَّد لاحقاً من الإدارة.
   // مشرف الفرع يضيف ضمن فروعه فقط — يرث الفرع من الأب (المقيَّد أصلاً باختيار أب من فرعه).
@@ -2985,6 +2992,7 @@ async function approveNewborn(f) {
   if (!father) { toast('لم يُعثر على والد المولود في الشجرة'); return; }
   if (!isAdmin() && !(isManager() && inMyBranch(father))) { toast('ليست لديك صلاحية على هذا الفرع'); return; }
   if (sameNameSiblings(father, o.name).some(c => c.status !== 'dead')) { toast('يوجد ابن حيّ بنفس الاسم لنفس الأب — راجِع الطلب'); return; }
+  if (father.status !== 'dead' && normalizeAr(o.name) === normalizeAr(father.name)) { toast('اسم المولود مطابق لاسم والده الحيّ — لا يصحّ، راجِع الطلب'); return; }
   const chain = [o.name].concat(lineage(father.id).map(x => x.name)).join(' بن ');
   if (!(await confirm2(`⚠️ سيُضاف «${o.name}» إلى الشجرة نهائياً تحت:\n${chain}\nتأكّد أنه ليس مكرّراً قبل المتابعة.`, { title: 'مراجعة قبل الإضافة', okText: 'متابعة', danger: false }))) return;
   const typed = await uiPrompt('للتأكيد النهائي اكتب كلمة: اضافة', { title: 'تأكيد نهائي', placeholder: 'اضافة', okText: 'إضافة' });
