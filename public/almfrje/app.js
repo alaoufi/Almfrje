@@ -228,6 +228,10 @@ let bannerSize = '';   // حجم خطّ لوحة التعريف (يحدّده ا
 const DEFAULT_DOC_TITLE = 'وثيقة لزمة ولد حسين عام ١١٧٣ هـ';
 const DEFAULT_DOC_CAPTION = 'لزمة ولد حسين في فارع الناصبية سنة ١١٧٣هـ — وردت فيها رؤوس الفروع، ولزيم المفارجة منها سفران المفرجي.';
 let docTitle = DEFAULT_DOC_TITLE, docCaption = DEFAULT_DOC_CAPTION;
+// نصّ المشاركة (زرّ المشاركة) — قابل للتعديل من «النصوص»
+const DEFAULT_SHARE_TITLE = 'المفارجة — شجرة العائلة';
+const DEFAULT_SHARE_TEXT = 'تصفّح شجرة قبيلة المفارجة';
+let shareTitle = DEFAULT_SHARE_TITLE, shareText = DEFAULT_SHARE_TEXT;
 const DEFAULT_FB_THANKS = 'شكراً لك 🌿\nتم إرسال ملاحظتك، وهي محل اهتمامنا.';
 let feedbackThanks = DEFAULT_FB_THANKS;
 const DEFAULT_GUEST_OK = 'مرحباً بك يا ابن العم {name} 🌿\nداخل مكانك وبين ربعك وجماعتك.. نسعد بوجودك';
@@ -442,6 +446,8 @@ async function loadSettings() {
     bannerSize = (typeof map.banner_size === 'string' && /^[0-9.]+rem$/.test(map.banner_size)) ? map.banner_size : '';
     docTitle = (typeof map.doc_title === 'string' && map.doc_title) ? map.doc_title : DEFAULT_DOC_TITLE;
     docCaption = (typeof map.doc_caption === 'string') ? map.doc_caption : DEFAULT_DOC_CAPTION;
+    shareTitle = (typeof map.share_title === 'string' && map.share_title) ? map.share_title : DEFAULT_SHARE_TITLE;
+    shareText = (typeof map.share_text === 'string' && map.share_text) ? map.share_text : DEFAULT_SHARE_TEXT;
     feedbackThanks = typeof map.feedback_thanks === 'string' && map.feedback_thanks ? map.feedback_thanks : DEFAULT_FB_THANKS;
     guestWelcomeOk = typeof map.guest_welcome_ok === 'string' && map.guest_welcome_ok ? map.guest_welcome_ok : DEFAULT_GUEST_OK;
     guestWelcomeFail = typeof map.guest_welcome_fail === 'string' && map.guest_welcome_fail ? map.guest_welcome_fail : DEFAULT_GUEST_FAIL;
@@ -980,9 +986,9 @@ async function copyText(s) {
 async function shareSite() {
   const url = location.origin;
   try {
-    if (navigator.share) { await navigator.share({ title: 'المفارجة — شجرة العائلة', text: 'تصفّح شجرة قبيلة المفارجة', url }); return; }
+    if (navigator.share) { await navigator.share({ title: shareTitle, text: shareText, url }); return; }
   } catch (e) { if (e && e.name === 'AbortError') return; /* أُلغيت المشاركة → لا بديل */ }
-  copyText(url);   // بديل: نسخ الرابط
+  copyText((shareText ? shareText + '\n' : '') + url);   // بديل: نسخ النص + الرابط
 }
 // مسار النسب: من الشخص حتى الأصل، مع حمايةٍ من الدوائر ونقص البيانات (بحدٍّ أقصى للأجيال).
 function getLineagePath(id, maxDepth = 50) {
@@ -4072,6 +4078,11 @@ function screenTexts() {
       ${fInput('العنوان', 'tx_doc_title', docTitle)}
       ${fTextarea('الوصف', 'tx_doc_caption', docCaption)}
       <button class="btn sm" id="tx_docSave" style="margin-top:6px">حفظ</button></div>
+    <div class="card"><h3>📤 نصّ المشاركة</h3>
+      <p class="muted" style="font-size:.85rem;margin-top:-2px">الرسالة التي تظهر عند مشاركة الموقع (زرّ المشاركة). <b>ملاحظة:</b> عنوان «بطاقة المعاينة» في واتساب وسمٌ ثابت في الترويسة (لا يُعدَّل من هنا).</p>
+      ${fInput('العنوان', 'tx_share_title', shareTitle)}
+      ${fInput('النص', 'tx_share_text', shareText)}
+      <button class="btn sm" id="tx_shareSave" style="margin-top:6px">حفظ</button></div>
     <div class="card"><h3>💬 رسالة الشكر بعد إرسال ملاحظة ${hintBtn('feedback_thanks')}</h3>
       <p class="muted" style="font-size:.85rem;margin-top:-2px">تظهر للمُرسِل في موديل بعد إرسال ملاحظته.</p>
       ${fTextarea('النص', 'tx_fbthanks', feedbackThanks)}
@@ -4204,6 +4215,15 @@ function screenTexts() {
       ({ error } = await sb.from('almfrje_settings').upsert({ key: 'doc_caption', value: c, updated_at: new Date().toISOString() }, { onConflict: 'key' })); if (error) throw error;
     });
     if (ok) { docTitle = t; docCaption = c; toast('تم الحفظ'); }
+  }); }
+  { const ss = document.getElementById('tx_shareSave'); if (ss) ss.addEventListener('click', async () => {
+    const t = val('tx_share_title').trim() || DEFAULT_SHARE_TITLE;
+    const x = val('tx_share_text').trim() || DEFAULT_SHARE_TEXT;
+    const ok = await guard(async () => {
+      let { error } = await sb.from('almfrje_settings').upsert({ key: 'share_title', value: t, updated_at: new Date().toISOString() }, { onConflict: 'key' }); if (error) throw error;
+      ({ error } = await sb.from('almfrje_settings').upsert({ key: 'share_text', value: x, updated_at: new Date().toISOString() }, { onConflict: 'key' })); if (error) throw error;
+    });
+    if (ok) { shareTitle = t; shareText = x; toast('تم الحفظ'); }
   }); }
   document.getElementById('tx_fbthanksSave').addEventListener('click', async () => {
     const txt = val('tx_fbthanks').trim() || DEFAULT_FB_THANKS;
