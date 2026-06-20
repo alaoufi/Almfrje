@@ -852,7 +852,7 @@ function screenHome() {
     ${branchGroupsHtml()}
     <div class="card"><div class="recent-head"><h3 style="margin:0">آخر الإضافات${sinceMs ? ` (${newCount})` : ''} ${hintBtn('recent')}</h3></div>
       ${recent.length ? recent.map(p => `<div class="row click" data-recent="${p.id}"><span class="k">${esc(p.name)}</span><span class="v">${p.created_at ? fmtDate(p.created_at) : esc(branchName(p.branch_id))}</span></div>`).join('') : '<div class="muted" style="padding:6px">لا إضافات جديدة.</div>'}</div>
-    ${sitePowered ? `<div style="text-align:center;margin:18px 0 6px;font-size:.74rem;opacity:.75">${esc(sitePowered)}</div>` : ''}`;
+    ${sitePowered ? `<div style="text-align:center;margin:10px 0 0;font-size:.74rem;opacity:.75">${esc(sitePowered)}</div>` : ''}`;
   const q = document.getElementById('q');
   q.addEventListener('input', debounce(() => instantSearch(q.value, document.getElementById('qr')), 130));
   const pwGo = document.getElementById('pwGo'); if (pwGo) pwGo.addEventListener('click', () => setHash('#/profile'));

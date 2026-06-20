@@ -19,7 +19,7 @@ body {
   background: var(--bg); color: var(--text); line-height: 1.6;
 }
 .hidden { display: none !important; }
-#app { padding-bottom: 76px; }
+#app { padding-bottom: calc(56px + env(safe-area-inset-bottom)); }
 
 /* App bar */
 .appbar {
