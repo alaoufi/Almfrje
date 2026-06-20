@@ -451,7 +451,7 @@ async function loadSettings() {
     feedbackThanks = typeof map.feedback_thanks === 'string' && map.feedback_thanks ? map.feedback_thanks : DEFAULT_FB_THANKS;
     guestWelcomeOk = typeof map.guest_welcome_ok === 'string' && map.guest_welcome_ok ? map.guest_welcome_ok : DEFAULT_GUEST_OK;
     guestWelcomeFail = typeof map.guest_welcome_fail === 'string' && map.guest_welcome_fail ? map.guest_welcome_fail : DEFAULT_GUEST_FAIL;
-    siteTitle = typeof map.site_title === 'string' && map.site_title ? map.site_title : DEFAULT_SITE_TITLE;
+    siteTitle = typeof map.site_title === 'string' ? map.site_title : DEFAULT_SITE_TITLE;   // فراغٌ محفوظ = مخفيّ
     sitePowered = typeof map.site_powered === 'string' ? map.site_powered : DEFAULT_SITE_POWERED;
     homeHero = typeof map.home_hero === 'string' && map.home_hero ? map.home_hero : DEFAULT_HOME_HERO;
     feedbackCardText = typeof map.feedback_card_text === 'string' && map.feedback_card_text ? map.feedback_card_text : DEFAULT_FB_CARD;
@@ -4117,7 +4117,7 @@ function screenTexts() {
   pingPresence(false);   // تحديث «المتواجدون الآن» وتفصيلهم حسب الفرع عند فتح البطاقة
   { const rrc = document.getElementById('recent_reset'); if (rrc) rrc.addEventListener('click', resetRecent); }
   document.getElementById('tx_titleSave').addEventListener('click', async () => {
-    const t = val('tx_title').trim() || DEFAULT_SITE_TITLE; const pw = val('tx_powered').trim();
+    const t = val('tx_title').trim(); const pw = val('tx_powered').trim();   // يُسمح بفراغ العنوان (لإخفائه)
     const ok = await guard(async () => {
       let { error } = await sb.from('almfrje_settings').upsert({ key: 'site_title', value: t, updated_at: new Date().toISOString() }, { onConflict: 'key' }); if (error) throw error;
       ({ error } = await sb.from('almfrje_settings').upsert({ key: 'site_powered', value: pw, updated_at: new Date().toISOString() }, { onConflict: 'key' })); if (error) throw error;
@@ -5035,7 +5035,7 @@ function renderAuth() {
     // ===== واجهة الزائر: حقل واحد فقط (الاسم بالتسلسل) =====
     box.innerHTML = `<div class="auth-box">
       <div class="logo" style="font-size:3.2rem">🌳</div>
-      <h2 style="margin:.2rem 0 ${occasionText ? '4px' : '12px'}">${esc(siteTitle)}</h2>
+      ${siteTitle ? `<h2 style="margin:.2rem 0 ${occasionText ? '4px' : '12px'}">${esc(siteTitle)}</h2>` : ''}
       ${occasionText ? `<div style="font-weight:800;font-size:1.05rem;margin:0 0 12px;text-align:center;color:${okColor(occasionColor)}">${esc(occasionText)}</div>` : ''}
       <div style="font-size:1.1rem;font-weight:800;margin-bottom:10px;text-align:center">${esc(guestPrompt)}</div>
       ${fInput('اكتب اسمك بالتسلسل هنا', 'g_lineage', '')}
@@ -5054,7 +5054,7 @@ function renderAuth() {
   }
   // ===== واجهة المسؤول/المشرف =====
   box.innerHTML = `<div class="auth-box">
-    <div class="logo">🌳</div><h2 style="margin-bottom:0">${esc(siteTitle)}</h2>
+    <div class="logo">🌳</div>${siteTitle ? `<h2 style="margin-bottom:0">${esc(siteTitle)}</h2>` : ''}
     ${occasionText ? `<div style="font-weight:800;font-size:1.05rem;margin:4px 0 2px;text-align:center;color:${okColor(occasionColor)}">${esc(occasionText)}</div>` : ''}
     ${sitePowered ? `<div style="font-size:.72rem;opacity:.8;margin-bottom:.4rem">${esc(sitePowered)}</div>` : ''}<div class="sub">دخول المسؤول / مشرف الفرع</div>
     ${fInput('الجوال أو اسم المستخدم', 'a_id', '')}
