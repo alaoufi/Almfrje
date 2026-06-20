@@ -2739,13 +2739,17 @@ function screenStats() {
   const deadNoIssue = C.persons.filter(p => p.status === 'dead' && (descCount.get(p.id) || 0) === 0).length;
   const deadWithIssue = dead - deadNoIssue;
   const mg = maxGen();
-  // عدد كل جيل (الإجمالي + الأحياء)
-  const genTot = {}, genAlive = {};
-  C.persons.forEach(p => { const g = p.generation || 1; genTot[g] = (genTot[g] || 0) + 1; if (p.status === 'alive') genAlive[g] = (genAlive[g] || 0) + 1; });
+  // عدد كل جيل (إجمالي + حي + متوفّى + لم يعقب)
+  const genTot = {}, genAlive = {}, genNoIssue = {};
+  C.persons.forEach(p => {
+    const g = p.generation || 1; genTot[g] = (genTot[g] || 0) + 1;
+    if (p.status === 'alive') genAlive[g] = (genAlive[g] || 0) + 1;
+    else if ((descCount.get(p.id) || 0) === 0) genNoIssue[g] = (genNoIssue[g] || 0) + 1;
+  });
   const genRows = [];
   for (let g = 1; g <= mg; g++) {
-    const t = genTot[g] || 0, a = genAlive[g] || 0, d = t - a;
-    genRows.push(`<div class="row"><span class="k">الجيل ${g}</span><span class="v">${t} فرد • ${a} حيّ • ${d} متوفّى</span></div>`);
+    const t = genTot[g] || 0, a = genAlive[g] || 0, no = genNoIssue[g] || 0, dw = t - a - no;
+    genRows.push(`<div class="row"><span class="k">الجيل ${g}</span><span class="v">${t} فرد • <span style="color:var(--c-alive)">${a} حيّ</span> • <span style="color:var(--c-dead)">${dw} متوفّى</span> • <span style="color:var(--c-noissue)">${no} لم يعقب</span></span></div>`);
   }
   const branchSizes = C.branches.map(b => ({ b, n: branchCount(b.id) })).sort((x, y) => y.n - x.n);
   const vb = visitStats.byBranch || {}, vc = visitStats.byCity || {};
@@ -2760,12 +2764,12 @@ function screenStats() {
   view().innerHTML = `
     <div class="card"><h3>📊 إحصاءات عامة</h3>
       ${row('إجمالي الأفراد', total)}${row('إجمالي الفروع', C.branches.length)}${row('عدد الأجيال', mg)}
-      ${row('الأحياء', alive)}
-      ${row('<span class="status-dot died" style="margin:0 0 0 6px"></span> المتوفون (الإجمالي)', '<b>' + dead + '</b>')}</div>
+      <div class="stat3">
+        <div class="s3 s3-alive"><div class="s3-n">${alive}</div><div class="s3-l">أحياء</div></div>
+        <div class="s3 s3-dead"><div class="s3-n">${deadWithIssue}</div><div class="s3-l">متوفّون (لهم ذرية)</div></div>
+        <div class="s3 s3-noissue"><div class="s3-n">${deadNoIssue}</div><div class="s3-l">لم يعقب</div></div>
+      </div></div>
     <div class="card"><h3>👥 عدد كل جيل</h3>${genRows.join('') || noItem()}</div>
-    <div class="card"><h3>🕊️ تفصيل المتوفين</h3>
-      ${row('<span class="status-dot died" style="margin:0 0 0 6px"></span> متوفّى وله ذرية', deadWithIssue)}
-      ${row('<span class="status-dot died-noissue" style="margin:0 0 0 6px"></span> لم يعقب', '<b class="died-noissue-txt">' + deadNoIssue + '</b>')}</div>
     <div class="card"><h3>🗂️ الفروع حسب العدد</h3>${branchSizes.length ? branchSizes.map(x => row(esc(x.b.name), x.n)).join('') : noItem()}</div>
     <div class="card"><h3>🌿 أكبر البيوت (الأكثر ذرّيةً)</h3>${topDesc.length ? topDesc.map(x => `<div class="row"><span class="k">${esc(x.p.name)} <span class="muted" style="font-weight:400;font-size:.78rem">${esc(lineageShort(x.p.id, 4))}</span></span><span class="v">${x.n} فرد</span></div>`).join('') : noItem()}</div>
     <div class="card"><h3>🔤 أكثر الأسماء شيوعاً</h3>${topNames.length ? topNames.map(([n, c]) => row(esc(n), c)).join('') : noItem()}</div>

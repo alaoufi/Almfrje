@@ -3,6 +3,7 @@
   --accent: #0EA5E9; --gold: #D97706;
   --bg: #f3f4f8; --card: #ffffff; --line: #e3e5ee;
   --text: #1b1b1f; --muted: #6b7280; --danger: #c62828; --ok: #15803d;
+  --c-alive: #15803d; --c-dead: #6b7280; --c-noissue: #b91c1c;   /* ألوان الحالات الموحّدة (حي/متوفّى/لم يعقب) */
   --radius: 14px; --shadow: 0 1px 3px rgba(0,0,0,.12);
 }
 html[data-theme="dark"] {
@@ -10,6 +11,7 @@ html[data-theme="dark"] {
   --accent: #38BDF8; --gold: #FBBF24;
   --bg: #0f1117; --card: #1a1d27; --line: #2a2e3c;
   --text: #e8eaf2; --muted: #9aa1b4; --danger: #f87171; --ok: #4ade80;
+  --c-alive: #4ade80; --c-dead: #9ca3af; --c-noissue: #f87171;
   --shadow: 0 1px 3px rgba(0,0,0,.5);
 }
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -553,7 +555,7 @@ ul.hier ul.hier > .hier-li::before {
 .bk-item-sub { font-size: .78rem; color: var(--muted); margin-inline-start: auto; }
 .bk-item.bk-blocked { opacity: .55; cursor: not-allowed; background: rgba(127,127,127,.06); }
 .bk-item.bk-blocked input { cursor: not-allowed; }
-.bk-dead-tag { font-size: .68rem; font-weight: 600; color: #9ca3af; border: 1px solid var(--line); border-radius: 999px; padding: 1px 7px; margin-inline-start: 6px; }
+.bk-dead-tag { font-size: .68rem; font-weight: 600; color: var(--c-dead); border: 1px solid var(--line); border-radius: 999px; padding: 1px 7px; margin-inline-start: 6px; }
 
 /* ===== قائمة تعديل/مراجعة البيانات (لكل فرد) ===== */
 .grid-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 2px 14px; }
@@ -693,15 +695,11 @@ ul.hier ul.hier > .hier-li::before {
 
 /* ===== مؤشّر الحالة (نقطة ملوّنة بدل كلمة) ===== */
 .status-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; vertical-align: middle; margin-inline-start: 4px; flex: none; }
-.status-dot.died { background: #9ca3af; }                 /* متوفّى: رمادي */
-.status-dot.died-noissue { background: #b91c1c; }         /* توفي ولم يعقب: أحمر داكن */
-[data-theme="dark"] .status-dot.died { background: #6b7280; }
-[data-theme="dark"] .status-dot.died-noissue { background: #ef4444; }
+.status-dot.died { background: var(--c-dead); }                 /* متوفّى: رمادي */
+.status-dot.died-noissue { background: var(--c-noissue); }         /* توفي ولم يعقب: أحمر داكن */
 /* نص الحالة في صفحة الشخص */
-.died-txt { color: #6b7280; font-weight: 700; }
-.died-noissue-txt { color: #b91c1c; font-weight: 800; }
-[data-theme="dark"] .died-txt { color: #9ca3af; }
-[data-theme="dark"] .died-noissue-txt { color: #ef4444; }
+.died-txt { color: var(--c-dead); font-weight: 700; }
+.died-noissue-txt { color: var(--c-noissue); font-weight: 800; }
 /* مفتاح الألوان */
 .status-legend { display: flex; gap: 18px; flex-wrap: wrap; font-size: 1rem; font-weight: 700; margin: 6px 2px; }
 .status-legend span { display: inline-flex; align-items: center; gap: 5px; }
@@ -729,10 +727,19 @@ ul.hier ul.hier > .hier-li::before {
 .reorder-up:disabled, .reorder-down:disabled { opacity: .3; cursor: default; box-shadow: none; }
 .nick { color: var(--gold); font-weight: 600; font-size: .9em; }
 .n-alive { color: var(--text) !important; font-weight: 700; }  /* موجود: لون عادي */
-.n-died { color: #9ca3af !important; }                    /* متوفّى: رمادي */
-.n-noissue { color: #b91c1c !important; }                 /* لم يعقب: أحمر داكن */
-[data-theme="dark"] .n-died { color: #9ca3af !important; }
-[data-theme="dark"] .n-noissue { color: #f87171 !important; }
+.n-died { color: var(--c-dead) !important; }                    /* متوفّى: رمادي */
+.n-noissue { color: var(--c-noissue) !important; }                 /* لم يعقب: أحمر داكن */
+/* بطاقات حالات الإحصائيات: العدد فوق، التفصيل تحته، بروزٌ ثلاثي الأبعاد */
+.stat3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 14px 0 2px; }
+.s3 { text-align: center; border-radius: 14px; padding: 14px 6px;
+  background: linear-gradient(160deg, color-mix(in srgb, var(--s3c) 14%, var(--card)), var(--card) 72%);
+  border: 1px solid color-mix(in srgb, var(--s3c) 32%, var(--line));
+  box-shadow: 0 13px 26px -18px color-mix(in srgb, var(--s3c) 75%, transparent), 0 2px 0 color-mix(in srgb, var(--s3c) 24%, transparent), inset 0 1px 0 rgba(255,255,255,.5); }
+.s3-n { font-size: 1.7rem; font-weight: 800; line-height: 1.1; color: var(--s3c); }
+.s3-l { font-size: .74rem; font-weight: 700; color: var(--muted); margin-top: 4px; }
+.s3-alive { --s3c: var(--c-alive); }
+.s3-dead { --s3c: var(--c-dead); }
+.s3-noissue { --s3c: var(--c-noissue); }
 
 /* ===== شريط تبويبات لوحة التحكم ===== */
 .admin-tabs { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 8px; margin-bottom: 10px; -webkit-overflow-scrolling: touch; }
@@ -799,7 +806,7 @@ ul.hier ul.hier > .hier-li::before {
 .rel-chip { display: inline-block; background: var(--bg); border: 1px solid var(--line); border-radius: 999px; padding: 4px 11px; font-weight: 700; font-size: .9rem; cursor: pointer; }
 .rel-chip:active { background: var(--brand-l); }
 .rel-chip.strong { border-color: var(--brand); }
-.rel-chip.n-died { color: var(--muted); } .rel-chip.n-noissue { color: var(--danger); }
+.rel-chip.n-died { color: var(--c-dead); } .rel-chip.n-noissue { color: var(--c-noissue); }
 .rel-more { display: inline-block; background: color-mix(in srgb, var(--brand) 12%, transparent); color: var(--brand); border-radius: 999px; padding: 4px 11px; font-weight: 800; font-size: .85rem; cursor: pointer; }
 
 /* العدسة السريعة */
@@ -838,7 +845,7 @@ ul.hier ul.hier > .hier-li::before {
 .rad-g { cursor: pointer; }
 .rad-c { fill: var(--brand); stroke: #fff; stroke-width: 2.5; }
 .rad-c.d0 { fill: var(--brand-d); stroke-width: 3; } .rad-c.d1 { fill: var(--brand); } .rad-c.d2 { fill: var(--accent); } .rad-c.d3 { fill: #6b7fd1; }
-.rad-c.n-died { fill: var(--muted); } .rad-c.n-noissue { fill: var(--danger); }
+.rad-c.n-died { fill: var(--c-dead); } .rad-c.n-noissue { fill: var(--c-noissue); }
 /* تسمية المركز داخل الدائرة بيضاء؛ التسميات الشعاعية بلون النص مع هالة بيضاء لوضوحها */
 .rad-t { pointer-events: none; font-weight: 800; }
 .rad-t0 { fill: #fff; font-size: 13px; }
