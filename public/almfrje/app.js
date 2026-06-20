@@ -2743,7 +2743,10 @@ function screenStats() {
   const genTot = {}, genAlive = {};
   C.persons.forEach(p => { const g = p.generation || 1; genTot[g] = (genTot[g] || 0) + 1; if (p.status === 'alive') genAlive[g] = (genAlive[g] || 0) + 1; });
   const genRows = [];
-  for (let g = 1; g <= mg; g++) genRows.push(`<div class="row"><span class="k">الجيل ${g}</span><span class="v">${genTot[g] || 0} فرد${(genAlive[g] || 0) ? ' • ' + genAlive[g] + ' حيّ' : ''}</span></div>`);
+  for (let g = 1; g <= mg; g++) {
+    const t = genTot[g] || 0, a = genAlive[g] || 0, d = t - a;
+    genRows.push(`<div class="row"><span class="k">الجيل ${g}</span><span class="v">${t} فرد • ${a} حيّ • ${d} متوفّى</span></div>`);
+  }
   const branchSizes = C.branches.map(b => ({ b, n: branchCount(b.id) })).sort((x, y) => y.n - x.n);
   const vb = visitStats.byBranch || {}, vc = visitStats.byCity || {};
   const vbRows = Object.keys(vb).length ? Object.entries(vb).sort((a, b) => b[1] - a[1]).map(([bid, n]) => row('🗂️ ' + esc(branchName(Number(bid))), n)).join('') : '<div class="muted" style="font-size:.85rem;padding:4px 0">لا زيارات مسجّلة بعد.</div>';
