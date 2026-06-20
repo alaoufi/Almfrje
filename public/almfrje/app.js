@@ -2830,11 +2830,15 @@ function fbPickerSearch(term, resEl, aliveOnly, onPick) {
   // يقبل الفاصل مسافة أو «بن»/«ابن» بين الاسم واسم الأب — تُتجاهَل كلمة الوصل.
   const tokens = String(term || '').trim().split(/\s+/).map(normalizeAr).filter(t => t && t !== 'بن' && t !== 'ابن');
   if (!tokens.length) { resEl.innerHTML = ''; return; }
-  const pool = aliveOnly ? C.persons.filter(p => p.status !== 'dead') : C.persons;
-  const list = pool.filter(p => personMatchTokens(p, tokens)).slice(0, 25);
-  resEl.innerHTML = list.length
-    ? list.map(p => `<div class="row click" data-pk="${p.id}"><span class="k">${esc(p.name)}</span><span class="v" style="font-size:.78rem">${esc(lineageShort(p.id, 6))}</span></div>`).join('')
-    : '<div class="muted" style="padding:6px">لا نتائج — اكتب الاسم ثم اسم الأب لتقليص القائمة</div>';
+  const all = C.persons.filter(p => personMatchTokens(p, tokens));
+  if (!all.length) { resEl.innerHTML = '<div class="muted" style="padding:6px">الاسم لا يوجد</div>'; return; }
+  const live = aliveOnly ? all.filter(p => p.status !== 'dead') : all;
+  const deadM = aliveOnly ? all.filter(p => p.status === 'dead') : [];
+  let html = live.slice(0, 25).map(p => `<div class="row click" data-pk="${p.id}"><span class="k">${esc(p.name)}</span><span class="v" style="font-size:.78rem">${esc(lineageShort(p.id, 6))}</span></div>`).join('');
+  // المطابقون المتوفّون: يُعرضون كتنبيه فقط (لا يصلحون أباً لمولود)
+  if (deadM.length) html += deadM.slice(0, 15).map(p => `<div class="row" style="opacity:.75"><span class="k">${esc(p.name)} <span style="color:var(--c-dead);font-weight:800;font-size:.8rem">(متوفّى)</span></span><span class="v" style="font-size:.78rem">${esc(lineageShort(p.id, 6))}</span></div>`).join('');
+  if (!live.length && deadM.length) html = '<div class="muted" style="padding:6px">المطابق متوفّى — لا يصلح والداً لمولود:</div>' + html;
+  resEl.innerHTML = html || '<div class="muted" style="padding:6px">الاسم لا يوجد</div>';
   resEl.querySelectorAll('[data-pk]').forEach(el => el.addEventListener('click', () => {
     onPick(byId.get(parseInt(el.dataset.pk, 10))); resEl.innerHTML = '';
   }));
