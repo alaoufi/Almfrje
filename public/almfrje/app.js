@@ -629,6 +629,7 @@ const ROUTES = {
   feedbacks: { t: 'ملاحظات الزوار', back: true, fn: screenFeedbacks },
   trash: { t: 'سلة المحذوفات', back: true, fn: screenTrash },
   about: { t: 'نبذة تعريفية', back: true, fn: screenAbout },
+  document: { t: 'وثيقة لزمة ولد حسين', back: true, fn: screenDocument },
   aboutedit: { t: 'الصفحة التعريفية', back: true, fn: screenAboutEdit },
   guide: { t: 'دليل الزوّار', back: true, fn: screenGuide },
   guideadmin: { t: 'تعليمات الإدارة', back: true, fn: screenGuideAdmin },
@@ -797,6 +798,14 @@ function screenHome() {
     })() : ''}
     ${!isGuestUser() && !pwChanged() ? `<div class="notice-pw">🔐 ننصحك بتغيير كلمة المرور الآن لحماية حسابك. <button class="btn sm" id="pwGo" style="margin-top:6px">تغيير كلمة المرور</button> <button class="btn sm outline" id="pwSkip" style="margin-top:6px">لاحقاً</button></div>` : ''}
     <div class="home-greet">أهلاً <span class="hg-name">${esc(currentUserName() || me.full_name || '')}</span>${isGuestUser() ? '' : `<span class="hg-role"> • ${esc(arOf(ROLES, me.role))}</span>`}${isManager() && myBranches().length ? `<span class="hg-role"> (${(isGeneralManager() && !(Array.isArray(me.branch_ids) && me.branch_ids.length) && !me.branch_id) ? 'كل الفروع' : myBranches().map(b => esc(branchName(b))).join('، ')})</span>` : ''}</div>
+    <div class="card doc-card click" data-go="#/document">
+      <img class="doc-thumb" src="/almfrje/lazma-1173-thumb.jpg" alt="وثيقة لزمة ولد حسين" loading="lazy">
+      <div class="doc-card-body">
+        <div class="li-title">📜 وثيقة لزمة ولد حسين عام ١١٧٣ هـ</div>
+        <div class="li-sub muted">اضغط لعرض الوثيقة كاملة</div>
+      </div>
+      <span class="doc-card-arrow">‹</span>
+    </div>
     <div class="card" style="border:2px solid var(--brand);background:color-mix(in srgb, var(--brand) 7%, transparent)">
       <h3 style="margin:0 0 4px">📝 ملاحظات الزوار ${hintBtn('feedback_send')}</h3>
       <p class="muted" style="margin:0 0 8px;font-size:.88rem">${esc(feedbackCardText)}</p>
@@ -3798,6 +3807,22 @@ function screenAbout() {
     <div class="about-wrap"><div class="about-card"><div class="about-body">${sanitizeHtml(aboutHtml)}</div></div></div>`;
   bindGo();
 }
+// عرض وثيقة لزمة ولد حسين (صفحة عرضٍ ثلاثية الأبعاد احترافية)
+function screenDocument() {
+  view().innerHTML = `
+    <div class="doc-wrap">
+      <div class="doc-3d">
+        <div class="doc-eyebrow">وثيقة تاريخية</div>
+        <h2 class="doc-title">وثيقة لزمة ولد حسين عام ١١٧٣ هـ</h2>
+        <div class="doc-frame"><img id="docImg" src="/almfrje/lazma-1173.jpg" alt="وثيقة لزمة ولد حسين عام 1173هـ" loading="lazy"></div>
+        <div class="doc-actions no-print"><button class="btn" id="docZoom">🔍 فتح بالحجم الكامل</button></div>
+        <p class="doc-note muted">لزمة المفارجة من ولد حسين في فارع الناصبية سنة ١١٧٣هـ — وردت فيها رؤوس الفروع، ولزيمهم سفران المفرجي.</p>
+      </div>
+    </div>`;
+  const open = () => window.open('/almfrje/lazma-1173.jpg', '_blank');
+  const z = document.getElementById('docZoom'); if (z) z.addEventListener('click', open);
+  const img = document.getElementById('docImg'); if (img) img.addEventListener('click', open);
+}
 
 /* ===== دليل الموقع (كتيّب تعليمات مفصّل) =====
    مبني من بنية الموقع نفسه، فيتحدّث آلياً عند إضافة/تعديل أي ميزة هنا. */
@@ -3840,6 +3865,7 @@ const GUIDE = [
   ]},
   { sec: 'ℹ️ نبذة تعريفية', items: [
     { t: 'صفحة قبيلة المفارجة', fn: 'تعريف بالقبيلة ونسبها وديارها.', brief: 'صفحة منسّقة تُعرض بشكل ثلاثي الأبعاد.', det: 'يحرّرها المدير بأدوات تنسيق الخطوط من التحكم ← الصفحة التعريفية، وتظهر للجميع.' },
+    { t: 'وثيقة لزمة ولد حسين ١١٧٣هـ', fn: 'عرض الوثيقة التاريخية الأصلية.', brief: 'بطاقة بالرئيسية تفتح صفحة عرضٍ ثلاثية الأبعاد.', det: 'اضغط بطاقة «📜 وثيقة لزمة ولد حسين عام ١١٧٣ هـ» بالرئيسية لعرض صورة الوثيقة في إطارٍ مجسّم، مع «فتح بالحجم الكامل» للتكبير.' },
   ]},
   { sec: '✉️ ملاحظات الزوار', items: [
     { t: 'إرسال ملاحظة للإدارة', fn: 'إبلاغ الإدارة بخطأ أو طلب إضافة/تصحيح.', brief: 'يُؤخذ اسمك الذي دخلت به تلقائياً، وتكتب ملاحظتك.', det: 'طلب إضافة مولود يصل منظّماً (اسم الأب والمولود وسنة الولادة والمدينة)، فيوافق عليه المدير أو مشرف الفرع بعد رسائل تأكيدية وكتابة كلمة «اضافة».' },

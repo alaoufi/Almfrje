@@ -88,6 +88,31 @@ html.dark .br-online { color: #4cd07d; }
 .about-i:active { transform: translateY(1px); }
 
 /* عرض احترافي ثلاثي الأبعاد للبطاقة */
+/* ===== وثيقة تاريخية: بطاقة الرئيسية + صفحة العرض ثلاثية الأبعاد ===== */
+.doc-card { display: flex; align-items: center; gap: 12px; }
+.doc-thumb { width: 58px; height: 58px; object-fit: cover; border-radius: 10px; flex: none; border: 2px solid color-mix(in srgb, var(--gold) 55%, var(--line)); box-shadow: 0 6px 14px -8px rgba(0,0,0,.45); background: #f5ecd8; }
+.doc-card-body { flex: 1; min-width: 0; }
+.doc-card .li-title { color: var(--brand); }
+.doc-card-arrow { color: var(--gold); font-size: 1.6rem; font-weight: 800; flex: none; }
+.doc-wrap { perspective: 1300px; padding: 14px 6px 28px; max-width: 860px; margin: 0 auto; }
+.doc-3d {
+  text-align: center; border-radius: 20px; padding: 20px 16px 22px;
+  background: linear-gradient(160deg, color-mix(in srgb, var(--gold) 12%, var(--card)), var(--card) 70%);
+  border: 1px solid color-mix(in srgb, var(--gold) 38%, var(--line));
+  box-shadow: 0 28px 54px -28px rgba(0,0,0,.55), 0 2px 0 color-mix(in srgb, var(--gold) 30%, transparent), inset 0 1px 0 rgba(255,255,255,.55);
+}
+.doc-eyebrow { color: var(--gold); font-weight: 800; letter-spacing: 2px; font-size: .78rem; }
+.doc-title { color: var(--brand); font-size: 1.32rem; font-weight: 800; margin: .25em 0 .7em; letter-spacing: -.2px; }
+.doc-frame {
+  display: inline-block; max-width: 100%; border-radius: 12px; overflow: hidden; background: #fff; border: 7px solid #fff;
+  box-shadow: 0 34px 64px -26px rgba(0,0,0,.6), 0 10px 0 -2px color-mix(in srgb, var(--gold) 45%, #5a3e12);
+  transform: rotateX(5deg); transition: transform .35s ease;
+}
+.doc-frame:hover, .doc-frame:active { transform: rotateX(0deg) translateY(-4px); }
+.doc-frame img { display: block; max-width: 100%; height: auto; cursor: zoom-in; }
+.doc-actions { margin-top: 16px; }
+.doc-note { margin: 12px auto 0; max-width: 640px; font-size: .85rem; line-height: 1.9; }
+@media (prefers-reduced-motion: reduce) { .doc-frame { transform: none; } }
 .about-wrap { perspective: 1200px; padding: 14px 6px 28px; }
 .about-card {
   position: relative; max-width: 760px; margin: 0 auto; padding: 26px 22px;
