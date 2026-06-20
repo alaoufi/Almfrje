@@ -225,7 +225,7 @@ const DEFAULT_BANNER = 'المفرجي قبيلة من ولد حسين من ال
 let bannerText = DEFAULT_BANNER;
 let bannerSize = '';   // حجم خطّ لوحة التعريف (يحدّده المدير)؛ فارغ = الافتراضي
 // وثيقة لزمة ولد حسين — عنوان ووصف قابلان للتعديل من «النصوص»
-const DEFAULT_DOC_TITLE = 'وثيقة لزمة ولد حسين عام ١١٧٣ هـ';
+const DEFAULT_DOC_TITLE = 'وثيقة لزمة ولد حسين سنة ١١٧٣هـ في فارع الناصبية';
 const DEFAULT_DOC_CAPTION = 'لزمة ولد حسين في فارع الناصبية سنة ١١٧٣هـ — وردت فيها رؤوس الفروع، ولزيم المفارجة منها سفران المفرجي.';
 let docTitle = DEFAULT_DOC_TITLE, docCaption = DEFAULT_DOC_CAPTION;
 // قسم الوثائق: مصفوفة [{title,url,text}] — يديرها المدير (إضافة/تعديل/حذف).
@@ -835,8 +835,8 @@ function screenHome() {
     ${tribeDocs.length ? `<div class="card doc-card click" data-go="#/documents">
       <img class="doc-thumb" src="${esc((tribeDocs[0] && tribeDocs[0].url) || '/almfrje/lazma-1173-thumb.jpg')}" alt="وثائق القبيلة" loading="lazy">
       <div class="doc-card-body">
-        <div class="li-title">📜 وثائق القبيلة${tribeDocs.length > 1 ? ` (${tribeDocs.length})` : ''}</div>
-        <div class="li-sub muted">اضغط لعرض الوثائق وتفريغ نصوصها</div>
+        <div class="li-title">📜 ${tribeDocs.length === 1 ? esc(tribeDocs[0].title || 'وثيقة') : 'وثائق القبيلة (' + tribeDocs.length + ')'}</div>
+        <div class="li-sub muted">اضغط لعرض الوثيقة وتفريغ نصّها</div>
       </div>
       <span class="doc-card-arrow">‹</span>
     </div>` : ''}
