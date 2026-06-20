@@ -985,10 +985,11 @@ async function copyText(s) {
 // مشاركة الموقع: واجهة المشاركة الأصلية للجهاز إن توفّرت، وإلا نسخ الرابط للحافظة.
 async function shareSite() {
   const url = location.origin;
+  const msg = [shareTitle, shareText].filter(Boolean).join('\n');   // واتساب يعرض النصّ فقط — فندمج العنوان معه
   try {
-    if (navigator.share) { await navigator.share({ title: shareTitle, text: shareText, url }); return; }
+    if (navigator.share) { await navigator.share({ title: shareTitle, text: msg, url }); return; }
   } catch (e) { if (e && e.name === 'AbortError') return; /* أُلغيت المشاركة → لا بديل */ }
-  copyText((shareText ? shareText + '\n' : '') + url);   // بديل: نسخ النص + الرابط
+  copyText((msg ? msg + '\n' : '') + url);   // بديل: نسخ الرسالة + الرابط
 }
 // مسار النسب: من الشخص حتى الأصل، مع حمايةٍ من الدوائر ونقص البيانات (بحدٍّ أقصى للأجيال).
 function getLineagePath(id, maxDepth = 50) {
@@ -4079,7 +4080,7 @@ function screenTexts() {
       ${fTextarea('الوصف', 'tx_doc_caption', docCaption)}
       <button class="btn sm" id="tx_docSave" style="margin-top:6px">حفظ</button></div>
     <div class="card"><h3>📤 نصّ المشاركة</h3>
-      <p class="muted" style="font-size:.85rem;margin-top:-2px">الرسالة التي تظهر عند مشاركة الموقع (زرّ المشاركة). <b>ملاحظة:</b> عنوان «بطاقة المعاينة» في واتساب وسمٌ ثابت في الترويسة (لا يُعدَّل من هنا).</p>
+      <p class="muted" style="font-size:.85rem;margin-top:-2px">العنوان والنص يظهران معاً في رسالة المشاركة (زرّ المشاركة). <b>ملاحظة:</b> «بطاقة المعاينة» الصغيرة في واتساب لها عنوانٌ ثابت في الترويسة (لا يُعدَّل من هنا).</p>
       ${fInput('العنوان', 'tx_share_title', shareTitle)}
       ${fInput('النص', 'tx_share_text', shareText)}
       <button class="btn sm" id="tx_shareSave" style="margin-top:6px">حفظ</button></div>
