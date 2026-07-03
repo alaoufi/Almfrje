@@ -4897,7 +4897,12 @@ function addUserModal() {
     : '<div class="muted">لا فروع بعد.</div>';
   const permChksNew = MGR_PERMS.map(([k, l]) => `<label class="perm-chk"><input type="checkbox" data-nuperm="${k}" checked><span>${l}</span></label>`).join('');
   openModal('إضافة مستخدم جديد', `
-    ${fInput('الاسم الكامل', 'nu_name', '')}
+    <div class="field">
+      <label>الاسم (يُختار من الشجرة — لا بدّ أن يكون حيّاً)</label>
+      <input id="nu_search" type="text" placeholder="اكتب الاسم ثم اسم أبيه (مثال: سالم خالد) *" autocomplete="off">
+      <div id="nu_results" style="max-height:200px;overflow:auto"></div>
+      <div id="nu_selected" class="muted" style="margin-top:6px"></div>
+    </div>
     ${fInput('رقم الجوال', 'nu_phone', '', 'tel', 'inputmode="tel"')}
     ${fInput('اسم المستخدم (اختياري)', 'nu_user', '', 'text', 'autocomplete="off"')}
     ${pinField('الرقم السري (٤ أرقام فأكثر)', 'nu_pin')}
@@ -4918,13 +4923,23 @@ function addUserModal() {
     };
     roleSel.addEventListener('change', syncRole); syncRole();
 
+    // الاسم يُنتقى من الشجرة (حيّ فقط) — كطريقة دخول الزائر/إضافة المواليد
+    let nuPerson = null;
+    const nuSearch = document.getElementById('nu_search');
+    nuSearch.addEventListener('input', () => fbPickerSearch(nuSearch.value, document.getElementById('nu_results'), true, (p) => {
+      nuPerson = p;
+      document.getElementById('nu_selected').innerHTML = p ? '<div style="padding:8px 10px;border:1px solid var(--brand);border-radius:8px;font-size:.9rem">✅ الاسم: <b>' + esc(lineageShort(p.id, 12)) + '</b></div>' : '';
+      nuSearch.value = p ? p.name : '';
+    }));
+
     document.getElementById('nu_save').addEventListener('click', async () => {
-      const full_name = val('nu_name').trim();
+      if (!nuPerson) { toast('اختر الاسم من الشجرة (لا بدّ أن يكون حيّاً)'); return; }
+      const full_name = lineageShort(nuPerson.id, 4);
       const phone = normPhone(val('nu_phone'));
       const username = val('nu_user').trim();
       const pin = val('nu_pin').trim();
       const role = roleSel.value;
-      if (!full_name) { toast('أدخل الاسم'); return; }
+      if (!full_name) { toast('تعذّر تحديد الاسم'); return; }
       if (phone.length < 7) { toast('أدخل رقم جوال صحيح'); return; }
       if (!PIN_RE.test(pin)) { toast('الرقم السري ٤ أرقام على الأقل'); return; }
       const isSup = role === 'branch_manager' || role === 'general_manager';
@@ -4942,7 +4957,7 @@ function addUserModal() {
         const res = await fetch('/api/almfrje-create-user', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
-          body: JSON.stringify({ full_name, username, phone, pin, role, branch_ids: isMgr ? branch_ids : [], perms }),
+          body: JSON.stringify({ full_name, username, phone, pin, role, branch_ids: isSup ? branch_ids : [], perms }),
         });
         const j = await res.json().catch(() => ({}));
         if (!res.ok || !j.ok) throw new Error(j.error || 'تعذّر إنشاء الحساب');
