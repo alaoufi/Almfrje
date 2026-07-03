@@ -184,6 +184,22 @@ html.dark .about-card { box-shadow: 0 18px 44px -18px rgba(0,0,0,.8), 0 2px 0 co
 .guide-lbl { font-size: .78rem; font-weight: 800; color: var(--brand); }
 .guide-val { font-size: .92rem; line-height: 1.7; word-break: break-word; }
 
+/* الأسئلة الشائعة (تصنيف مستقل) — أكورديون سؤال/جواب */
+.faq-item { background: color-mix(in srgb, var(--brand) 4%, var(--card)); border: 1px solid var(--line);
+  border-inline-start: 3px solid color-mix(in srgb, var(--brand) 45%, transparent); border-radius: 12px;
+  margin-bottom: 10px; box-shadow: 0 2px 6px -3px rgba(0,0,0,.3); overflow: hidden; }
+.faq-item > summary { cursor: pointer; font-weight: 800; color: var(--text); font-size: .98rem; line-height: 1.6;
+  padding: 13px 14px; list-style: none; display: flex; align-items: center; gap: 8px; }
+.faq-item > summary::-webkit-details-marker { display: none; }
+.faq-item > summary::after { content: '+'; margin-inline-start: auto; font-size: 1.3rem; font-weight: 900;
+  color: var(--brand); line-height: 1; }
+.faq-item[open] > summary::after { content: '\2212'; }
+.faq-item[open] > summary { color: var(--brand); }
+.faq-a { padding: 0 14px 14px; color: var(--muted); font-size: .92rem; line-height: 1.9;
+  border-top: 1px dashed var(--line); margin: 0 12px; padding-top: 11px; }
+.faq-adm-tag { background: color-mix(in srgb, var(--brand) 16%, transparent); color: var(--brand);
+  border-radius: 999px; padding: 2px 8px; font-size: .7rem; font-weight: 800; flex: none; }
+
 /* محرّر النص الغني (أدوات تنسيق الخطوط) */
 .rte-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; padding: 6px; margin-top: 8px;
   background: var(--bg); border: 1px solid var(--line); border-radius: 10px 10px 0 0; }
