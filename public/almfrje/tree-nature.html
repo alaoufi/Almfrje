@@ -173,55 +173,64 @@
       }
     })();
 
-    /* ===== ٣) التخطيط الشعاعي الرأسي: جذعٌ بالأسفل وتاجٌ مروحيّ يتفتّح للأعلى (أبعاد شبه مربّعة) ===== */
+    /* ===== ٣) تخطيط «الغُصين»: كل أبٍ غصنٌ قصير اسمه عليه، وأوراق أبنائه ملتصقةٌ به على جانبيه =====
+       لا مسافات فارغة: الغصن يطول فقط بقدر أوراقه، وأبناؤه الآباء يتفرّعون من طرفه مباشرة. */
     function jit(id, k) { var x = Math.sin(id * 127.1 + k * 311.7) * 43758.5453; return (x - Math.floor(x)) - .5; }
-    // العمق الأقصى + إجمالي الأوراق (لتحديد نصف قطر التاج)
-    var maxGen = 1, totalLeaves = 0;
-    (function () {
-      var stack = rootsArr.map(function (r) { return { p: r, gen: 1 }; });
-      while (stack.length) {
-        var t = stack.pop(); if (t.gen > maxGen) maxGen = t.gen;
-        var cs = kids.get(t.p.id);
-        if (cs) for (var i = 0; i < cs.length; i++) stack.push({ p: cs[i], gen: t.gen + 1 });
-      }
-      rootsArr.forEach(function (r) { totalLeaves += leafN.get(r.id) || 1; });
-    })();
-    var TOTAL_ANG = 2.6;                                     // فتحة المروحة ≈ ١٥٠°
-    var R = Math.max(1400, 30 * totalLeaves / TOTAL_ANG);    // نصف قطر التاج: يتّسع لكل الأوراق على المحيط
-    var GEN_LEN = R / maxGen;                                // طول الجيل الواحد على نصف القطر
-    var TRUNK_H = Math.max(340, R * 0.16);                   // ارتفاع الجذع
-    var ROOT_DEPTH = Math.max(150, R * 0.06);                // عمق الجذور تحت الأرض
-    var trunkX = 0, topY = -TRUNK_H;
+    var SEG_BASE = 110, LEAF_STEP = 30, LEAF_OFF = 34, TOTAL_ANG = 2.6;
+    var trunkX = 0;
     var X = new Map(), Y = new Map(), ANG = new Map();
-    var bbMinX = -300, bbMaxX = 300, bbMinY = -TRUNK_H;
+    var SEG = new Map();    // غصن كل أب: [بداية س، بداية ص، نهاية س، نهاية ص]
+    var STEM = new Map();   // نقطة التصاق كل ورقة بغصن أبيها
+    var bbMinX = -250, bbMaxX = 250, bbMinY = -500;
+    var virtualTrunk = rootsArr.length > 1;   // عدّة جذور → جذع افتراضي يتفرّعون منه
     (function () {
-      // كل أبٍ يملك قطاعاً زاويّاً يقسمه على أبنائه بنسبة أوراق كلٍّ منهم
-      var stack = [], a = -TOTAL_ANG / 2;
-      rootsArr.forEach(function (r) {
-        var w = (leafN.get(r.id) || 1) / totalLeaves * TOTAL_ANG;
-        stack.push({ p: r, gen: 1, a0: a, a1: a + w }); a += w;
-      });
-      while (stack.length) {
-        var t = stack.pop();
-        var mid = (t.a0 + t.a1) / 2 + jit(t.p.id, 2) * (t.a1 - t.a0) * .18;
-        var r = t.gen * GEN_LEN * (1 + jit(t.p.id, 1) * .07);
-        var x = trunkX + Math.sin(mid) * r, y = topY - Math.cos(mid) * r;
-        X.set(t.p.id, x); Y.set(t.p.id, y); ANG.set(t.p.id, mid);
-        if (x < bbMinX) bbMinX = x; if (x > bbMaxX) bbMaxX = x; if (y < bbMinY) bbMinY = y;
-        var cs = kids.get(t.p.id);
-        if (cs) {
-          var la = t.a0, ln = leafN.get(t.p.id) || 1;
-          for (var i = 0; i < cs.length; i++) {
-            var w2 = (leafN.get(cs[i].id) || 1) / ln * (t.a1 - t.a0);
-            stack.push({ p: cs[i], gen: t.gen + 1, a0: la, a1: la + w2 }); la += w2;
-          }
+      var stack = [];
+      function seg(f, sx, sy, d, gen) {
+        var cs = kids.get(f.id) || [], leaves = [], folks = [];
+        cs.forEach(function (c) { (kids.has(c.id) ? folks : leaves).push(c); });
+        // طول الغصن بقدر حاجته: صفّا أوراق + هامش يكبر قليلاً بذرّيته
+        var L = SEG_BASE + Math.ceil(leaves.length / 2) * LEAF_STEP + Math.min(150, Math.sqrt(descN.get(f.id) || 0) * 7);
+        if (gen === 0) L = Math.max(L, 420);                 // غصن الجدّ الأعلى = الجذع نفسه
+        var ex = sx + Math.sin(d) * L, ey = sy - Math.cos(d) * L;
+        SEG.set(f.id, [sx, sy, ex, ey]); ANG.set(f.id, d);
+        X.set(f.id, (sx + ex) / 2); Y.set(f.id, (sy + ey) / 2);
+        if (ex < bbMinX) bbMinX = ex; if (ex > bbMaxX) bbMaxX = ex; if (ey < bbMinY) bbMinY = ey;
+        // أوراقه قريبة منه: بالتناوب يمين/يسار على طول الغصن
+        leaves.forEach(function (c, i) {
+          var t = Math.min(L - 26, SEG_BASE * .5 + Math.floor(i / 2) * LEAF_STEP);
+          var side = (i % 2) ? 1 : -1;
+          var bx = sx + Math.sin(d) * t, by = sy - Math.cos(d) * t;
+          var lx = bx + Math.cos(d) * side * LEAF_OFF, ly = by + Math.sin(d) * side * LEAF_OFF;
+          STEM.set(c.id, [bx, by]); X.set(c.id, lx); Y.set(c.id, ly); ANG.set(c.id, d * .5 + side * .35);
+          if (lx < bbMinX) bbMinX = lx; if (lx > bbMaxX) bbMaxX = lx; if (ly < bbMinY) bbMinY = ly;
+        });
+        // أبناؤه الآباء: مروحة من طرف غصنه مباشرة (بلا وصلات زائدة)
+        if (folks.length) {
+          var tot = 0; folks.forEach(function (c) { tot += leafN.get(c.id) || 1; });
+          var spread = (gen === 0) ? TOTAL_ANG : Math.min(2.2, .5 + .45 * Math.min(folks.length, 5) + .04 * Math.sqrt(tot));
+          var a = d - spread / 2;
+          folks.forEach(function (c) {
+            var w = (leafN.get(c.id) || 1) / tot * spread;
+            var nd = Math.max(-1.5, Math.min(1.5, a + w / 2)) + jit(c.id, 2) * .07;
+            a += w;
+            stack.push({ f: c, sx: ex, sy: ey, d: nd, gen: gen + 1 });
+          });
         }
       }
+      if (!virtualTrunk) {
+        stack.push({ f: rootsArr[0], sx: trunkX, sy: 8, d: 0, gen: 0 });
+      } else {
+        var tot = 0; rootsArr.forEach(function (r) { tot += leafN.get(r.id) || 1; });
+        var a = -TOTAL_ANG / 2;
+        rootsArr.forEach(function (r) {
+          var w = (leafN.get(r.id) || 1) / tot * TOTAL_ANG;
+          stack.push({ f: r, sx: trunkX, sy: -420, d: a + w / 2, gen: 1 }); a += w;
+        });
+      }
+      while (stack.length) { var t = stack.pop(); seg(t.f, t.sx, t.sy, t.d, t.gen); }
     })();
-    // جدٌّ أعلى واحد؟ ضَع شارته على الجذع نفسه (كالمشجّرات المطبوعة) وتتفرّع ذرّيته من قمّته
-    if (rootsArr.length === 1) {
-      X.set(rootsArr[0].id, trunkX); Y.set(rootsArr[0].id, -TRUNK_H * 0.5); ANG.set(rootsArr[0].id, 0);
-    }
+    var treeSpan = Math.max(900, bbMaxX - bbMinX);
+    var ROOT_DEPTH = Math.max(140, treeSpan * .05);          // عمق الجذور تحت الأرض
     // امتداد ذرية كل أب [minX,maxX,minY,maxY] — لرسم ظلّةٍ خضراء واحدة تحتضن كل بيت (والجذر يحتضن التاج كله)
     var ext = new Map();
     (function () {
@@ -302,7 +311,8 @@
       ctx.fillRect(vx0, 0, vx1 - vx0, ROOT_DEPTH * 1.6 + 160);
 
       // الجذور (زخرفية أسفل الأرض) — تتناسب مع حجم الشجرة
-      var rootSpread = Math.max(520, R * .22), rootDepth = ROOT_DEPTH;
+      var tw = Math.max(26, treeSpan * .022);   // سماكة الجذع
+      var rootSpread = Math.max(420, treeSpan * .18), rootDepth = ROOT_DEPTH;
       var rootW = Math.max(14, tw * .4);
       ctx.strokeStyle = '#5b4226'; ctx.lineCap = 'round';
       for (var r = 0; r < 7; r++) {
@@ -315,27 +325,22 @@
         ctx.stroke();
       }
 
-      // الجذع
-      var tw = Math.max(30, R * .045);   // جذع سميك يتناسب مع حجم الشجرة (كالملصقات)
-      ctx.strokeStyle = '#6b4423'; ctx.lineWidth = tw;
-      ctx.beginPath(); ctx.moveTo(trunkX, 10); ctx.lineTo(trunkX, topY); ctx.stroke();
+      // الجذع الافتراضي (عند تعدّد الجذور فقط — الجدّ الواحد غصنُه هو الجذع)
+      if (virtualTrunk) {
+        ctx.strokeStyle = '#6b4423'; ctx.lineWidth = tw;
+        ctx.beginPath(); ctx.moveTo(trunkX, 10); ctx.lineTo(trunkX, -420); ctx.stroke();
+      }
 
-      // الغصون من الجذع إلى الأصول (الجدّ الواحد يجلس على الجذع نفسه فلا يحتاج وصلة)
-      if (rootsArr.length > 1) rootsArr.forEach(function (rp) {
-        drawBranch(trunkX, topY, X.get(rp.id), Y.get(rp.id), Math.max(branchW(rp), tw * .5), 0, ANG.get(rp.id) || 0);
-      });
-
-      // كل الفروع (أب → ابن) — منحنيات تتبع الاتجاه الشعاعي فتبدو غصوناً حقيقية
-      ctx.strokeStyle = '#7a4f28';
+      // أغصان الآباء: قطعة قصيرة واحدة لكل أب (أوراقه عليها واسمه فوقها)
+      ctx.strokeStyle = '#7a4f28'; ctx.lineCap = 'round';
       persons.forEach(function (p) {
-        var cs = kids.get(p.id); if (!cs) return;
-        var x1 = X.get(p.id), y1 = Y.get(p.id);
+        var s = SEG.get(p.id); if (!s) return;
         var e = ext.get(p.id);
-        if (e && (e[1] < vx0 || e[0] > vx1 || e[3] < vy0 || e[2] > vy1)) return;   // اقتصاص بامتداد الذرية
-        var a1 = ANG.get(p.id) || 0;
-        for (var i = 0; i < cs.length; i++) {
-          drawBranch(x1, y1, X.get(cs[i].id), Y.get(cs[i].id), branchW(cs[i]), a1, ANG.get(cs[i].id) || 0);
-        }
+        if (e && (e[1] < vx0 - 100 || e[0] > vx1 + 100 || e[3] < vy0 - 100 || e[2] > vy1 + 100)) return;
+        var w = Math.max(branchW(p), (p.father_id == null || !byId.has(p.father_id)) && !virtualTrunk ? tw : 0);
+        ctx.lineWidth = w;
+        var mx = (s[0] + s[2]) / 2 + jit(p.id, 5) * 26, my = (s[1] + s[3]) / 2 + jit(p.id, 7) * 14;
+        ctx.beginPath(); ctx.moveTo(s[0], s[1]); ctx.quadraticCurveTo(mx, my, s[2], s[3]); ctx.stroke();
       });
 
       // الظلّة: ورقة/غيمة خضراء واحدة كبيرة تحتضن التاج كله، وتحتها ظلال أصغر لكل بيت
@@ -364,9 +369,15 @@
         if (x < vx0 || x > vx1 || y < vy0 || y > vy1) return;
         var isLeaf = !kids.has(p.id);
         if (isLeaf) {
-          // ورقة شجر يتوسّطها الاسم — تتّجه لخارج التاج مع غصنها
+          // عُنيق صغير يصل الورقة بغصن أبيها (الورقة ملتصقة بالغصن كالملصق)
+          var st = STEM.get(p.id);
+          if (st) {
+            ctx.strokeStyle = '#7a4f28'; ctx.lineWidth = 2.4;
+            ctx.beginPath(); ctx.moveTo(st[0], st[1]); ctx.lineTo(x, y); ctx.stroke();
+          }
+          // ورقة شجر يتوسّطها الاسم
           var mid = ANG.get(p.id) || 0;
-          var phi = mid - Math.PI / 2;                       // ‎+x بعد الدوران = خارج التاج
+          var phi = mid - Math.PI / 2;
           var la = (phi < -Math.PI / 2 || phi > Math.PI / 2) ? phi + Math.PI : phi;
           la = Math.max(-0.7, Math.min(0.7, la)) + jit(p.id, 4) * .1;   // ميلٌ مقروء (≤ ٤٠° تقريباً) كأوراق الملصقات
           var nm = p.name || '';
@@ -387,7 +398,7 @@
           // أب: شارة بيضاوية فاتحة على الغصن يتوسّطها اسمه (كالمشجّرات المطبوعة)
           var nm2 = p.name || '';
           if (showNames || (showBig && (descN.get(p.id) || 0) >= 20)) {
-            var fs = Math.min(60, 12 + Math.sqrt(descN.get(p.id) || 0) * 1.5);   // شارة الجدّ الكبير أكبر
+            var fs = Math.min(38, 12 + Math.sqrt(descN.get(p.id) || 0) * 1.1);   // شارة الجدّ الكبير أكبر (باعتدال كالملصق)
             var brx = Math.max(28, nm2.length * fs * .3 + 12), bry = Math.max(13, fs * .9);
             ctx.beginPath(); ctx.ellipse(x, y, brx, bry, 0, 0, 7);
             ctx.fillStyle = '#f7ecd4'; ctx.fill();
@@ -401,14 +412,6 @@
           }
         }
       });
-    }
-    function drawBranch(x1, y1, x2, y2, w, a1, a2) {
-      // منحنى يخرج باتجاه غصن الأب وينتهي باتجاه غصن الابن (شعاعياً)
-      ctx.lineWidth = w; ctx.lineCap = 'round';
-      var d = Math.hypot(x2 - x1, y2 - y1) * .4;
-      ctx.beginPath(); ctx.moveTo(x1, y1);
-      ctx.bezierCurveTo(x1 + Math.sin(a1) * d, y1 - Math.cos(a1) * d, x2 - Math.sin(a2) * d, y2 + Math.cos(a2) * d, x2, y2);
-      ctx.stroke();
     }
 
     /* ===== ٥) السحب والتكبير (فأرة + لمس/قرص) ===== */
