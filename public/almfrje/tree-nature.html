@@ -30,11 +30,19 @@
   .lg { display:flex; align-items:center; gap:6px; }
   .dotc { width:10px; height:10px; border-radius:50%; flex:none; }
   #load { position:fixed; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center;
-    gap:14px; background:linear-gradient(180deg,#a5d8f3,#dbeffb); z-index:10; color:#1e3a5f; font-weight:700; }
+    gap:14px; background:linear-gradient(180deg,#a5d8f3,#dbeffb); z-index:10; color:#1e3a5f; font-weight:700;
+    text-align:center; padding:0 20px; }
   #load .sp { width:44px; height:44px; border:4px solid rgba(30,58,95,.2); border-top-color:#1e3a5f;
     border-radius:50%; animation:spin 1s linear infinite; }
   @keyframes spin { to { transform:rotate(360deg); } }
   #load a { color:#1d4ed8; font-weight:800; }
+  .pbar { width:min(260px, 70vw); height:10px; background:rgba(30,58,95,.15); border-radius:99px; overflow:hidden; }
+  #pfill { height:100%; width:0%; background:linear-gradient(90deg,#2f9e44,#1e3a5f); border-radius:99px; transition:width .15s; }
+  #pnum { font-size:1.3rem; font-weight:900; }
+  #btnHome { position:fixed; bottom:calc(74px + env(safe-area-inset-bottom)); inset-inline:0; margin:auto; width:max-content;
+    display:none; border:none; border-radius:999px; background:#14532d; color:#fff; font:inherit; font-weight:800;
+    padding:11px 22px; box-shadow:0 4px 16px rgba(0,0,0,.35); cursor:pointer; z-index:5; }
+  #btnHome:active { transform:scale(.96); }
   #info { position:fixed; bottom:calc(70px + env(safe-area-inset-bottom)); inset-inline:14px; margin:auto; max-width:480px;
     background:rgba(255,255,255,.97); border-radius:14px; padding:12px 14px; box-shadow:0 6px 24px rgba(0,0,0,.3);
     z-index:6; display:none; }
@@ -66,7 +74,9 @@
 
   <div id="info"><button class="x" id="infoX">✕</button><div class="nm" id="infoName"></div><div class="ln" id="infoLine"></div></div>
 
-  <div id="load"><div class="sp"></div><div id="loadMsg">… جارٍ تحميل الشجرة</div></div>
+  <button id="btnHome">🌳 توسيط الشجرة</button>
+
+  <div id="load"><div class="sp"></div><div id="pnum"></div><div id="loadMsg">… جارٍ تحميل الشجرة</div><div class="pbar"><div id="pfill"></div></div></div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="/almfrje/config.js"></script>
@@ -82,13 +92,31 @@
     if (!cfg.SUPABASE_URL || !cfg.SUPABASE_ANON_KEY) { fail('تعذّر تحميل الإعداد — أعد المحاولة.'); return; }
     var sb = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
 
-    async function fetchAllRows(table) {
+    // مؤشر التحميل الرقمي: نسبة مئوية + عدد الأسماء
+    var pnum = document.getElementById('pnum'), pfill = document.getElementById('pfill');
+    function prog(n, total) {
+      if (total > 0) {
+        var pc = Math.min(100, Math.round(n * 100 / total));
+        pnum.textContent = pc + '٪';
+        loadMsg.textContent = 'جارٍ تحميل الأسماء… (' + n + ' من ' + total + ')';
+        pfill.style.width = pc + '%';
+      } else {
+        pnum.textContent = n;
+        loadMsg.textContent = '… جارٍ تحميل الأسماء';
+      }
+    }
+    async function countRows(table) {
+      try { var r = await sb.from(table).select('id', { count: 'exact', head: true }); return r.count || 0; }
+      catch (e) { return 0; }
+    }
+    async function fetchAllRows(table, total) {
       var out = [], page = 1000;
       for (var from = 0; ; from += page) {
         var r = await sb.from(table).select('id,name,father_id,status,generation,sort').range(from, from + page - 1);
         if (r.error) throw r.error;
         if (!r.data || !r.data.length) break;
         out = out.concat(r.data);
+        prog(out.length, total);
         if (r.data.length < page) break;
       }
       return out;
@@ -101,9 +129,13 @@
       fail('لعرض الشجرة سجّل دخولك أولاً.<br><br><a href="/">افتح الموقع وادخل (زائراً أو مشرفاً)</a><br>ثم عُد لهذه الصفحة وحدّثها 🔄');
       return;
     }
+    var total = await countRows('almfrje_persons_pub');
+    if (!total) total = await countRows('almfrje_persons');
+    prog(0, total);
     var persons = [], lastErr = null;
-    try { persons = await fetchAllRows('almfrje_persons_pub'); }
-    catch (e) { lastErr = e; try { persons = await fetchAllRows('almfrje_persons'); } catch (e2) { lastErr = e2; } }
+    try { persons = await fetchAllRows('almfrje_persons_pub', total); }
+    catch (e) { lastErr = e; try { persons = await fetchAllRows('almfrje_persons', total); } catch (e2) { lastErr = e2; } }
+    pnum.textContent = '١٠٠٪'; loadMsg.textContent = '… جارٍ رسم الشجرة'; pfill.style.width = '100%';
     if (!persons.length) {
       fail('تعذّر جلب بيانات الشجرة' + (lastErr && lastErr.message ? ':<br><span style="font-size:.8rem;color:#b91c1c">' + String(lastErr.message).replace(/</g, '&lt;') + '</span>' : '.')
         + '<br><br><a href="/">افتح الموقع وسجّل دخولك</a> ثم عُد وحدّث الصفحة 🔄');
@@ -168,6 +200,28 @@
       }
     })();
     var worldW = Math.max(nextLeaf - 1, 1) * LEAF_GAP;
+    // امتداد ذرية كل أب [minX,maxX,minY,maxY] — لرسم ظلّةٍ خضراء واحدة تحتضن كل بيت (والجذر يحتضن التاج كله)
+    var ext = new Map();
+    (function () {
+      var stack = rootsArr.map(function (r) { return { p: r, phase: 0 }; });
+      while (stack.length) {
+        var t = stack[stack.length - 1], cs = kids.get(t.p.id) || [];
+        if (t.phase === 0) {
+          t.phase = 1;
+          for (var i = cs.length - 1; i >= 0; i--) stack.push({ p: cs[i], phase: 0 });
+        } else {
+          stack.pop();
+          var x = X.get(t.p.id), y = Y.get(t.p.id);
+          var e = [x, x, y, y];
+          for (var j = 0; j < cs.length; j++) {
+            var ce = ext.get(cs[j].id);
+            if (ce[0] < e[0]) e[0] = ce[0]; if (ce[1] > e[1]) e[1] = ce[1];
+            if (ce[2] < e[2]) e[2] = ce[2]; if (ce[3] > e[3]) e[3] = ce[3];
+          }
+          ext.set(t.p.id, e);
+        }
+      }
+    })();
     // موضع الجذع: منتصف مواضع الأصول
     var trunkX = 0;
     if (rootsArr.length) { var sx = 0; rootsArr.forEach(function (r) { sx += X.get(r.id); }); trunkX = sx / rootsArr.length; }
@@ -255,6 +309,23 @@
         }
       });
 
+      // الظلّة: ورقة/غيمة خضراء واحدة كبيرة تحتضن التاج كله، وتحتها ظلال أصغر لكل بيت
+      persons.forEach(function (p) {
+        if (!kids.has(p.id)) return;
+        var e = ext.get(p.id); if (!e) return;
+        if (e[1] < vx0 || e[0] > vx1 || e[3] < vy0 || e[2] > vy1) return;
+        var cx = (e[0] + e[1]) / 2, cy = (e[2] + e[3]) / 2;
+        var rx = (e[1] - e[0]) / 2 + 55, ry = (e[3] - e[2]) / 2 + 70;
+        ctx.beginPath(); ctx.ellipse(cx, cy, rx, ry, jit(p.id, 6) * .15, 0, 7);
+        ctx.fillStyle = (p.id % 2) ? 'rgba(64,145,60,.085)' : 'rgba(46,125,50,.085)';
+        ctx.fill();
+      });
+
+      // زر «توسيط الشجرة» يظهر إذا خرجت الشجرة كلها من الشاشة
+      var offX = (worldW + 400) < vx0 || (Math.min(0, trunkX) - 400) > vx1;
+      var offY = 300 < vy0 || (-(maxGen * GEN_GAP) - 150) > vy1;
+      document.getElementById('btnHome').style.display = (offX || offY) ? 'block' : 'none';
+
       // الأوراق + الأسماء
       var showNames = scale >= 0.5;
       var showBig = scale >= 0.16;
@@ -328,6 +399,7 @@
     document.getElementById('btnIn').addEventListener('click', function () { zoomAt(innerWidth / 2, innerHeight / 2, 1.35); });
     document.getElementById('btnOut').addEventListener('click', function () { zoomAt(innerWidth / 2, innerHeight / 2, 1 / 1.35); });
     document.getElementById('btnFit').addEventListener('click', fit);
+    document.getElementById('btnHome').addEventListener('click', fit);
 
     /* ===== ٦) لمس اسم/ورقة → بطاقة النسب ===== */
     var moved = false, downXY = null;
