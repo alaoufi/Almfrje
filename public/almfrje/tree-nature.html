@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#87c5eb">
+<meta name="robots" content="noindex">
+<title>الشجرة الطبيعية — قبيلة المفارجة</title>
+<link rel="icon" href="/almfrje/icon.svg" type="image/svg+xml">
+<style>
+  /* صفحة مستقلة: شجرة طبيعية (جذور/جذع/غصون/أوراق) تُرسم على Canvas مع سحبٍ وتكبير */
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html, body { height:100%; overflow:hidden; font-family:'Segoe UI', Tahoma, Arial, sans-serif; }
+  #cv { display:block; width:100vw; height:100vh; touch-action:none; cursor:grab; }
+  #cv.drag { cursor:grabbing; }
+  .bar { position:fixed; top:0; inset-inline:0; display:flex; align-items:center; gap:8px;
+    padding:10px 12px calc(10px); background:linear-gradient(180deg, rgba(15,23,42,.55), transparent);
+    color:#fff; z-index:5; pointer-events:none; }
+  .bar > * { pointer-events:auto; }
+  .bar h1 { font-size:1rem; font-weight:800; text-shadow:0 1px 4px rgba(0,0,0,.5); flex:1; text-align:center; }
+  .ib { width:38px; height:38px; border:none; border-radius:12px; background:rgba(255,255,255,.92);
+    color:#0f172a; font-size:1.15rem; font-weight:900; cursor:pointer; box-shadow:0 2px 8px rgba(0,0,0,.25);
+    display:flex; align-items:center; justify-content:center; text-decoration:none; }
+  .ib:active { transform:scale(.94); }
+  .ctrls { position:fixed; bottom:calc(18px + env(safe-area-inset-bottom)); inset-inline-end:14px;
+    display:flex; flex-direction:column; gap:8px; z-index:5; }
+  .legend { position:fixed; bottom:calc(18px + env(safe-area-inset-bottom)); inset-inline-start:14px;
+    background:rgba(255,255,255,.92); border-radius:12px; padding:8px 12px; font-size:.74rem; color:#0f172a;
+    box-shadow:0 2px 10px rgba(0,0,0,.2); z-index:5; line-height:1.9; }
+  .lg { display:flex; align-items:center; gap:6px; }
+  .dotc { width:10px; height:10px; border-radius:50%; flex:none; }
+  #load { position:fixed; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center;
+    gap:14px; background:linear-gradient(180deg,#a5d8f3,#dbeffb); z-index:10; color:#1e3a5f; font-weight:700; }
+  #load .sp { width:44px; height:44px; border:4px solid rgba(30,58,95,.2); border-top-color:#1e3a5f;
+    border-radius:50%; animation:spin 1s linear infinite; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+  #load a { color:#1d4ed8; font-weight:800; }
+  #info { position:fixed; bottom:calc(70px + env(safe-area-inset-bottom)); inset-inline:14px; margin:auto; max-width:480px;
+    background:rgba(255,255,255,.97); border-radius:14px; padding:12px 14px; box-shadow:0 6px 24px rgba(0,0,0,.3);
+    z-index:6; display:none; }
+  #info.on { display:block; }
+  #info .nm { font-weight:900; color:#14532d; margin-bottom:4px; }
+  #info .ln { font-size:.82rem; color:#475569; line-height:1.8; }
+  #info .x { position:absolute; top:6px; inset-inline-start:8px; border:none; background:none; font-size:1rem; cursor:pointer; color:#64748b; }
+</style>
+</head>
+<body>
+  <canvas id="cv"></canvas>
+
+  <div class="bar">
+    <a class="ib" href="/" title="العودة للموقع">‹</a>
+    <h1>🌳 الشجرة الطبيعية — قبيلة المفارجة</h1>
+    <button class="ib" id="btnFit" title="ملاءمة العرض">⤢</button>
+  </div>
+
+  <div class="ctrls">
+    <button class="ib" id="btnIn" title="تكبير">＋</button>
+    <button class="ib" id="btnOut" title="تصغير">－</button>
+  </div>
+
+  <div class="legend">
+    <div class="lg"><span class="dotc" style="background:#2f9e44"></span> ورقة خضراء: حيّ</div>
+    <div class="lg"><span class="dotc" style="background:#b91c1c"></span> ورقة حمراء: متوفّى لم يعقب</div>
+    <div class="lg"><span class="dotc" style="background:#8b5a2b"></span> الغصن: أبٌ وذرّيته عليه</div>
+  </div>
+
+  <div id="info"><button class="x" id="infoX">✕</button><div class="nm" id="infoName"></div><div class="ln" id="infoLine"></div></div>
+
+  <div id="load"><div class="sp"></div><div id="loadMsg">… جارٍ تحميل الشجرة</div></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="/almfrje/config.js"></script>
+  <script src="/almfrje-config"></script>
+  <script>
+  (async function () {
+    'use strict';
+    var loadEl = document.getElementById('load'), loadMsg = document.getElementById('loadMsg');
+    function fail(html) { loadMsg.innerHTML = html; loadEl.querySelector('.sp').style.display = 'none'; }
+
+    /* ===== ١) البيانات: نفس مشروع الموقع ونفس جلسته المحفوظة في المتصفّح ===== */
+    var cfg = window.ALMFRJE_CONFIG || {};
+    if (!cfg.SUPABASE_URL || !cfg.SUPABASE_ANON_KEY) { fail('تعذّر تحميل الإعداد — أعد المحاولة.'); return; }
+    var sb = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
+
+    async function fetchAllRows(table) {
+      var out = [], page = 1000;
+      for (var from = 0; ; from += page) {
+        var r = await sb.from(table).select('id,name,father_id,status,generation,sort').range(from, from + page - 1);
+        if (r.error) throw r.error;
+        if (!r.data || !r.data.length) break;
+        out = out.concat(r.data);
+        if (r.data.length < page) break;
+      }
+      return out;
+    }
+
+    var persons = [];
+    try {
+      try { persons = await fetchAllRows('almfrje_persons_pub'); }
+      catch (e) { persons = await fetchAllRows('almfrje_persons'); }
+    } catch (e) { persons = []; }
+    if (!persons.length) {
+      fail('لا يمكن عرض الشجرة قبل الدخول.<br><br><a href="/">افتح الموقع وسجّل دخولك (زائراً أو مشرفاً)</a><br>ثم عُد لهذه الصفحة وحدّثها 🔄');
+      return;
+    }
+
+    /* ===== ٢) بناء الهيكل ===== */
+    var byId = new Map(); persons.forEach(function (p) { byId.set(p.id, p); });
+    var kids = new Map();
+    persons.forEach(function (p) {
+      var f = p.father_id;
+      if (f != null && byId.has(f)) { if (!kids.has(f)) kids.set(f, []); kids.get(f).push(p); }
+    });
+    kids.forEach(function (arr) {
+      arr.sort(function (a, b) { return (a.sort || 9e9) - (b.sort || 9e9) || a.id - b.id; });
+    });
+    var rootsArr = persons.filter(function (p) { return p.father_id == null || !byId.has(p.father_id); });
+    rootsArr.sort(function (a, b) { return (a.sort || 9e9) - (b.sort || 9e9) || a.id - b.id; });
+
+    // عدد الذرية + عدد الأوراق (لتوزيع العرض وسماكة الغصون) — تكرارياً بمكدّس (بلا حدود عمق)
+    var descN = new Map(), leafN = new Map();
+    (function () {
+      var stack = rootsArr.map(function (r) { return { p: r, phase: 0 }; });
+      while (stack.length) {
+        var t = stack[stack.length - 1], cs = kids.get(t.p.id) || [];
+        if (t.phase === 0) {
+          t.phase = 1;
+          for (var i = cs.length - 1; i >= 0; i--) stack.push({ p: cs[i], phase: 0 });
+        } else {
+          stack.pop();
+          var d = 0, l = 0;
+          for (var j = 0; j < cs.length; j++) { d += 1 + (descN.get(cs[j].id) || 0); l += leafN.get(cs[j].id) || 1; }
+          descN.set(t.p.id, d); leafN.set(t.p.id, cs.length ? l : 1);
+        }
+      }
+    })();
+
+    /* ===== ٣) التخطيط: الأرض عند y=0 والأجيال تصعد للأعلى ===== */
+    var LEAF_GAP = 34, GEN_GAP = 170;
+    function jit(id, k) { var x = Math.sin(id * 127.1 + k * 311.7) * 43758.5453; return (x - Math.floor(x)) - .5; }
+    var X = new Map(), Y = new Map(), nextLeaf = 0;
+    (function () {
+      var stack = [];
+      for (var i = rootsArr.length - 1; i >= 0; i--) stack.push({ p: rootsArr[i], gen: 1, phase: 0 });
+      while (stack.length) {
+        var t = stack[stack.length - 1], cs = kids.get(t.p.id) || [];
+        if (t.phase === 0) {
+          t.phase = 1;
+          if (!cs.length) { // ورقة
+            stack.pop();
+            X.set(t.p.id, nextLeaf * LEAF_GAP); nextLeaf++;
+            Y.set(t.p.id, -t.gen * GEN_GAP + jit(t.p.id, 1) * 55);
+          } else {
+            for (var j = cs.length - 1; j >= 0; j--) stack.push({ p: cs[j], gen: t.gen + 1, phase: 0 });
+          }
+        } else {
+          stack.pop();
+          var sum = 0; for (var k2 = 0; k2 < cs.length; k2++) sum += X.get(cs[k2].id);
+          X.set(t.p.id, sum / cs.length + jit(t.p.id, 2) * 12);
+          Y.set(t.p.id, -t.gen * GEN_GAP + jit(t.p.id, 1) * 40);
+        }
+      }
+    })();
+    var worldW = Math.max(nextLeaf - 1, 1) * LEAF_GAP;
+    // موضع الجذع: منتصف مواضع الأصول
+    var trunkX = 0;
+    if (rootsArr.length) { var sx = 0; rootsArr.forEach(function (r) { sx += X.get(r.id); }); trunkX = sx / rootsArr.length; }
+    var trunkTopY = -GEN_GAP * 0.55;
+    var maxGen = 1; persons.forEach(function (p) { var g = Math.round(-((Y.get(p.id) || 0)) / GEN_GAP); if (g > maxGen) maxGen = g; });
+
+    /* ===== ٤) الرسم ===== */
+    var cv = document.getElementById('cv'), ctx = cv.getContext('2d');
+    var dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+    var scale = 1, ox = 0, oy = 0;   // world→screen: sx = (wx-ox)*scale
+    function resize() {
+      cv.width = Math.round(innerWidth * dpr); cv.height = Math.round(innerHeight * dpr);
+      cv.style.width = innerWidth + 'px'; cv.style.height = innerHeight + 'px';
+      requestDraw();
+    }
+    function fit() {
+      var m = 70;
+      var s1 = (innerWidth - m) / (worldW + 200);
+      var s2 = (innerHeight - m) / ((maxGen * GEN_GAP) + 320);
+      scale = Math.max(0.012, Math.min(s1, s2, 1.25));
+      ox = trunkX - (innerWidth / 2) / scale;
+      oy = (-(maxGen * GEN_GAP) - 120) + 30 / scale; // أعلى الشجرة قرب أعلى الشاشة
+      // مركزة عمودية: اجعل منتصف الشجرة في منتصف الشاشة
+      var midW = (-(maxGen * GEN_GAP) + 170) / 2;
+      oy = midW - (innerHeight / 2) / scale;
+      requestDraw();
+    }
+    var raf = 0;
+    function requestDraw() { if (!raf) raf = requestAnimationFrame(function () { raf = 0; draw(); }); }
+
+    function branchW(p) { return Math.max(1.6, Math.sqrt((descN.get(p.id) || 0) + 1) * 1.35); }
+    var statusLeaf = function (p) { return p.status === 'dead' ? '#b91c1c' : '#2f9e44'; };
+
+    function draw() {
+      var W = cv.width, H = cv.height;
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      // السماء
+      var sky = ctx.createLinearGradient(0, 0, 0, H);
+      sky.addColorStop(0, '#8ecbee'); sky.addColorStop(.65, '#cfe9f8'); sky.addColorStop(1, '#eaf6ce');
+      ctx.fillStyle = sky; ctx.fillRect(0, 0, W, H);
+      // الشمس
+      ctx.beginPath(); ctx.arc(W * .84, H * .13, Math.min(W, H) * .06, 0, 7);
+      ctx.fillStyle = 'rgba(255,236,150,.9)'; ctx.fill();
+      ctx.beginPath(); ctx.arc(W * .84, H * .13, Math.min(W, H) * .1, 0, 7);
+      ctx.fillStyle = 'rgba(255,236,150,.25)'; ctx.fill();
+
+      ctx.setTransform(scale * dpr, 0, 0, scale * dpr, -ox * scale * dpr, -oy * scale * dpr);
+      var vx0 = ox - 50 / scale, vx1 = ox + (innerWidth + 50) / scale;
+      var vy0 = oy - 50 / scale, vy1 = oy + (innerHeight + 50) / scale;
+
+      // الأرض
+      var groundH = 260;
+      var g = ctx.createLinearGradient(0, 0, 0, groundH);
+      g.addColorStop(0, '#7bb661'); g.addColorStop(.14, '#5f9e4b'); g.addColorStop(.16, '#7a5a3a'); g.addColorStop(1, '#4b3621');
+      ctx.fillStyle = g;
+      ctx.fillRect(vx0, 0, vx1 - vx0, groundH + 200);
+
+      // الجذور (زخرفية أسفل الأرض)
+      ctx.strokeStyle = '#5b4226'; ctx.lineCap = 'round';
+      for (var r = 0; r < 7; r++) {
+        var t = (r / 6 - .5);
+        ctx.lineWidth = 14 - Math.abs(t) * 12;
+        ctx.beginPath();
+        ctx.moveTo(trunkX, 6);
+        ctx.bezierCurveTo(trunkX + t * 120, 60, trunkX + t * 320, 110, trunkX + t * 520 + jit(r + 9, 3) * 60, 150 + Math.abs(t) * 70);
+        ctx.stroke();
+      }
+
+      // الجذع
+      var tw = Math.max(20, Math.sqrt(persons.length) * 1.35);
+      ctx.strokeStyle = '#6b4423'; ctx.lineWidth = tw;
+      ctx.beginPath(); ctx.moveTo(trunkX, 10); ctx.lineTo(trunkX, trunkTopY); ctx.stroke();
+
+      // الغصون من الجذع إلى الأصول
+      rootsArr.forEach(function (rp) {
+        drawBranch(trunkX, trunkTopY, X.get(rp.id), Y.get(rp.id), Math.max(branchW(rp), tw * .5));
+      });
+
+      // كل الفروع (أب → ابن)
+      ctx.strokeStyle = '#7a4f28';
+      persons.forEach(function (p) {
+        var cs = kids.get(p.id); if (!cs) return;
+        var x1 = X.get(p.id), y1 = Y.get(p.id);
+        if (x1 < vx0 - 900 || x1 > vx1 + 900) return;   // اقتصاص أفقي واسع
+        for (var i = 0; i < cs.length; i++) {
+          drawBranch(x1, y1, X.get(cs[i].id), Y.get(cs[i].id), branchW(cs[i]));
+        }
+      });
+
+      // الأوراق + الأسماء
+      var showNames = scale >= 0.5;
+      var showBig = scale >= 0.16;
+      ctx.textAlign = 'center';
+      persons.forEach(function (p) {
+        var x = X.get(p.id), y = Y.get(p.id);
+        if (x < vx0 || x > vx1 || y < vy0 || y > vy1) return;
+        var isLeaf = !kids.has(p.id);
+        if (isLeaf) {
+          // ورقة شجر بيضاوية مائلة
+          var a = jit(p.id, 4) * 1.1;
+          ctx.save(); ctx.translate(x, y); ctx.rotate(a);
+          ctx.beginPath(); ctx.ellipse(0, -7, 6.5, 12, 0, 0, 7);
+          ctx.fillStyle = statusLeaf(p); ctx.fill();
+          ctx.strokeStyle = 'rgba(0,0,0,.25)'; ctx.lineWidth = .7;
+          ctx.beginPath(); ctx.moveTo(0, 4); ctx.lineTo(0, -16); ctx.stroke();
+          ctx.restore();
+          if (showNames) {
+            ctx.fillStyle = '#1e293b'; ctx.font = '700 11px Segoe UI, Tahoma';
+            ctx.fillText(p.name || '', x, y + 16);
+          }
+        } else {
+          // عقدة أب: برعم + الاسم
+          ctx.beginPath(); ctx.arc(x, y, Math.max(2.5, branchW(p) * .8), 0, 7);
+          ctx.fillStyle = '#5b4226'; ctx.fill();
+          if (showNames || (showBig && (descN.get(p.id) || 0) >= 20)) {
+            var fs = Math.min(20, 11 + Math.sqrt(descN.get(p.id) || 0) * .7);
+            ctx.font = '800 ' + fs + 'px Segoe UI, Tahoma';
+            ctx.fillStyle = '#173d1f';
+            ctx.strokeStyle = 'rgba(255,255,255,.75)'; ctx.lineWidth = 3;
+            ctx.strokeText(p.name || '', x, y - 10);
+            ctx.fillText(p.name || '', x, y - 10);
+          }
+        }
+      });
+    }
+    function drawBranch(x1, y1, x2, y2, w) {
+      ctx.lineWidth = w; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(x1, y1);
+      var dy = y1 - y2;
+      ctx.bezierCurveTo(x1 + (x2 - x1) * .12, y1 - dy * .45, x2 - (x2 - x1) * .12, y2 + dy * .35, x2, y2);
+      ctx.stroke();
+    }
+
+    /* ===== ٥) السحب والتكبير (فأرة + لمس/قرص) ===== */
+    var ptrs = new Map(), lastD = 0;
+    cv.addEventListener('pointerdown', function (e) { cv.setPointerCapture(e.pointerId); ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY }); cv.classList.add('drag'); });
+    cv.addEventListener('pointerup', function (e) { ptrs.delete(e.pointerId); lastD = 0; cv.classList.remove('drag'); });
+    cv.addEventListener('pointercancel', function (e) { ptrs.delete(e.pointerId); lastD = 0; cv.classList.remove('drag'); });
+    cv.addEventListener('pointermove', function (e) {
+      if (!ptrs.has(e.pointerId)) return;
+      var pr = ptrs.get(e.pointerId);
+      if (ptrs.size === 1) {
+        ox -= (e.clientX - pr.x) / scale; oy -= (e.clientY - pr.y) / scale;
+        pr.x = e.clientX; pr.y = e.clientY; requestDraw();
+      } else if (ptrs.size === 2) {
+        pr.x = e.clientX; pr.y = e.clientY;
+        var a = ptrs.values(), p1 = a.next().value, p2 = a.next().value;
+        var d = Math.hypot(p1.x - p2.x, p1.y - p2.y);
+        var cx = (p1.x + p2.x) / 2, cy = (p1.y + p2.y) / 2;
+        if (lastD) zoomAt(cx, cy, d / lastD);
+        lastD = d;
+      }
+    });
+    cv.addEventListener('wheel', function (e) { e.preventDefault(); zoomAt(e.clientX, e.clientY, e.deltaY < 0 ? 1.15 : 1 / 1.15); }, { passive: false });
+    function zoomAt(cx, cy, f) {
+      var ns = Math.max(0.008, Math.min(4, scale * f)); f = ns / scale;
+      ox += (cx / scale) * (1 - 1 / f); oy += (cy / scale) * (1 - 1 / f);
+      scale = ns; requestDraw();
+    }
+    document.getElementById('btnIn').addEventListener('click', function () { zoomAt(innerWidth / 2, innerHeight / 2, 1.35); });
+    document.getElementById('btnOut').addEventListener('click', function () { zoomAt(innerWidth / 2, innerHeight / 2, 1 / 1.35); });
+    document.getElementById('btnFit').addEventListener('click', fit);
+
+    /* ===== ٦) لمس اسم/ورقة → بطاقة النسب ===== */
+    var moved = false, downXY = null;
+    cv.addEventListener('pointerdown', function (e) { moved = false; downXY = { x: e.clientX, y: e.clientY }; });
+    cv.addEventListener('pointermove', function (e) { if (downXY && Math.hypot(e.clientX - downXY.x, e.clientY - downXY.y) > 8) moved = true; });
+    cv.addEventListener('pointerup', function (e) {
+      if (moved || ptrs.size) return;
+      var wx = ox + e.clientX / scale, wy = oy + e.clientY / scale;
+      var best = null, bd = (30 / scale) * (30 / scale);
+      persons.forEach(function (p) {
+        var dx = X.get(p.id) - wx, dy = Y.get(p.id) - wy, d = dx * dx + dy * dy;
+        if (d < bd) { bd = d; best = p; }
+      });
+      var info = document.getElementById('info');
+      if (!best) { info.classList.remove('on'); return; }
+      var chain = [], cur = best, guard = 0;
+      while (cur && guard++ < 40) { chain.push(cur.name); cur = cur.father_id != null ? byId.get(cur.father_id) : null; }
+      document.getElementById('infoName').textContent = (best.status === 'dead' ? '🍂 ' : '🍃 ') + (best.name || '');
+      document.getElementById('infoLine').textContent = chain.join(' بن ') + (kids.has(best.id) ? ' — الذرية: ' + descN.get(best.id) + ' فرد' : '');
+      info.classList.add('on');
+    });
+    document.getElementById('infoX').addEventListener('click', function () { document.getElementById('info').classList.remove('on'); });
+
+    window.addEventListener('resize', resize);
+    resize(); fit();
+    loadEl.remove();
+  })().catch(function (e) {
+    var m = document.getElementById('loadMsg');
+    if (m) m.textContent = 'حدث خطأ: ' + (e && e.message ? e.message : e);
+  });
+  </script>
+</body>
+</html>
