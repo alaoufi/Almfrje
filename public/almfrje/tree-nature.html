@@ -192,15 +192,22 @@
         var L = SEG_BASE + Math.ceil(leaves.length / 2) * LEAF_STEP + Math.min(150, Math.sqrt(descN.get(f.id) || 0) * 7);
         if (gen === 0) L = Math.max(L, 420);                 // غصن الجدّ الأعلى = الجذع نفسه
         var ex = sx + Math.sin(d) * L, ey = sy - Math.cos(d) * L;
-        SEG.set(f.id, [sx, sy, ex, ey]); ANG.set(f.id, d);
-        X.set(f.id, (sx + ex) / 2); Y.set(f.id, (sy + ey) / 2);
+        // انحناء طبيعي متعرّج: نقطة تحكّم منحرفة عمودياً — الغصن المرسوم والأوراق يتبعان المنحنى نفسه
+        var nx = -(ey - sy) / L, ny = (ex - sx) / L;
+        var bend = L * .16 * jit(f.id, 5);
+        var qx = (sx + ex) / 2 + nx * bend, qy = (sy + ey) / 2 + ny * bend;
+        SEG.set(f.id, [sx, sy, qx, qy, ex, ey]); ANG.set(f.id, d);
+        X.set(f.id, .25 * sx + .5 * qx + .25 * ex); Y.set(f.id, .25 * sy + .5 * qy + .25 * ey);
         if (ex < bbMinX) bbMinX = ex; if (ex > bbMaxX) bbMaxX = ex; if (ey < bbMinY) bbMinY = ey;
-        // أوراقه قريبة منه: بالتناوب يمين/يسار على طول الغصن
+        // أوراقه قريبة منه: بالتناوب يمين/يسار على طول منحنى الغصن نفسه
         leaves.forEach(function (c, i) {
-          var t = Math.min(L - 26, SEG_BASE * .5 + Math.floor(i / 2) * LEAF_STEP);
+          var t = Math.min(L - 26, SEG_BASE * .5 + Math.floor(i / 2) * LEAF_STEP) / L, mt = 1 - t;
           var side = (i % 2) ? 1 : -1;
-          var bx = sx + Math.sin(d) * t, by = sy - Math.cos(d) * t;
-          var lx = bx + Math.cos(d) * side * LEAF_OFF, ly = by + Math.sin(d) * side * LEAF_OFF;
+          var bx = mt * mt * sx + 2 * mt * t * qx + t * t * ex;
+          var by = mt * mt * sy + 2 * mt * t * qy + t * t * ey;
+          var tx = 2 * mt * (qx - sx) + 2 * t * (ex - qx), ty = 2 * mt * (qy - sy) + 2 * t * (ey - qy);
+          var tl = Math.hypot(tx, ty) || 1;
+          var lx = bx - (ty / tl) * side * LEAF_OFF, ly = by + (tx / tl) * side * LEAF_OFF;
           STEM.set(c.id, [bx, by]); X.set(c.id, lx); Y.set(c.id, ly); ANG.set(c.id, d * .5 + side * .35);
           if (lx < bbMinX) bbMinX = lx; if (lx > bbMaxX) bbMaxX = lx; if (ly < bbMinY) bbMinY = ly;
         });
@@ -273,6 +280,26 @@
     var raf = 0;
     function requestDraw() { if (!raf) raf = requestAnimationFrame(function () { raf = 0; draw(); }); }
 
+    // غصنٌ متدرّج السماكة على منحنى: يُملأ كمضلّع بين حافّتين متوازيتين تضيقان نحو الطرف
+    function drawTapered(x0, y0, qx, qy, x1, y1, w0, w1) {
+      var N = 8, up = [], dn = [], i, t, mt, px, py, tx, ty, tl, w;
+      for (i = 0; i <= N; i++) {
+        t = i / N; mt = 1 - t;
+        px = mt * mt * x0 + 2 * mt * t * qx + t * t * x1;
+        py = mt * mt * y0 + 2 * mt * t * qy + t * t * y1;
+        tx = 2 * mt * (qx - x0) + 2 * t * (x1 - qx);
+        ty = 2 * mt * (qy - y0) + 2 * t * (y1 - qy);
+        tl = Math.hypot(tx, ty) || 1;
+        w = (w0 * (1 - t) + w1 * t) / 2;
+        up.push([px - (ty / tl) * w, py + (tx / tl) * w]);
+        dn.push([px + (ty / tl) * w, py - (tx / tl) * w]);
+      }
+      ctx.beginPath(); ctx.moveTo(up[0][0], up[0][1]);
+      for (i = 1; i <= N; i++) ctx.lineTo(up[i][0], up[i][1]);
+      for (i = N; i >= 0; i--) ctx.lineTo(dn[i][0], dn[i][1]);
+      ctx.closePath(); ctx.fill();
+    }
+
     function branchW(p) { return Math.max(1.6, Math.sqrt((descN.get(p.id) || 0) + 1) * 1.35); }
     // ألوان الأوراق: الأحياء بتدرّجات خضراء متنوّعة (كالمشجّرات المطبوعة)، ومن تُوفّي ولم يعقب بالأحمر الداكن
     var GREENS = ['#2f9e44', '#37a24a', '#5c940d', '#40912e'];
@@ -327,20 +354,20 @@
 
       // الجذع الافتراضي (عند تعدّد الجذور فقط — الجدّ الواحد غصنُه هو الجذع)
       if (virtualTrunk) {
-        ctx.strokeStyle = '#6b4423'; ctx.lineWidth = tw;
-        ctx.beginPath(); ctx.moveTo(trunkX, 10); ctx.lineTo(trunkX, -420); ctx.stroke();
+        ctx.fillStyle = '#6b4423';
+        drawTapered(trunkX, 10, trunkX, -205, trunkX, -420, tw, tw * .55);
       }
 
-      // أغصان الآباء: قطعة قصيرة واحدة لكل أب (أوراقه عليها واسمه فوقها)
-      ctx.strokeStyle = '#7a4f28'; ctx.lineCap = 'round';
+      // أغصان الآباء: قطعة متدرّجة السماكة (عريضة عند القاعدة تستدقّ نحو الطرف) كالمشجّرات اليدوية
+      var BROWNS = ['#6b4423', '#77502b', '#5f3d1f'];
       persons.forEach(function (p) {
         var s = SEG.get(p.id); if (!s) return;
         var e = ext.get(p.id);
         if (e && (e[1] < vx0 - 100 || e[0] > vx1 + 100 || e[3] < vy0 - 100 || e[2] > vy1 + 100)) return;
-        var w = Math.max(branchW(p), (p.father_id == null || !byId.has(p.father_id)) && !virtualTrunk ? tw : 0);
-        ctx.lineWidth = w;
-        var mx = (s[0] + s[2]) / 2 + jit(p.id, 5) * 26, my = (s[1] + s[3]) / 2 + jit(p.id, 7) * 14;
-        ctx.beginPath(); ctx.moveTo(s[0], s[1]); ctx.quadraticCurveTo(mx, my, s[2], s[3]); ctx.stroke();
+        var isRoot = (p.father_id == null || !byId.has(p.father_id)) && !virtualTrunk;
+        var w0 = Math.max(branchW(p) * 1.7, isRoot ? tw : 0);
+        ctx.fillStyle = BROWNS[Math.abs(p.id) % 3];
+        drawTapered(s[0], s[1], s[2], s[3], s[4], s[5], w0, Math.max(2.2, w0 * .28));
       });
 
       // الظلّة: ورقة/غيمة خضراء واحدة كبيرة تحتضن التاج كله، وتحتها ظلال أصغر لكل بيت
@@ -369,25 +396,30 @@
         if (x < vx0 || x > vx1 || y < vy0 || y > vy1) return;
         var isLeaf = !kids.has(p.id);
         if (isLeaf) {
-          // عُنيق صغير يصل الورقة بغصن أبيها (الورقة ملتصقة بالغصن كالملصق)
-          var st = STEM.get(p.id);
-          if (st) {
-            ctx.strokeStyle = '#7a4f28'; ctx.lineWidth = 2.4;
-            ctx.beginPath(); ctx.moveTo(st[0], st[1]); ctx.lineTo(x, y); ctx.stroke();
-          }
-          // ورقة شجر يتوسّطها الاسم
+          // ورقة لوزية بطرفٍ مدبّب وعرقٍ أوسط (كأوراق المشجّرات اليدوية) يتوسّطها الاسم
           var mid = ANG.get(p.id) || 0;
           var phi = mid - Math.PI / 2;
           var la = (phi < -Math.PI / 2 || phi > Math.PI / 2) ? phi + Math.PI : phi;
-          la = Math.max(-0.7, Math.min(0.7, la)) + jit(p.id, 4) * .1;   // ميلٌ مقروء (≤ ٤٠° تقريباً) كأوراق الملصقات
+          la = Math.max(-0.7, Math.min(0.7, la)) + jit(p.id, 4) * .1;   // ميلٌ مقروء (≤ ٤٠° تقريباً)
           var nm = p.name || '';
-          var rx = Math.max(30, nm.length * 4 + 14), ry = Math.max(14, rx * .42);
+          var rx = Math.max(32, nm.length * 4 + 16), ry = Math.max(14, rx * .42);
+          // العُنيق: من غصن الأب إلى قاعدة الورقة (لا مركزها)
+          var st = STEM.get(p.id);
+          if (st) {
+            var bx2 = x - Math.cos(la) * rx * .92, by2 = y - Math.sin(la) * rx * .92;
+            ctx.strokeStyle = '#7a4f28'; ctx.lineWidth = 2.6; ctx.lineCap = 'round';
+            ctx.beginPath(); ctx.moveTo(st[0], st[1]); ctx.lineTo(bx2, by2); ctx.stroke();
+          }
           ctx.save(); ctx.translate(x, y); ctx.rotate(la);
-          ctx.beginPath(); ctx.ellipse(0, 0, rx, ry, 0, 0, 7);
+          ctx.beginPath();
+          ctx.moveTo(-rx, 0);
+          ctx.quadraticCurveTo(0, -ry * 2, rx, 0);   // الحافة العليا — طرفان مدبّبان
+          ctx.quadraticCurveTo(0, ry * 2, -rx, 0);   // الحافة السفلى
+          ctx.closePath();
           ctx.fillStyle = statusLeaf(p); ctx.fill();
           ctx.strokeStyle = 'rgba(0,0,0,.3)'; ctx.lineWidth = 1; ctx.stroke();
-          ctx.strokeStyle = 'rgba(255,255,255,.35)'; ctx.lineWidth = .8;   // العرق الأوسط
-          ctx.beginPath(); ctx.moveTo(-rx + 4, 0); ctx.lineTo(rx - 4, 0); ctx.stroke();
+          ctx.strokeStyle = 'rgba(255,255,255,.45)'; ctx.lineWidth = .9;   // العرق الأوسط
+          ctx.beginPath(); ctx.moveTo(-rx + 4, 0); ctx.lineTo(rx - 5, 0); ctx.stroke();
           if (showNames) {
             ctx.font = '700 13px Segoe UI, Tahoma'; ctx.textAlign = 'center';
             ctx.fillStyle = '#fff';
