@@ -67,9 +67,9 @@
   </div>
 
   <div class="legend">
-    <div class="lg"><span class="dotc" style="background:#2f9e44"></span> ورقة خضراء: حيّ</div>
+    <div class="lg"><span class="dotc" style="background:#2f9e44"></span> ورقة خضراء: حيّ (اسمه داخلها)</div>
     <div class="lg"><span class="dotc" style="background:#b91c1c"></span> ورقة حمراء: متوفّى لم يعقب</div>
-    <div class="lg"><span class="dotc" style="background:#8b5a2b"></span> الغصن: أبٌ وذرّيته عليه</div>
+    <div class="lg"><span class="dotc" style="background:#f7ecd4;border:1px solid #8b5a2b"></span> شارة على الغصن: أبٌ وله ذرية</div>
   </div>
 
   <div id="info"><button class="x" id="infoX">✕</button><div class="nm" id="infoName"></div><div class="ln" id="infoLine"></div></div>
@@ -173,33 +173,55 @@
       }
     })();
 
-    /* ===== ٣) التخطيط: الأرض عند y=0 والأجيال تصعد للأعلى ===== */
-    var LEAF_GAP = 34, GEN_GAP = 170;
+    /* ===== ٣) التخطيط الشعاعي الرأسي: جذعٌ بالأسفل وتاجٌ مروحيّ يتفتّح للأعلى (أبعاد شبه مربّعة) ===== */
     function jit(id, k) { var x = Math.sin(id * 127.1 + k * 311.7) * 43758.5453; return (x - Math.floor(x)) - .5; }
-    var X = new Map(), Y = new Map(), nextLeaf = 0;
+    // العمق الأقصى + إجمالي الأوراق (لتحديد نصف قطر التاج)
+    var maxGen = 1, totalLeaves = 0;
     (function () {
-      var stack = [];
-      for (var i = rootsArr.length - 1; i >= 0; i--) stack.push({ p: rootsArr[i], gen: 1, phase: 0 });
+      var stack = rootsArr.map(function (r) { return { p: r, gen: 1 }; });
       while (stack.length) {
-        var t = stack[stack.length - 1], cs = kids.get(t.p.id) || [];
-        if (t.phase === 0) {
-          t.phase = 1;
-          if (!cs.length) { // ورقة
-            stack.pop();
-            X.set(t.p.id, nextLeaf * LEAF_GAP); nextLeaf++;
-            Y.set(t.p.id, -t.gen * GEN_GAP + jit(t.p.id, 1) * 55);
-          } else {
-            for (var j = cs.length - 1; j >= 0; j--) stack.push({ p: cs[j], gen: t.gen + 1, phase: 0 });
+        var t = stack.pop(); if (t.gen > maxGen) maxGen = t.gen;
+        var cs = kids.get(t.p.id);
+        if (cs) for (var i = 0; i < cs.length; i++) stack.push({ p: cs[i], gen: t.gen + 1 });
+      }
+      rootsArr.forEach(function (r) { totalLeaves += leafN.get(r.id) || 1; });
+    })();
+    var TOTAL_ANG = 2.6;                                     // فتحة المروحة ≈ ١٥٠°
+    var R = Math.max(1400, 30 * totalLeaves / TOTAL_ANG);    // نصف قطر التاج: يتّسع لكل الأوراق على المحيط
+    var GEN_LEN = R / maxGen;                                // طول الجيل الواحد على نصف القطر
+    var TRUNK_H = Math.max(340, R * 0.16);                   // ارتفاع الجذع
+    var ROOT_DEPTH = Math.max(150, R * 0.06);                // عمق الجذور تحت الأرض
+    var trunkX = 0, topY = -TRUNK_H;
+    var X = new Map(), Y = new Map(), ANG = new Map();
+    var bbMinX = -300, bbMaxX = 300, bbMinY = -TRUNK_H;
+    (function () {
+      // كل أبٍ يملك قطاعاً زاويّاً يقسمه على أبنائه بنسبة أوراق كلٍّ منهم
+      var stack = [], a = -TOTAL_ANG / 2;
+      rootsArr.forEach(function (r) {
+        var w = (leafN.get(r.id) || 1) / totalLeaves * TOTAL_ANG;
+        stack.push({ p: r, gen: 1, a0: a, a1: a + w }); a += w;
+      });
+      while (stack.length) {
+        var t = stack.pop();
+        var mid = (t.a0 + t.a1) / 2 + jit(t.p.id, 2) * (t.a1 - t.a0) * .18;
+        var r = t.gen * GEN_LEN * (1 + jit(t.p.id, 1) * .07);
+        var x = trunkX + Math.sin(mid) * r, y = topY - Math.cos(mid) * r;
+        X.set(t.p.id, x); Y.set(t.p.id, y); ANG.set(t.p.id, mid);
+        if (x < bbMinX) bbMinX = x; if (x > bbMaxX) bbMaxX = x; if (y < bbMinY) bbMinY = y;
+        var cs = kids.get(t.p.id);
+        if (cs) {
+          var la = t.a0, ln = leafN.get(t.p.id) || 1;
+          for (var i = 0; i < cs.length; i++) {
+            var w2 = (leafN.get(cs[i].id) || 1) / ln * (t.a1 - t.a0);
+            stack.push({ p: cs[i], gen: t.gen + 1, a0: la, a1: la + w2 }); la += w2;
           }
-        } else {
-          stack.pop();
-          var sum = 0; for (var k2 = 0; k2 < cs.length; k2++) sum += X.get(cs[k2].id);
-          X.set(t.p.id, sum / cs.length + jit(t.p.id, 2) * 12);
-          Y.set(t.p.id, -t.gen * GEN_GAP + jit(t.p.id, 1) * 40);
         }
       }
     })();
-    var worldW = Math.max(nextLeaf - 1, 1) * LEAF_GAP;
+    // جدٌّ أعلى واحد؟ ضَع شارته على الجذع نفسه (كالمشجّرات المطبوعة) وتتفرّع ذرّيته من قمّته
+    if (rootsArr.length === 1) {
+      X.set(rootsArr[0].id, trunkX); Y.set(rootsArr[0].id, -TRUNK_H * 0.5); ANG.set(rootsArr[0].id, 0);
+    }
     // امتداد ذرية كل أب [minX,maxX,minY,maxY] — لرسم ظلّةٍ خضراء واحدة تحتضن كل بيت (والجذر يحتضن التاج كله)
     var ext = new Map();
     (function () {
@@ -222,12 +244,6 @@
         }
       }
     })();
-    // موضع الجذع: منتصف مواضع الأصول
-    var trunkX = 0;
-    if (rootsArr.length) { var sx = 0; rootsArr.forEach(function (r) { sx += X.get(r.id); }); trunkX = sx / rootsArr.length; }
-    var trunkTopY = -GEN_GAP * 0.55;
-    var maxGen = 1; persons.forEach(function (p) { var g = Math.round(-((Y.get(p.id) || 0)) / GEN_GAP); if (g > maxGen) maxGen = g; });
-
     /* ===== ٤) الرسم ===== */
     var cv = document.getElementById('cv'), ctx = cv.getContext('2d');
     var dpr = Math.min(window.devicePixelRatio || 1, 2.5);
@@ -238,20 +254,20 @@
       requestDraw();
     }
     function fit() {
-      // الملاءمة على الارتفاع (الشجرة الواسعة تُمرَّر يميناً ويساراً — هذا مقصود)
-      var m = 80;
-      var treeTop = -(maxGen * GEN_GAP) - 80, treeBottom = 250;   // يشمل الجذور تحت الأرض
-      var s2 = (innerHeight - m) / (treeBottom - treeTop);
-      scale = Math.max(0.02, Math.min(s2, 1.2));
-      ox = trunkX - (innerWidth / 2) / scale;                     // مركزة أفقياً على الجذع
-      oy = (treeTop + treeBottom) / 2 - (innerHeight / 2) / scale;
+      // ملاءمة الشجرة كاملةً (شبه مربّعة): من الجذور حتى قمّة التاج
+      var x0 = bbMinX - 150, x1 = bbMaxX + 150, y0 = bbMinY - 150, y1 = ROOT_DEPTH * 1.5 + 130;
+      scale = Math.max(0.004, Math.min((innerWidth - 30) / (x1 - x0), (innerHeight - 30) / (y1 - y0), 1.2));
+      ox = (x0 + x1) / 2 - (innerWidth / 2) / scale;
+      oy = (y0 + y1) / 2 - (innerHeight / 2) / scale;
       requestDraw();
     }
     var raf = 0;
     function requestDraw() { if (!raf) raf = requestAnimationFrame(function () { raf = 0; draw(); }); }
 
     function branchW(p) { return Math.max(1.6, Math.sqrt((descN.get(p.id) || 0) + 1) * 1.35); }
-    var statusLeaf = function (p) { return p.status === 'dead' ? '#b91c1c' : '#2f9e44'; };
+    // ألوان الأوراق: الأحياء بتدرّجات خضراء متنوّعة (كالمشجّرات المطبوعة)، ومن تُوفّي ولم يعقب بالأحمر الداكن
+    var GREENS = ['#2f9e44', '#37a24a', '#5c940d', '#40912e'];
+    function statusLeaf(p) { return p.status === 'dead' ? '#b91c1c' : GREENS[Math.abs(p.id * 7) % GREENS.length]; }
 
     function draw() {
       var W = cv.width, H = cv.height;
@@ -265,6 +281,14 @@
       ctx.fillStyle = 'rgba(255,236,150,.9)'; ctx.fill();
       ctx.beginPath(); ctx.arc(W * .84, H * .13, Math.min(W, H) * .1, 0, 7);
       ctx.fillStyle = 'rgba(255,236,150,.25)'; ctx.fill();
+      // غيوم ناعمة
+      ctx.fillStyle = 'rgba(255,255,255,.8)';
+      [[.16, .12], [.5, .07], [.3, .2], [.72, .24]].forEach(function (c) {
+        var gx = W * c[0], gy = H * c[1], gr = Math.min(W, H) * .045;
+        ctx.beginPath();
+        ctx.arc(gx, gy, gr, 0, 7); ctx.arc(gx + gr * 1.2, gy + gr * .25, gr * .8, 0, 7); ctx.arc(gx - gr * 1.2, gy + gr * .3, gr * .7, 0, 7);
+        ctx.fill();
+      });
 
       ctx.setTransform(scale * dpr, 0, 0, scale * dpr, -ox * scale * dpr, -oy * scale * dpr);
       var vx0 = ox - 50 / scale, vx1 = ox + (innerWidth + 50) / scale;
@@ -275,37 +299,42 @@
       var g = ctx.createLinearGradient(0, 0, 0, groundH);
       g.addColorStop(0, '#7bb661'); g.addColorStop(.14, '#5f9e4b'); g.addColorStop(.16, '#7a5a3a'); g.addColorStop(1, '#4b3621');
       ctx.fillStyle = g;
-      ctx.fillRect(vx0, 0, vx1 - vx0, groundH + 200);
+      ctx.fillRect(vx0, 0, vx1 - vx0, ROOT_DEPTH * 1.6 + 160);
 
-      // الجذور (زخرفية أسفل الأرض)
+      // الجذور (زخرفية أسفل الأرض) — تتناسب مع حجم الشجرة
+      var rootSpread = Math.max(520, R * .22), rootDepth = ROOT_DEPTH;
+      var rootW = Math.max(14, tw * .4);
       ctx.strokeStyle = '#5b4226'; ctx.lineCap = 'round';
       for (var r = 0; r < 7; r++) {
         var t = (r / 6 - .5);
-        ctx.lineWidth = 14 - Math.abs(t) * 12;
+        ctx.lineWidth = rootW - Math.abs(t) * rootW * .8;
         ctx.beginPath();
         ctx.moveTo(trunkX, 6);
-        ctx.bezierCurveTo(trunkX + t * 120, 60, trunkX + t * 320, 110, trunkX + t * 520 + jit(r + 9, 3) * 60, 150 + Math.abs(t) * 70);
+        ctx.bezierCurveTo(trunkX + t * rootSpread * .23, rootDepth * .4, trunkX + t * rootSpread * .62, rootDepth * .73,
+          trunkX + t * rootSpread + jit(r + 9, 3) * rootSpread * .1, rootDepth + Math.abs(t) * rootDepth * .45);
         ctx.stroke();
       }
 
       // الجذع
-      var tw = Math.max(20, Math.sqrt(persons.length) * 1.35);
+      var tw = Math.max(30, R * .045);   // جذع سميك يتناسب مع حجم الشجرة (كالملصقات)
       ctx.strokeStyle = '#6b4423'; ctx.lineWidth = tw;
-      ctx.beginPath(); ctx.moveTo(trunkX, 10); ctx.lineTo(trunkX, trunkTopY); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(trunkX, 10); ctx.lineTo(trunkX, topY); ctx.stroke();
 
-      // الغصون من الجذع إلى الأصول
-      rootsArr.forEach(function (rp) {
-        drawBranch(trunkX, trunkTopY, X.get(rp.id), Y.get(rp.id), Math.max(branchW(rp), tw * .5));
+      // الغصون من الجذع إلى الأصول (الجدّ الواحد يجلس على الجذع نفسه فلا يحتاج وصلة)
+      if (rootsArr.length > 1) rootsArr.forEach(function (rp) {
+        drawBranch(trunkX, topY, X.get(rp.id), Y.get(rp.id), Math.max(branchW(rp), tw * .5), 0, ANG.get(rp.id) || 0);
       });
 
-      // كل الفروع (أب → ابن)
+      // كل الفروع (أب → ابن) — منحنيات تتبع الاتجاه الشعاعي فتبدو غصوناً حقيقية
       ctx.strokeStyle = '#7a4f28';
       persons.forEach(function (p) {
         var cs = kids.get(p.id); if (!cs) return;
         var x1 = X.get(p.id), y1 = Y.get(p.id);
-        if (x1 < vx0 - 900 || x1 > vx1 + 900) return;   // اقتصاص أفقي واسع
+        var e = ext.get(p.id);
+        if (e && (e[1] < vx0 || e[0] > vx1 || e[3] < vy0 || e[2] > vy1)) return;   // اقتصاص بامتداد الذرية
+        var a1 = ANG.get(p.id) || 0;
         for (var i = 0; i < cs.length; i++) {
-          drawBranch(x1, y1, X.get(cs[i].id), Y.get(cs[i].id), branchW(cs[i]));
+          drawBranch(x1, y1, X.get(cs[i].id), Y.get(cs[i].id), branchW(cs[i]), a1, ANG.get(cs[i].id) || 0);
         }
       });
 
@@ -317,13 +346,13 @@
         var cx = (e[0] + e[1]) / 2, cy = (e[2] + e[3]) / 2;
         var rx = (e[1] - e[0]) / 2 + 55, ry = (e[3] - e[2]) / 2 + 70;
         ctx.beginPath(); ctx.ellipse(cx, cy, rx, ry, jit(p.id, 6) * .15, 0, 7);
-        ctx.fillStyle = (p.id % 2) ? 'rgba(64,145,60,.085)' : 'rgba(46,125,50,.085)';
+        ctx.fillStyle = (p.id % 2) ? 'rgba(64,145,60,.06)' : 'rgba(46,125,50,.06)';
         ctx.fill();
       });
 
       // زر «توسيط الشجرة» يظهر إذا خرجت الشجرة كلها من الشاشة
-      var offX = (worldW + 400) < vx0 || (Math.min(0, trunkX) - 400) > vx1;
-      var offY = 300 < vy0 || (-(maxGen * GEN_GAP) - 150) > vy1;
+      var offX = (bbMaxX + 400) < vx0 || (bbMinX - 400) > vx1;
+      var offY = 300 < vy0 || (bbMinY - 200) > vy1;
       document.getElementById('btnHome').style.display = (offX || offY) ? 'block' : 'none';
 
       // الأوراق + الأسماء
@@ -335,38 +364,50 @@
         if (x < vx0 || x > vx1 || y < vy0 || y > vy1) return;
         var isLeaf = !kids.has(p.id);
         if (isLeaf) {
-          // ورقة شجر بيضاوية مائلة
-          var a = jit(p.id, 4) * 1.1;
-          ctx.save(); ctx.translate(x, y); ctx.rotate(a);
-          ctx.beginPath(); ctx.ellipse(0, -7, 6.5, 12, 0, 0, 7);
+          // ورقة شجر يتوسّطها الاسم — تتّجه لخارج التاج مع غصنها
+          var mid = ANG.get(p.id) || 0;
+          var phi = mid - Math.PI / 2;                       // ‎+x بعد الدوران = خارج التاج
+          var la = (phi < -Math.PI / 2 || phi > Math.PI / 2) ? phi + Math.PI : phi;
+          la = Math.max(-0.7, Math.min(0.7, la)) + jit(p.id, 4) * .1;   // ميلٌ مقروء (≤ ٤٠° تقريباً) كأوراق الملصقات
+          var nm = p.name || '';
+          var rx = Math.max(30, nm.length * 4 + 14), ry = Math.max(14, rx * .42);
+          ctx.save(); ctx.translate(x, y); ctx.rotate(la);
+          ctx.beginPath(); ctx.ellipse(0, 0, rx, ry, 0, 0, 7);
           ctx.fillStyle = statusLeaf(p); ctx.fill();
-          ctx.strokeStyle = 'rgba(0,0,0,.25)'; ctx.lineWidth = .7;
-          ctx.beginPath(); ctx.moveTo(0, 4); ctx.lineTo(0, -16); ctx.stroke();
-          ctx.restore();
+          ctx.strokeStyle = 'rgba(0,0,0,.3)'; ctx.lineWidth = 1; ctx.stroke();
+          ctx.strokeStyle = 'rgba(255,255,255,.35)'; ctx.lineWidth = .8;   // العرق الأوسط
+          ctx.beginPath(); ctx.moveTo(-rx + 4, 0); ctx.lineTo(rx - 4, 0); ctx.stroke();
           if (showNames) {
-            ctx.fillStyle = '#1e293b'; ctx.font = '700 11px Segoe UI, Tahoma';
-            ctx.fillText(p.name || '', x, y + 16);
+            ctx.font = '700 13px Segoe UI, Tahoma'; ctx.textAlign = 'center';
+            ctx.fillStyle = '#fff';
+            ctx.fillText(nm, 0, 4.5);
           }
+          ctx.restore();
         } else {
-          // عقدة أب: برعم + الاسم
-          ctx.beginPath(); ctx.arc(x, y, Math.max(2.5, branchW(p) * .8), 0, 7);
-          ctx.fillStyle = '#5b4226'; ctx.fill();
+          // أب: شارة بيضاوية فاتحة على الغصن يتوسّطها اسمه (كالمشجّرات المطبوعة)
+          var nm2 = p.name || '';
           if (showNames || (showBig && (descN.get(p.id) || 0) >= 20)) {
-            var fs = Math.min(20, 11 + Math.sqrt(descN.get(p.id) || 0) * .7);
-            ctx.font = '800 ' + fs + 'px Segoe UI, Tahoma';
-            ctx.fillStyle = '#173d1f';
-            ctx.strokeStyle = 'rgba(255,255,255,.75)'; ctx.lineWidth = 3;
-            ctx.strokeText(p.name || '', x, y - 10);
-            ctx.fillText(p.name || '', x, y - 10);
+            var fs = Math.min(60, 12 + Math.sqrt(descN.get(p.id) || 0) * 1.5);   // شارة الجدّ الكبير أكبر
+            var brx = Math.max(28, nm2.length * fs * .3 + 12), bry = Math.max(13, fs * .9);
+            ctx.beginPath(); ctx.ellipse(x, y, brx, bry, 0, 0, 7);
+            ctx.fillStyle = '#f7ecd4'; ctx.fill();
+            ctx.strokeStyle = '#8b5a2b'; ctx.lineWidth = 1.6; ctx.stroke();
+            ctx.font = '800 ' + fs + 'px Segoe UI, Tahoma'; ctx.textAlign = 'center';
+            ctx.fillStyle = '#5b3a17';
+            ctx.fillText(nm2, x, y + fs * .34);
+          } else {
+            ctx.beginPath(); ctx.arc(x, y, Math.max(2.5, branchW(p) * .8), 0, 7);
+            ctx.fillStyle = '#5b4226'; ctx.fill();
           }
         }
       });
     }
-    function drawBranch(x1, y1, x2, y2, w) {
+    function drawBranch(x1, y1, x2, y2, w, a1, a2) {
+      // منحنى يخرج باتجاه غصن الأب وينتهي باتجاه غصن الابن (شعاعياً)
       ctx.lineWidth = w; ctx.lineCap = 'round';
+      var d = Math.hypot(x2 - x1, y2 - y1) * .4;
       ctx.beginPath(); ctx.moveTo(x1, y1);
-      var dy = y1 - y2;
-      ctx.bezierCurveTo(x1 + (x2 - x1) * .12, y1 - dy * .45, x2 - (x2 - x1) * .12, y2 + dy * .35, x2, y2);
+      ctx.bezierCurveTo(x1 + Math.sin(a1) * d, y1 - Math.cos(a1) * d, x2 - Math.sin(a2) * d, y2 + Math.cos(a2) * d, x2, y2);
       ctx.stroke();
     }
 
