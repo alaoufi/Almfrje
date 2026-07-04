@@ -94,13 +94,19 @@
       return out;
     }
 
-    var persons = [];
-    try {
-      try { persons = await fetchAllRows('almfrje_persons_pub'); }
-      catch (e) { persons = await fetchAllRows('almfrje_persons'); }
-    } catch (e) { persons = []; }
+    // الجلسة: نفس جلسة الموقع (تُحفظ في المتصفّح) — بدونها لا تسمح القاعدة بالقراءة
+    var sess = null;
+    try { sess = (await sb.auth.getSession()).data.session; } catch (e) { /* */ }
+    if (!sess) {
+      fail('لعرض الشجرة سجّل دخولك أولاً.<br><br><a href="/">افتح الموقع وادخل (زائراً أو مشرفاً)</a><br>ثم عُد لهذه الصفحة وحدّثها 🔄');
+      return;
+    }
+    var persons = [], lastErr = null;
+    try { persons = await fetchAllRows('almfrje_persons_pub'); }
+    catch (e) { lastErr = e; try { persons = await fetchAllRows('almfrje_persons'); } catch (e2) { lastErr = e2; } }
     if (!persons.length) {
-      fail('لا يمكن عرض الشجرة قبل الدخول.<br><br><a href="/">افتح الموقع وسجّل دخولك (زائراً أو مشرفاً)</a><br>ثم عُد لهذه الصفحة وحدّثها 🔄');
+      fail('تعذّر جلب بيانات الشجرة' + (lastErr && lastErr.message ? ':<br><span style="font-size:.8rem;color:#b91c1c">' + String(lastErr.message).replace(/</g, '&lt;') + '</span>' : '.')
+        + '<br><br><a href="/">افتح الموقع وسجّل دخولك</a> ثم عُد وحدّث الصفحة 🔄');
       return;
     }
 
@@ -178,15 +184,13 @@
       requestDraw();
     }
     function fit() {
-      var m = 70;
-      var s1 = (innerWidth - m) / (worldW + 200);
-      var s2 = (innerHeight - m) / ((maxGen * GEN_GAP) + 320);
-      scale = Math.max(0.012, Math.min(s1, s2, 1.25));
-      ox = trunkX - (innerWidth / 2) / scale;
-      oy = (-(maxGen * GEN_GAP) - 120) + 30 / scale; // أعلى الشجرة قرب أعلى الشاشة
-      // مركزة عمودية: اجعل منتصف الشجرة في منتصف الشاشة
-      var midW = (-(maxGen * GEN_GAP) + 170) / 2;
-      oy = midW - (innerHeight / 2) / scale;
+      // الملاءمة على الارتفاع (الشجرة الواسعة تُمرَّر يميناً ويساراً — هذا مقصود)
+      var m = 80;
+      var treeTop = -(maxGen * GEN_GAP) - 80, treeBottom = 250;   // يشمل الجذور تحت الأرض
+      var s2 = (innerHeight - m) / (treeBottom - treeTop);
+      scale = Math.max(0.02, Math.min(s2, 1.2));
+      ox = trunkX - (innerWidth / 2) / scale;                     // مركزة أفقياً على الجذع
+      oy = (treeTop + treeBottom) / 2 - (innerHeight / 2) / scale;
       requestDraw();
     }
     var raf = 0;
