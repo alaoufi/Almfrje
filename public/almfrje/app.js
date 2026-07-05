@@ -2017,7 +2017,7 @@ function treeNodeHtml(id) {
   const p = byId.get(id); if (!p) return '';
   const cs = childrenOf(id); const open = treeOpen.has(id); const has = cs.length > 0;
   const toggle = has ? `<button class="ttoggle" data-tog="${id}">${open ? '−' : '+'}</button>` : `<span class="ttoggle leaf">•</span>`;
-  let html = `<div class="tnode"><div class="trow">${toggle}<span class="tname ${nameCls(p)}" data-open="${id}"${nameTitle(p)}>${esc(p.name)}</span>${statusTag(p)}${has ? `<span class="tcount">(${cs.length} • ${descCount.get(id) || 0})</span>` : ''}</div>`;
+  let html = `<div class="tnode"><div class="trow">${toggle}<span class="tname ${nameCls(p)}" data-open="${id}"${nameTitle(p)}>${esc(p.name)}</span>${nickSuffix(p)}${statusTag(p)}${has ? `<span class="tcount">(${cs.length} • ${descCount.get(id) || 0})</span>` : ''}</div>`;
   if (open && has) html += `<div class="tkids">${cs.map(c => treeNodeHtml(c.id)).join('')}</div>`;
   html += `</div>`;
   return html;
