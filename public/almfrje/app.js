@@ -10,7 +10,7 @@ function statusText(p) {
   return (descCount.get(p.id) || 0) === 0 ? statLabels.noissue : statLabels.dead;
 }
 // لاحقة اللقب تُكتب بجانب الاسم في القوائم والمشجّرات «اللقب».
-function nickSuffix(p) { return p && p.nickname ? ` <span class="nick">«${esc(p.nickname)}»</span>` : ''; }
+function nickSuffix(p) { return p && p.nickname ? ` <span class="nick">(${esc(p.nickname)})</span>` : ''; }
 // وسم حالة مختصر يُكتب بجانب الاسم في المشجّرات (متوفّى / توفي ولم يعقب) بلون الحالة.
 function statusTag(p) {
   if (!p || p.status !== 'dead') return '';
@@ -2270,7 +2270,7 @@ function hierNode(id, depth) {
     <div class="hier-row">
       ${toggle}
       <div class="hier-main">
-        <div class="hier-line"><span class="hier-name ${nameCls(p)}" data-hopen="${id}"${nameTitle(p)}>${esc(p.name)}</span>${statusTag(p)}</div>
+        <div class="hier-line"><span class="hier-name ${nameCls(p)}" data-hopen="${id}"${nameTitle(p)}>${esc(p.name)}</span>${nickSuffix(p)}${statusTag(p)}</div>
         ${meta}
       </div>
     </div>`;
