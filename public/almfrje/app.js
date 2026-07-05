@@ -214,6 +214,8 @@ let _authUid = null;   // هوية الجلسة الحالية — لتجاهل 
 let imported = false;
 let guestOpen = false;    // إتاحة زر «تصفّح كزائر» بحساب زائر مدمج (قراءة فقط)
 let guestGens = 0;        // عدد الأجيال المطلوبة للتحقق قبل دخول الزائر (0 = بلا تحقّق)
+let settingsOk = false;   // نجح تحميل الإعدادات من القاعدة؟ (فشلها الكامل = مشكلة اتصال، لا «موقع مغلق»)
+let _dbProxied = false;   // الاتصال يمرّ عبر وسيط الموقع /sbdb (لشبكاتٍ تحجب نطاق القاعدة مباشرة)
 const GUEST_HIDE_DEFAULT = { phone: true, media: true, notes: true };  // ما يُخفى عن الزائر افتراضياً
 let guestHide = { ...GUEST_HIDE_DEFAULT };
 let recentSince = '';      // تاريخ تصفير «آخر الإضافات» (ISO) — يُحدّده المدير
@@ -435,9 +437,36 @@ async function loadAll() {
   await loadSettings();
   buildIndex();
 }
+// تحويل الاتصال إلى وسيط الموقع ‎/sbdb‎ — لشبكاتٍ تحجب نطاق القاعدة مباشرة (تحدث على أجهزة الكمبيوتر خاصة)
+function switchDbToProxy() {
+  _dbProxied = true;
+  try { localStorage.setItem('almfrje_dbproxy', '1'); } catch (e) { /* */ }
+  sb = window.supabase.createClient(location.origin + '/sbdb', window.ALMFRJE_CONFIG.SUPABASE_ANON_KEY);
+}
 async function loadSettings() {
-  try {
-    const { data } = await sb.from('almfrje_settings').select('key,value');
+  for (let att = 0; att < 3; att++) {
+    try {
+      await loadSettingsOnce();
+      settingsOk = true;
+      // نجحنا عبر الوسيط؟ افحص بالخلفية إن عاد الوصول المباشر فارجع إليه في الفتحات القادمة (أسرع)
+      if (_dbProxied) {
+        try {
+          fetch(window.ALMFRJE_CONFIG.SUPABASE_URL + '/auth/v1/health', { headers: { apikey: window.ALMFRJE_CONFIG.SUPABASE_ANON_KEY }, cache: 'no-store' })
+            .then(r => { if (r.ok) { try { localStorage.removeItem('almfrje_dbproxy'); } catch (e) { /* */ } } }).catch(() => { /* */ });
+        } catch (e) { /* */ }
+      }
+      return;
+    } catch (e) {
+      settingsOk = false;
+      if (!_dbProxied) switchDbToProxy();                                   // المحاولة التالية عبر وسيط الموقع
+      else if (att < 2) await new Promise(r => setTimeout(r, 900));         // مهلة قصيرة ثم إعادة
+    }
+  }
+}
+async function loadSettingsOnce() {
+  {
+    const { data, error } = await sb.from('almfrje_settings').select('key,value');
+    if (error) throw error;
     const map = {}; (data || []).forEach(r => map[r.key] = r.value);
     imported = map.imported === true;
     visitStats = (map.visit_stats && typeof map.visit_stats === 'object') ? map.visit_stats : { total: 0, byBranch: {}, byCity: {} };
@@ -468,7 +497,7 @@ async function loadSettings() {
     congrats = (map.congrats && typeof map.congrats === 'object') ? map.congrats : null;
     // تطبيق نصوص التعليمات المعدّلة من الإعدادات فوق الافتراضية
     applyHintOverrides(map.hints_overrides);
-  } catch (e) { /* تجاهل — تبقى القيم الافتراضية */ }
+  }
 }
 // نصوص التعليمات: نحتفظ بالافتراضية، ونطبّق تعديلات المدير فوقها.
 const HINTS_DEFAULT = JSON.parse(JSON.stringify(HINTS));
@@ -5418,6 +5447,27 @@ function showSetup() {
     <p class="sub">على alaoufi.me يُضبط الاتصال تلقائياً عبر <b>/api/almfrje-config</b> من متغيّرات البيئة — تأكّد من إضافة <b>NEXT_PUBLIC_SUPABASE_URL</b> و <b>NEXT_PUBLIC_SUPABASE_ANON_KEY</b>، ثم أعد التحميل.</p>
     <p class="muted" style="font-size:.85rem">جداول المفارجة تُنشأ تلقائياً عند تشغيل ترقية alaoufi.me (<b>/api/migrate</b>) — بلا تنفيذ SQL يدوي. (للاستضافة الثابتة فقط: عبّئ <b>config.js</b>.)</p></div>`;
 }
+// تعذّر الوصول للقاعدة كلياً (حتى عبر وسيط الموقع): شاشة واضحة بتشخيصٍ تلقائي بدل شاشة دخول خاطئة.
+function renderNetFail() {
+  document.getElementById('app').classList.add('hidden');
+  const box = document.getElementById('auth'); box.classList.remove('hidden');
+  box.innerHTML = `<div class="auth-box"><div class="logo">📡</div>
+    <h2>تعذّر الاتصال بقاعدة البيانات</h2>
+    <p class="sub" style="line-height:1.9">يبدو أن الشبكة الحالية تمنع الوصول للبيانات.<br>جرّب شبكةً أخرى (مثل نقطة اتصال من الجوال) أو أعد المحاولة.</p>
+    <div id="nf_diag" class="auth-msg" style="text-align:center;line-height:2">… جارٍ الفحص</div>
+    <button class="btn" id="nf_retry">🔄 إعادة المحاولة</button></div>`;
+  document.getElementById('nf_retry').addEventListener('click', () => location.reload());
+  (async () => {
+    const lines = [];
+    try { const r = await fetch('/almfrje-config', { cache: 'no-store' }); lines.push((r.ok ? '✅' : '❌') + ' خادم الموقع'); }
+    catch (e) { lines.push('❌ خادم الموقع'); }
+    try { const r = await fetch(window.ALMFRJE_CONFIG.SUPABASE_URL + '/auth/v1/health', { headers: { apikey: window.ALMFRJE_CONFIG.SUPABASE_ANON_KEY }, cache: 'no-store' }); lines.push((r.ok ? '✅' : '❌') + ' قاعدة البيانات (مباشرة)'); }
+    catch (e) { lines.push('❌ قاعدة البيانات (مباشرة) — محجوبة على هذه الشبكة'); }
+    try { const r = await fetch(location.origin + '/sbdb/auth/v1/health', { headers: { apikey: window.ALMFRJE_CONFIG.SUPABASE_ANON_KEY }, cache: 'no-store' }); lines.push((r.ok ? '✅' : '❌') + ' قاعدة البيانات (عبر الموقع)'); }
+    catch (e) { lines.push('❌ قاعدة البيانات (عبر الموقع)'); }
+    const d = document.getElementById('nf_diag'); if (d) d.innerHTML = lines.join('<br>');
+  })();
+}
 async function init() {
   applyTheme('light');   // الوضع النهاري فقط (أُلغي العرض الليلي)
   { const shb = document.getElementById('shareBtn'); if (shb) shb.addEventListener('click', shareSite); }
@@ -5430,7 +5480,10 @@ async function init() {
     } catch (e) { location.reload(); }
   }); }
   if (configMissing()) { showSetup(); return; }
-  sb = window.supabase.createClient(window.ALMFRJE_CONFIG.SUPABASE_URL, window.ALMFRJE_CONFIG.SUPABASE_ANON_KEY);
+  // هذا الجهاز احتاج وسيط الموقع سابقاً (شبكته تحجب نطاق القاعدة)؟ ابدأ عليه مباشرةً
+  let _dbUrl = window.ALMFRJE_CONFIG.SUPABASE_URL;
+  try { if (localStorage.getItem('almfrje_dbproxy') === '1') { _dbProxied = true; _dbUrl = location.origin + '/sbdb'; } } catch (e) { /* */ }
+  sb = window.supabase.createClient(_dbUrl, window.ALMFRJE_CONFIG.SUPABASE_ANON_KEY);
   // إعداد تلقائي للقاعدة بأسلوب «أفضل جهد» وبلا انتظار — لا يحجب فتح التطبيق.
   // (الجداول تُنشأ مرة واحدة؛ النداء يعمل في الخلفية دون تعطيل البدء.)
   try { fetch('/api/almfrje-setup', { method: 'POST' }).catch(() => {}); } catch (e) { /* تجاهل */ }
@@ -5469,6 +5522,12 @@ async function init() {
   // دخول المسؤول أبداً عبر رابطٍ مرسل — تظهر فقط بالنقر داخل الجلسة (المزيد ← دخول المسؤول).
   if (isAdminLoginUrl()) { try { history.replaceState(null, '', location.pathname + location.search); } catch (e) { location.hash = ''; } }
   await loadSettings();
+  // فشل تحميل الإعدادات كلياً (حتى عبر الوسيط)؟ لا تعرض شاشة المسؤول خطأً — اعرض شاشة
+  // «تعذّر الاتصال» بتشخيصٍ يوضّح الجهة المحجوبة، إلا لمن لديه جلسة قائمة.
+  if (!settingsOk) {
+    const { data: { session: s0 } } = await sb.auth.getSession();
+    if (!s0) { showLoading(false); renderNetFail(); return; }
+  }
   const { data: { session } } = await sb.auth.getSession();
   const wantAdmin = isAdminLoginUrl();
   if (session && session.user) {

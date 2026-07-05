@@ -1,3 +1,6 @@
+// قاعدة بيانات المفرجي — يستخدمها وسيط ‎/sbdb‎ أدناه (لشبكاتٍ تحجب نطاق Supabase مباشرة)
+const ALMFRJE_DB = process.env.ALMFRJE_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://noupszhgfyqhfotokabj.supabase.co';
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
@@ -6,6 +9,10 @@ const nextConfig = {
   },
   async rewrites() {
     return [
+      // وسيط قاعدة بيانات المفرجي: بعض الشبكات (خصوصاً على أجهزة الكمبيوتر) تحجب نطاق
+      // Supabase مباشرةً فتظهر شاشة الدخول الخاطئة ويفشل كل شيء. هذا المسار يمرّر
+      // REST/Auth عبر نطاق الموقع نفسه، ويتحوّل إليه المتصفّح تلقائياً عند الحجب.
+      { source: '/sbdb/:path*', destination: `${ALMFRJE_DB}/:path*` },
       // المفرجي يُخدَم من جذر الدومين / مباشرةً (ليعمل على almfrje.alaoufi.me دون مسار).
       // المساران /almfrje و/almfrji يبقيان عاملَين كـ alias لنفس التطبيق (توافق قديم).
       { source: '/', destination: '/almfrje/index.html' },
@@ -62,6 +69,8 @@ const nextConfig = {
       { source: '/', headers: noCache },
       // كل نقاط الـ API — يجب ألّا تُخزَّن أبداً (محتوى المستخدم)
       { source: '/api/:path*', headers: noCache },
+      // وسيط قاعدة البيانات — بيانات حيّة لا تُخزَّن
+      { source: '/sbdb/:path*', headers: noCache },
     ];
   },
 };
