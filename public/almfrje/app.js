@@ -1262,7 +1262,7 @@ function screenTimeline(arg) {
       const cards = arr.map(p => {
         const f2 = p.father_id ? byId.get(p.father_id) : null;
         return `<div class="tl-card" data-lensid="${p.id}">
-          <div class="tl-name ${nameCls(p)}">${esc(p.name)}${statusTag(p)}</div>
+          <div class="tl-name ${nameCls(p)}">${esc(p.name)}${nickSuffix(p)}${statusTag(p)}</div>
           <div class="tl-meta">${f2 ? 'بن ' + esc(f2.name) + ' • ' : ''}${esc(branchName(p.branch_id))}${(childCount.get(p.id) || 0) ? ' • ' + childCount.get(p.id) + ' ابن' : ''}</div>
         </div>`;
       }).join('');
@@ -1539,7 +1539,7 @@ async function screenPerson(arg) {
       <div class="stat a"><div class="n">${grand.length}</div><div class="l">الأحفاد</div></div>
       <div class="stat g"><div class="n">${descCount.get(id) || 0}</div><div class="l">إجمالي الذرية</div></div>
     </div>
-    <div class="card"><h3>الأبناء (${cs.length})</h3>${cs.length > 1 && canReorder(p) ? '<div class="reorder-hint"><b>↕️ ترتيب الأبناء</b> — رتّب بالسهمين ▲▼ لكل ابن. يبقى ضمن إخوته فقط ولا يتجاوز الأب.</div>' : ''}<div id="childList" class="${cs.length > 1 && canReorder(p) ? 'reorder-list' : ''}">${cs.length ? cs.map(c => `<div class="row child-row"${cs.length > 1 && canReorder(p) ? ` data-reorder-id="${c.id}"` : ''}>${cs.length > 1 && canReorder(p) ? `<span class="reorder-arrows"><button class="reorder-up" data-up="${c.id}" aria-label="تحريك لأعلى">▲</button><button class="reorder-down" data-down="${c.id}" aria-label="تحريك لأسفل">▼</button></span>` : ''}<span class="k"><a href="#/person/${c.id}" style="color:var(--brand);text-decoration:none">${esc(c.name)}</a></span><span class="v">${descCount.get(c.id) || 0} ذرية</span></div>`).join('') : noItem()}</div></div>
+    <div class="card"><h3>الأبناء (${cs.length})</h3>${cs.length > 1 && canReorder(p) ? '<div class="reorder-hint"><b>↕️ ترتيب الأبناء</b> — رتّب بالسهمين ▲▼ لكل ابن. يبقى ضمن إخوته فقط ولا يتجاوز الأب.</div>' : ''}<div id="childList" class="${cs.length > 1 && canReorder(p) ? 'reorder-list' : ''}">${cs.length ? cs.map(c => `<div class="row child-row"${cs.length > 1 && canReorder(p) ? ` data-reorder-id="${c.id}"` : ''}>${cs.length > 1 && canReorder(p) ? `<span class="reorder-arrows"><button class="reorder-up" data-up="${c.id}" aria-label="تحريك لأعلى">▲</button><button class="reorder-down" data-down="${c.id}" aria-label="تحريك لأسفل">▼</button></span>` : ''}<span class="k"><a href="#/person/${c.id}" style="color:var(--brand);text-decoration:none">${esc(c.name)}</a>${nickSuffix(c)}</span><span class="v">${descCount.get(c.id) || 0} ذرية</span></div>`).join('') : noItem()}</div></div>
     ${showDocs ? `<div class="card"><h3>الوثائق والصور (${docs.length})</h3>
       ${docs.length ? docs.map(d => `<div class="row"><span class="k">${d.kind === 'photo' ? '🖼️' : d.kind === 'pdf' ? '📄' : '📎'} <a href="${esc(d.url)}" target="_blank" rel="noopener" style="color:var(--brand);text-decoration:none">${esc(d.label || 'ملف')}</a></span>${canDelete() ? `<button class="btn sm danger" data-ddel="${d.id}">حذف</button>` : ''}</div>`).join('') : noItem()}
       ${canEditPerson(p) ? `<button class="btn outline" id="addDoc" style="margin-top:8px">➕ إضافة صورة/وثيقة</button>` : ''}
@@ -1713,7 +1713,7 @@ function screenReorder() {
         <div id="childList" class="${canOrder ? 'reorder-list' : ''}">
           ${list.length ? list.map(c => {
             const kc = childCount.get(c.id) || 0;
-            return `<div class="row child-row"${canOrder ? ` data-reorder-id="${c.id}"` : ''}>${canOrder ? `<span class="reorder-arrows"><button class="reorder-up" data-up="${c.id}" aria-label="أعلى">▲</button><button class="reorder-down" data-down="${c.id}" aria-label="أسفل">▼</button></span>` : ''}<span class="k"><a href="#" data-rointo="${c.id}" style="color:var(--brand);text-decoration:none">${esc(c.name)}</a></span><span class="v">${kc ? kc + ' ابن ›' : (descCount.get(c.id) || 0) + ' ذرية'}</span></div>`;
+            return `<div class="row child-row"${canOrder ? ` data-reorder-id="${c.id}"` : ''}>${canOrder ? `<span class="reorder-arrows"><button class="reorder-up" data-up="${c.id}" aria-label="أعلى">▲</button><button class="reorder-down" data-down="${c.id}" aria-label="أسفل">▼</button></span>` : ''}<span class="k"><a href="#" data-rointo="${c.id}" style="color:var(--brand);text-decoration:none">${esc(c.name)}</a>${nickSuffix(c)}</span><span class="v">${kc ? kc + ' ابن ›' : (descCount.get(c.id) || 0) + ' ذرية'}</span></div>`;
           }).join('') : '<div class="muted" style="padding:6px">لا أبناء.</div>'}
         </div>
       </div>`;
@@ -1805,7 +1805,7 @@ function screenDescendants(arg) {
     const pad = Math.min(depth, 8) * 14;   // إزاحة متدرّجة بحدّ أقصى تمنع التداخل في الأجيال العميقة
     return `<div class="idx-row${isRoot ? ' idx-root' : ''}${isParent ? ' idx-parent' : ''}" style="padding-inline-start:${pad}px">
       <span class="idx-num" dir="ltr">${numStr(num)}</span>
-      <a href="#/person/${x.id}" class="idx-name ${nameCls(x)}"${nameTitle(x)}>${esc(x.name)}</a>${statusTag(x)}
+      <a href="#/person/${x.id}" class="idx-name ${nameCls(x)}"${nameTitle(x)}>${esc(x.name)}</a>${nickSuffix(x)}${statusTag(x)}
       ${kidsN ? `<span class="idx-meta">${kidsN} ابن • ${descN} ذرية</span>` : ''}
     </div>`;
   }).join('');
@@ -2039,7 +2039,7 @@ function pickPerson(title, onPick, filterFn, startAt) {
       if (filterFn) list = list.filter(filterFn);
       list = list.filter(p => nameMatch(p, q.value)).slice(0, 40);
       body.innerHTML = list.length
-        ? list.map(p => `<div class="card click" data-pid="${p.id}" style="margin:6px 0;padding:10px"><div class="li-title">${esc(p.name)}</div><div class="li-sub">${esc(lineageShort(p.id))}</div></div>`).join('')
+        ? list.map(p => `<div class="card click" data-pid="${p.id}" style="margin:6px 0;padding:10px"><div class="li-title">${esc(p.name)}${nickSuffix(p)}</div><div class="li-sub">${esc(lineageShort(p.id))}</div></div>`).join('')
         : '<div class="muted" style="padding:8px">لا نتائج — امسح البحث لتصفّح الأجيال</div>';
       body.querySelectorAll('[data-pid]').forEach(c => c.addEventListener('click', () => take(byId.get(parseInt(c.dataset.pid, 10)))));
     };
@@ -2059,7 +2059,7 @@ function pickPerson(title, onPick, filterFn, startAt) {
           ${list.length ? list.map(c => {
             const kc = childCount.get(c.id) || 0;
             return `<div class="anc-row">
-              <span class="anc-name" data-ppinto="${c.id}"><b>${esc(c.name)}</b> <span class="muted" style="font-size:.78rem;font-weight:400">(جيل ${c.generation}${kc ? ' • ' + kc + ' ابن' : ''})</span></span>
+              <span class="anc-name" data-ppinto="${c.id}"><b>${esc(c.name)}</b>${nickSuffix(c)} <span class="muted" style="font-size:.78rem;font-weight:400">(جيل ${c.generation}${kc ? ' • ' + kc + ' ابن' : ''})</span></span>
               ${canPick(c) ? `<button class="btn sm" data-pppick="${c.id}">اختيار</button>` : ''}
             </div>`;
           }).join('') : '<div class="muted" style="padding:8px">لا أبناء — استخدم «اختيار هذا» بالأعلى.</div>'}
@@ -2771,7 +2771,7 @@ function screenDuplicates() {
     ${list.map(g => `<div class="card" style="padding:12px">
       <div class="li-sub">📜 الأب: <b>${g.father ? esc(lineageShort(g.father.id, 8)) : '— (الأصل)'}</b></div>
       <div class="li-sub">الاسم المكرّر: <b class="n-noissue">${esc(g.items[0].name)}</b> (${g.items.length})</div>
-      <div style="margin-top:6px">${g.items.map(c => `<div class="row"><span class="k"><a href="#/person/${c.id}" style="color:var(--brand);text-decoration:none">${esc(c.name)}</a></span><span class="v" style="font-size:.8rem">${esc(lineageShort(c.id))}</span></div>`).join('')}</div>
+      <div style="margin-top:6px">${g.items.map(c => `<div class="row"><span class="k"><a href="#/person/${c.id}" style="color:var(--brand);text-decoration:none">${esc(c.name)}</a>${nickSuffix(c)}</span><span class="v" style="font-size:.8rem">${esc(lineageShort(c.id))}</span></div>`).join('')}</div>
     </div>`).join('')}`;
   bindGo();
 }
@@ -2874,7 +2874,7 @@ function fbPickerSearch(term, resEl, aliveOnly, onPick) {
   if (!all.length) { resEl.innerHTML = '<div class="muted" style="padding:6px">الاسم لا يوجد</div>'; return; }
   const live = aliveOnly ? all.filter(p => p.status !== 'dead') : all;
   const deadM = aliveOnly ? all.filter(p => p.status === 'dead') : [];
-  let html = live.slice(0, 25).map(p => `<div class="row click" data-pk="${p.id}"><span class="k">${esc(p.name)}</span><span class="v" style="font-size:.78rem">${esc(lineageShort(p.id, 6))}</span></div>`).join('');
+  let html = live.slice(0, 25).map(p => `<div class="row click" data-pk="${p.id}"><span class="k">${esc(p.name)}${nickSuffix(p)}</span><span class="v" style="font-size:.78rem">${esc(lineageShort(p.id, 6))}</span></div>`).join('');
   // المطابقون المتوفّون: يُعرضون كتنبيه فقط (لا يصلحون أباً لمولود)
   if (deadM.length) html += deadM.slice(0, 15).map(p => `<div class="row" style="opacity:.75"><span class="k">${esc(p.name)} <span style="color:var(--c-dead);font-weight:800;font-size:.8rem">(متوفّى)</span></span><span class="v" style="font-size:.78rem">${esc(lineageShort(p.id, 6))}</span></div>`).join('');
   if (!live.length && deadM.length) html = '<div class="muted" style="padding:6px">المطابق متوفّى — لا يصلح والداً لمولود:</div>' + html;
