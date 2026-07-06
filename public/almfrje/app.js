@@ -4320,6 +4320,7 @@ function screenTexts() {
       <div class="li-sub" style="margin-top:10px;font-weight:800;color:var(--text)">حسب المنطقة (المدينة)</div>${cityRows}
       <button class="btn sm danger" id="visits_reset" style="margin-top:10px">↺ تصفير إحصاء الزيارات</button>
       <button class="btn sm outline" id="recent_reset" style="margin-top:10px">↺ تصفير «آخر الإضافات»</button>
+      <button class="btn sm ${recentShow ? 'outline' : ''}" id="recent_toggle" style="margin-top:10px">${recentShow ? '🙈 إخفاء «آخر الإضافات» عن الجميع' : '👁 إظهار «آخر الإضافات» للجميع'}</button>
       <p class="muted" style="font-size:.78rem;margin-top:6px">يُحتسب كل من يدخل الموقع (زائر/مشرف/مدير). «المتواجدون الآن» = نشِطون خلال آخر ٣ دقائق. وتصفير «آخر الإضافات» يبدأ عدّ الإضافات من جديد دون حذف بيانات.</p></div>
     <div class="card"><h3>🏷️ عنوان الموقع وسطر «powered by» ${hintBtn('site_title')}</h3>
       <p class="muted" style="font-size:.85rem;margin-top:-2px">يظهران في شاشات الدخول (الزائر والمسؤول) وفي تذييل قائمة «المزيد».</p>
@@ -4410,6 +4411,11 @@ function screenTexts() {
   }); }
   pingPresence(false);   // تحديث «المتواجدون الآن» وتفصيلهم حسب الفرع عند فتح البطاقة
   { const rrc = document.getElementById('recent_reset'); if (rrc) rrc.addEventListener('click', resetRecent); }
+  { const rtg = document.getElementById('recent_toggle'); if (rtg) rtg.addEventListener('click', async () => {
+    const nv = !recentShow;
+    const ok = await guard(async () => { const { error } = await sb.from('almfrje_settings').upsert({ key: 'recent_show', value: nv, updated_at: new Date().toISOString() }, { onConflict: 'key' }); if (error) throw error; });
+    if (ok) { recentShow = nv; toast(nv ? 'بطاقة «آخر الإضافات» ظاهرة للجميع' : 'أُخفيت «آخر الإضافات» عن الجميع'); screenTexts(); }
+  }); }
   document.getElementById('tx_titleSave').addEventListener('click', async () => {
     const t = val('tx_title').trim(); const pw = val('tx_powered').trim();   // يُسمح بفراغ العنوان (لإخفائه)
     const ok = await guard(async () => {

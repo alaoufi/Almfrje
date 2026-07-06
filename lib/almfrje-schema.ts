@@ -66,6 +66,14 @@ export const ALMFRJE_SCHEMA_SQL = `
       CREATE INDEX IF NOT EXISTS almfrje_persons_branch_idx ON public.almfrje_persons(branch_id);
       CREATE INDEX IF NOT EXISTS almfrje_persons_gen_idx    ON public.almfrje_persons(generation);
       CREATE INDEX IF NOT EXISTS almfrje_persons_name_trgm  ON public.almfrje_persons using gin (name gin_trgm_ops);
+      -- حاجز القاعدة ضد تكرار اسم ابنٍ حيٍّ لنفس الأب (طبقة ثانية تحت فحص الواجهة).
+      -- بمطابقة مُطبَّعة (توحيد الهمزات/الياء/الهاء وإزالة المسافات). وإن وُجدت تكراراتٌ
+      -- قديمة تمنع إنشاءه، يُتجاهَل بصمت ولا يُعطَّل سير الترقية.
+      DO $func$ BEGIN
+        CREATE UNIQUE INDEX IF NOT EXISTS almfrje_persons_livename_key
+          ON public.almfrje_persons (father_id, replace(translate(lower(name), 'أإآىةؤئ', 'ااايهوي'), ' ', ''))
+          WHERE status = 'alive' AND father_id IS NOT NULL;
+      EXCEPTION WHEN others THEN NULL; END $func$;
 
       -- ربط جذر الفرع بالأشخاص
       DO $func$ BEGIN
@@ -346,8 +354,8 @@ export const ALMFRJE_SCHEMA_SQL = `
       -- ختم إصدار المخطط: يرتفع مع كل تعديلٍ للمخطط، ووجوده بالقيمة الأحدث في القاعدة
       -- دليلٌ قاطع أن قناة الترقية التلقائية (/api/almfrje-setup) تعمل.
       INSERT INTO public.almfrje_settings (key, value)
-        VALUES ('schema_rev', '"2026-07-06-3"'::jsonb)
-        ON CONFLICT (key) DO UPDATE SET value = '"2026-07-06-3"'::jsonb, updated_at = now();
+        VALUES ('schema_rev', '"2026-07-06-4"'::jsonb)
+        ON CONFLICT (key) DO UPDATE SET value = '"2026-07-06-4"'::jsonb, updated_at = now();
 
       -- ملاحظات الزوار: يرسلها أي زائر/عضو، ويراجعها المدير ويضع علامة «تم».
       CREATE TABLE IF NOT EXISTS public.almfrje_feedback (
