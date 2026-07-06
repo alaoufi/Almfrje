@@ -138,6 +138,8 @@ export const ALMFRJE_SCHEMA_SQL = `
         select branch_id from public.almfrje_members where user_id = auth.uid() and is_active limit 1; $func$;
       -- هل يُشرف المستخدم الحالي على هذا الفرع؟ (يدعم branch_id المفرد + مصفوفة branch_ids)
       -- المشرف العام بلا فروعٍ محدّدة = يشرف على كل الفروع.
+      -- مهم: عناصر branch_ids تُخزَّن أرقاماً jsonb، ومعامل ? لا يطابق إلا النصوص —
+      -- لذا نفحص بـ @> للأرقام وبـ ? للنصوص (توافقاً مع أي بياناتٍ قديمة).
       CREATE OR REPLACE FUNCTION public.almfrje_manages_branch(bid bigint) RETURNS boolean
         LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $func$
         select exists (
@@ -145,6 +147,7 @@ export const ALMFRJE_SCHEMA_SQL = `
            where m.user_id = auth.uid() and m.is_active
              and ((m.role = 'general_manager' and m.branch_id is null and (m.branch_ids is null or m.branch_ids = '[]'::jsonb))
                   or m.branch_id = bid
+                  or (m.branch_ids @> to_jsonb(bid))
                   or (m.branch_ids ? bid::text))); $func$;
       CREATE OR REPLACE FUNCTION public.almfrje_perm(act text) RETURNS boolean
         LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $func$
@@ -340,8 +343,8 @@ export const ALMFRJE_SCHEMA_SQL = `
       -- ختم إصدار المخطط: يرتفع مع كل تعديلٍ للمخطط، ووجوده بالقيمة الأحدث في القاعدة
       -- دليلٌ قاطع أن قناة الترقية التلقائية (/api/almfrje-setup) تعمل.
       INSERT INTO public.almfrje_settings (key, value)
-        VALUES ('schema_rev', '"2026-07-06-1"'::jsonb)
-        ON CONFLICT (key) DO UPDATE SET value = '"2026-07-06-1"'::jsonb, updated_at = now();
+        VALUES ('schema_rev', '"2026-07-06-2"'::jsonb)
+        ON CONFLICT (key) DO UPDATE SET value = '"2026-07-06-2"'::jsonb, updated_at = now();
 
       -- ملاحظات الزوار: يرسلها أي زائر/عضو، ويراجعها المدير ويضع علامة «تم».
       CREATE TABLE IF NOT EXISTS public.almfrje_feedback (
