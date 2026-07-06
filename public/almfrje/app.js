@@ -1331,7 +1331,8 @@ function buildRadial(rootId, maxGen) {
 function screenRadial(arg) {
   if (arg && arg !== 'all') { const rid = parseInt(arg, 10); if (byId.get(rid)) radRoot = byId.get(rid); }
   if (!radRoot || !byId.get(radRoot.id)) {
-    if (!isAdmin() && isManager()) { const b = myBranches()[0]; radRoot = (b && branchRoot(b)) || roots()[0] || null; }
+    if (!isAdmin() && isManager() && !isGeneralManager()) { const b = myBranches()[0]; radRoot = (b && branchRoot(b)) || roots()[0] || null; }
+    else if (isGeneralManager()) { radRoot = roots()[0] || null; }   // المشرف العام يبدأ من القمة ككل المستخدمين
     else radRoot = roots()[0] || null;
   }
   if (!radRoot) { view().innerHTML = '<div class="center-empty">لا توجد بيانات.</div>'; return; }
@@ -5448,8 +5449,10 @@ function myPresenceBranch() {
       const matches = C.persons.filter(p => nameMatch(p, me.full_name));
       if (matches.length === 1 && matches[0].branch_id != null) b = matches[0].branch_id;
     }
-    // ٤) المشرف: أول فرع يُشرف عليه.
-    if (b == null && isManager()) { const mb = myBranches(); if (mb.length) b = mb[0]; }
+    // ٤) مشرفُ فرعٍ واحدٍ محدّد: يُنسب لفرعه. (المشرف العام/متعدّد الفروع لا يُخمَّن
+    //    فرعه — كان يُنسب خطأً لأول فرعٍ بالقائمة «مرزوق». يُحسب في الإجمالي بلا فرع،
+    //    أو يربط شخصَه من «ملفي الشخصي» فيُنسب لفرعه الحقيقي بدقة.)
+    if (b == null && isManager() && !isGeneralManager()) { const mb = myBranches(); if (mb.length === 1) b = mb[0]; }
   } catch (e) { /* أفضل جهد */ }
   _myBranchCache = b;
   return b;
