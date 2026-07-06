@@ -1075,3 +1075,46 @@ ul.hier ul.hier > .hier-li::before {
 .inb-badge { display: inline-flex; align-items: center; justify-content: center;
   background: var(--danger); color: #fff; border-radius: 999px; min-width: 20px; height: 20px;
   padding: 0 6px; font-size: .7rem; font-weight: 800; vertical-align: middle; margin-inline-start: 4px; }
+
+/* 💬 المناقشات — محاكاة واتساب: قائمة المحادثات */
+.wa-item { width: 100%; display: flex; align-items: center; gap: 10px; padding: 12px 12px;
+  margin: 0 0 8px; border: 1px solid var(--line); border-radius: 14px; cursor: pointer;
+  font: inherit; color: var(--text); background: var(--card); text-align: start;
+  box-shadow: 0 2px 8px -5px rgba(0,0,0,.3); }
+.wa-item:active { background: color-mix(in srgb, var(--brand) 6%, var(--card)); }
+.wa-item.unread { border-inline-start: 4px solid #1fa855; }
+.wa-av { width: 44px; height: 44px; flex: none; border-radius: 50%; display: flex; align-items: center;
+  justify-content: center; font-size: 1.3rem; background: color-mix(in srgb, #1fa855 14%, var(--card)); }
+.wa-tx { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.wa-row1, .wa-row2 { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.wa-title { font-weight: 800; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wa-time { font-size: .7rem; color: var(--muted); flex: none; }
+.wa-prev { font-size: .8rem; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wa-item.unread .wa-prev { color: var(--text); font-weight: 600; }
+.wa-dot { width: 10px; height: 10px; border-radius: 50%; background: #1fa855; flex: none; }
+
+/* غرفة المحادثة: خلفية وفقاعات وفواصل أيام */
+.wa-chat { min-height: 55vh; max-height: calc(100vh - 235px); overflow-y: auto; padding: 10px 6px;
+  border-radius: 14px; border: 1px solid var(--line);
+  background: color-mix(in srgb, #7a9e7e 12%, var(--bg)); display: flex; flex-direction: column; gap: 4px; }
+.wa-day { text-align: center; margin: 8px 0 4px; }
+.wa-day span { background: var(--card); color: var(--muted); font-size: .7rem; font-weight: 700;
+  padding: 3px 12px; border-radius: 999px; box-shadow: 0 1px 3px rgba(0,0,0,.15); }
+.wa-bub { position: relative; max-width: 82%; align-self: flex-start; background: var(--card);
+  border-radius: 12px; border-start-end-radius: 3px; padding: 6px 10px 16px;
+  box-shadow: 0 1px 2px rgba(0,0,0,.2); display: flex; flex-direction: column; }
+.wa-bub.me { align-self: flex-end; background: color-mix(in srgb, #1fa855 22%, var(--card));
+  border-start-end-radius: 12px; border-start-start-radius: 3px; }
+.wa-who { font-size: .72rem; font-weight: 800; color: #d9480f; margin-bottom: 2px; }
+.wa-body { white-space: pre-wrap; word-break: break-word; font-size: .95rem; line-height: 1.7; }
+.wa-t { position: absolute; bottom: 3px; inset-inline-end: 9px; font-size: .62rem; color: var(--muted); }
+
+/* شريط الإدخال */
+.wa-inputbar { display: flex; align-items: flex-end; gap: 8px; margin-top: 8px; }
+.wa-inputbar textarea { flex: 1; resize: none; border: 1px solid var(--line); border-radius: 22px;
+  padding: 11px 14px; font: inherit; background: var(--card); color: var(--text); max-height: 120px; }
+.wa-inputbar button { width: 46px; height: 46px; flex: none; border: none; border-radius: 50%;
+  background: #1fa855; color: #fff; font-size: 1.15rem; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; transform: scaleX(-1);
+  box-shadow: 0 3px 8px rgba(0,0,0,.25); }
+.wa-inputbar button:active { transform: scaleX(-1) scale(.92); }

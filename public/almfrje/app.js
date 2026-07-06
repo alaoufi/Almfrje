@@ -682,6 +682,8 @@ const ROUTES = {
   texts: { t: 'النصوص', back: true, fn: screenTexts },
   settings: { t: 'الإعدادات', back: true, fn: screenSettings },
   control: { t: 'لوحة التحكم', back: true, fn: screenControl },
+  discussions: { t: 'المناقشات', back: true, fn: screenTopics },
+  topic: { t: 'مناقشة', back: true, fn: screenTopicChat },
   backups: { t: 'النسخ والتصدير', back: true, fn: screenBackups },
   profile: { t: 'ملفي الشخصي', back: true, fn: screenProfile },
   stats: { t: 'الإحصائيات', back: true, fn: screenStats },
@@ -3311,6 +3313,7 @@ function screenMore() {
   // ٣) الإدارة (للمصرّح لهم فقط) — أدوات البيانات + لوحة التحكم والملاحظات والسجل والتعليمات مجمّعة
   const admin = [];
   if (isAdmin()) admin.push(['⚙️ لوحة التحكم', '#/control', 'control_panel']);
+  if (isAdmin() || isGeneralManager()) admin.push(['💬 المناقشات (الإدارة العليا)', '#/discussions']);
   { const n = (isAdmin() || isManager()) ? (C.feedbackPending || 0) : 0;
     if (isAdmin() || isManager()) admin.push(['📨 صندوق الوارد' + (n > 0 ? ' <span class="inb-badge">' + (n > 99 ? '99+' : n) + '</span>' : ''), '#/feedbacks', 'feedbacks']); }
   if (canAdd()) admin.push(['👶 إضافة مولود (مباشرة)', '#/person-edit/0', 'add_person']);
@@ -4284,6 +4287,7 @@ const GUIDE = [
   { sec: '🔐 دخول الإدارة والصلاحيات', role: 'admin', items: [
     { t: 'دخول المسؤول / مشرف الفرع', fn: 'دخول الإدارة لإضافة البيانات وتعديلها.', brief: 'من «المزيد ← دخول المسؤول / مشرف الفرع» بالجوال أو اسم المستخدم والرقم السري.', det: 'مدير النظام له صلاحية كاملة على كل الأقسام. مشرف الفرع يضيف ويعدّل ضمن فرعه المصرّح به فقط، ولا يرى أقسام الإدارة العامة. شاشة دخول الإدارة لا تظهر عبر رابطٍ مُرسَل أبداً — أي رابطٍ يُفتح يعرض دخول الزائر فقط.' },
     { t: 'صندوق الوارد', fn: 'كل ملاحظات وطلبات الزوار في مكانٍ واحد.', brief: 'تبويبان: 📥 ملاحظات الزوار (بانتظار الحسم) و🗂️ الأرشيف (المحسومة). وشارة عددٍ حمراء تتسلسل من تبويب «المزيد» حتى البند لتقودك إليه، وتنبيهٌ برسائل الصندوق فور دخولك.', det: 'المدير يرى الكل؛ والمشرف ما يخصّ فروعه. من البطاقة: اعتماد المولود أو الترتيب، الرد باسم الإدارة من بنك الردود، حفظ جوال المرسل في ملفه، ثم تنتقل المحسومة للأرشيف.' },
+    { t: 'المناقشات (الإدارة العليا)', fn: 'غرف نقاشٍ داخلية للمدير والمشرفين العامين فقط.', brief: 'المزيد ← «💬 المناقشات»: كل موضوعٍ محادثة مستقلة بأسلوب واتساب.', det: 'أنشئ موضوعاً بعنوانٍ واضح، وتحاور فيه بفقاعات رسائل (رسائلك بلونٍ مميّز والآخرون بأسمائهم)، مع فواصل الأيام ووقت كل رسالة، ومؤشرٍ أخضر للمواضيع التي فيها جديدٌ لم تقرأه، وتحديثٍ تلقائي أثناء فتح الغرفة. حذف الموضوع كاملاً للمدير وحده.' },
     { t: 'ملفي الشخصي', fn: 'تعديل بيانات حسابك.', brief: 'الاسم والجوال وكلمة المرور، وبياناتك في الشجرة (المدينة/الجوال/سنة الميلاد).', det: 'تغيير الجوال يعني الدخول لاحقاً بالرقم الجديد؛ احفظه.' },
   ]},
   { sec: '🗂️ البيانات (للمدير ومشرف الفرع)', role: 'admin', items: [
@@ -4454,6 +4458,137 @@ function screenAboutEdit() {
 }
 
 /* ===== النصوص: نص الرئيسية + تعريف ألوان الحالة (للمدير) ===== */
+/* ===== 💬 المناقشات (المدير + المشرفون العامون) — كل موضوعٍ محادثة مستقلة بأسلوب واتساب ===== */
+const canDiscuss = () => !!(me && me.is_active && (me.role === 'admin' || me.role === 'general_manager'));
+let _chatTimer = null, _chatLastId = 0;
+function waTime(iso) { try { const d = new Date(iso); return d.toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' }); } catch (e) { return ''; } }
+function waDay(iso) { try { const d = new Date(iso); const t = new Date(); const y = new Date(); y.setDate(t.getDate() - 1);
+  const same = (a, b) => a.toDateString() === b.toDateString();
+  if (same(d, t)) return 'اليوم'; if (same(d, y)) return 'أمس';
+  return d.toLocaleDateString('ar-SA', { day: 'numeric', month: 'long', year: 'numeric' }); } catch (e) { return ''; } }
+// قائمة المواضيع — كقائمة محادثات واتساب: الأحدث أولاً، معاينة آخر رسالة، ونقطة غير المقروء
+async function screenTopics() {
+  if (!canDiscuss()) { view().innerHTML = noPerm(); return; }
+  showLoading(true);
+  let topics = [], reads = {};
+  try {
+    const [t, r] = await Promise.all([
+      sb.from('almfrje_topics').select('*').order('last_msg_at', { ascending: false }).limit(200),
+      sb.from('almfrje_topic_reads').select('topic_id,last_read_at').eq('user_id', me.user_id),
+    ]);
+    topics = t.data || [];
+    (r.data || []).forEach(x => reads[x.topic_id] = x.last_read_at);
+  } catch (e) { /* */ }
+  showLoading(false);
+  view().innerHTML = `
+    <button class="btn" id="tp_new" style="width:100%;margin-bottom:10px">＋ موضوع نقاشٍ جديد</button>
+    ${topics.length ? topics.map(t => {
+      const unread = !reads[t.id] || (t.last_msg_at && Date.parse(t.last_msg_at) > Date.parse(reads[t.id]));
+      return `<button class="wa-item${unread ? ' unread' : ''}" data-topic="${t.id}">
+        <span class="wa-av">💬</span>
+        <span class="wa-tx">
+          <span class="wa-row1"><span class="wa-title">${esc(t.title)}</span><span class="wa-time">${t.last_msg_at ? waTime(t.last_msg_at) : ''}</span></span>
+          <span class="wa-row2"><span class="wa-prev">${t.last_msg_text ? esc((t.last_msg_by ? t.last_msg_by.split(' ')[0] + ': ' : '') + t.last_msg_text) : 'موضوع جديد — ابدأ النقاش'}</span>${unread ? '<span class="wa-dot"></span>' : ''}</span>
+        </span>
+      </button>`; }).join('') : '<div class="center-empty">لا مواضيع بعد — أنشئ أول موضوع نقاش.</div>'}`;
+  document.getElementById('tp_new').addEventListener('click', async () => {
+    const title = (await uiPrompt('عنوان الموضوع الجديد', { title: 'موضوع نقاشٍ جديد', placeholder: 'مثال: خطة تحديث بيانات فرع غباش', okText: 'إنشاء' }) || '').trim();
+    if (!title) return;
+    const who = (me && (me.full_name || me.username)) || '';
+    const ok = await guard(async () => {
+      const { data, error } = await sb.from('almfrje_topics').insert({ title, created_by_name: who, last_msg_text: '', last_msg_by: '' }).select('id').single();
+      if (error) throw error;
+      setHash('#/topic/' + data.id);
+    });
+    if (!ok) { /* بقي في القائمة */ }
+  });
+  view().querySelectorAll('[data-topic]').forEach(b => b.addEventListener('click', () => setHash('#/topic/' + b.dataset.topic)));
+}
+// غرفة المحادثة — فقاعات كواتساب: رسائلي بلون مميّز جهة، والآخرون جهة، مع فواصل الأيام
+async function screenTopicChat(arg) {
+  if (!canDiscuss()) { view().innerHTML = noPerm(); return; }
+  const tid = parseInt(arg, 10);
+  showLoading(true);
+  let topic = null, msgs = [];
+  try {
+    const [t, m] = await Promise.all([
+      sb.from('almfrje_topics').select('*').eq('id', tid).maybeSingle(),
+      sb.from('almfrje_topic_msgs').select('*').eq('topic_id', tid).order('id', { ascending: true }).limit(800),
+    ]);
+    topic = t.data; msgs = m.data || [];
+  } catch (e) { /* */ }
+  showLoading(false);
+  if (!topic) { view().innerHTML = '<div class="center-empty">الموضوع غير موجود.</div>'; return; }
+  document.getElementById('screenTitle').textContent = '💬 ' + topic.title;
+  _chatLastId = msgs.length ? msgs[msgs.length - 1].id : 0;
+  view().innerHTML = `
+    <div class="wa-chat" id="waChat">${waMsgsHtml(msgs)}</div>
+    <div class="wa-inputbar">
+      <textarea id="waText" rows="1" placeholder="اكتب رسالة"></textarea>
+      <button id="waSend" aria-label="إرسال">➤</button>
+    </div>
+    ${isAdmin() ? `<div class="no-print" style="text-align:center;margin-top:8px"><button class="btn sm danger" id="waDel">🗑️ حذف الموضوع كاملاً</button></div>` : ''}`;
+  const box = document.getElementById('waChat');
+  box.scrollTop = box.scrollHeight;
+  markTopicRead(tid);
+  const ta = document.getElementById('waText');
+  ta.addEventListener('input', () => { ta.style.height = 'auto'; ta.style.height = Math.min(ta.scrollHeight, 120) + 'px'; });
+  const send = async () => {
+    const body = ta.value.trim(); if (!body) return;
+    ta.value = ''; ta.style.height = 'auto';
+    const who = (me && (me.full_name || me.username)) || '';
+    const ok = await guard(async () => {
+      const { data, error } = await sb.from('almfrje_topic_msgs').insert({ topic_id: tid, body, author_name: who }).select('*').single();
+      if (error) throw error;
+      await sb.from('almfrje_topics').update({ last_msg_at: new Date().toISOString(), last_msg_text: body.slice(0, 80), last_msg_by: who }).eq('id', tid);
+      box.insertAdjacentHTML('beforeend', waMsgsHtml([data], _chatLastId ? msgs[msgs.length - 1] : null));
+      msgs.push(data); _chatLastId = data.id;
+      box.scrollTop = box.scrollHeight;
+      markTopicRead(tid);
+    });
+    if (!ok) ta.value = body;   // أعد النص عند الفشل
+  };
+  document.getElementById('waSend').addEventListener('click', send);
+  ta.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey && window.innerWidth > 700) { e.preventDefault(); send(); } });
+  { const dl = document.getElementById('waDel'); if (dl) dl.addEventListener('click', async () => {
+    if (!(await confirm2('حذف الموضوع وكل رسائله نهائياً؟', { danger: true, okText: 'حذف' }))) return;
+    const ok = await guard(async () => { const { error } = await sb.from('almfrje_topics').delete().eq('id', tid); if (error) throw error; });
+    if (ok) { toast('حُذف الموضوع'); setHash('#/discussions'); }
+  }); }
+  // تحديث تلقائي كل ١٢ ثانية ما دامت الغرفة مفتوحة (يتوقف ذاتياً عند مغادرتها)
+  if (_chatTimer) clearInterval(_chatTimer);
+  _chatTimer = setInterval(async () => {
+    if (!location.hash.startsWith('#/topic/' + tid)) { clearInterval(_chatTimer); _chatTimer = null; return; }
+    try {
+      const { data } = await sb.from('almfrje_topic_msgs').select('*').eq('topic_id', tid).gt('id', _chatLastId).order('id', { ascending: true }).limit(100);
+      if (data && data.length) {
+        const nearBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 120;
+        box.insertAdjacentHTML('beforeend', waMsgsHtml(data, msgs[msgs.length - 1] || null));
+        data.forEach(d => msgs.push(d));
+        _chatLastId = msgs[msgs.length - 1].id;
+        if (nearBottom) box.scrollTop = box.scrollHeight;
+        markTopicRead(tid);
+      }
+    } catch (e) { /* */ }
+  }, 12000);
+}
+function waMsgsHtml(list, prev) {
+  let lastDay = prev ? waDay(prev.created_at) : null;
+  return list.map(m => {
+    const mine = m.author === me.user_id;
+    const day = waDay(m.created_at);
+    const sep = day !== lastDay ? `<div class="wa-day"><span>${day}</span></div>` : '';
+    lastDay = day;
+    return `${sep}<div class="wa-bub ${mine ? 'me' : ''}">
+      ${!mine ? `<span class="wa-who">${esc((m.author_name || '').split(' بن ')[0] || m.author_name || '')}</span>` : ''}
+      <span class="wa-body">${esc(m.body)}</span>
+      <span class="wa-t">${waTime(m.created_at)}</span>
+    </div>`;
+  }).join('');
+}
+async function markTopicRead(tid) {
+  try { await sb.from('almfrje_topic_reads').upsert({ user_id: me.user_id, topic_id: tid, last_read_at: new Date().toISOString() }, { onConflict: 'user_id,topic_id' }); } catch (e) { /* */ }
+}
 // 🎛️ لوحة التحكم — مربّع لكل خدمة، مرتّبة متباعدة، وتحت كلٍّ منها مسؤولياتها
 function screenControl() {
   if (!isAdmin()) { view().innerHTML = noPerm(); return; }
