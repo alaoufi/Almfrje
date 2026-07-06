@@ -681,6 +681,7 @@ const ROUTES = {
   hints: { t: 'تعديل التعليمات', back: true, fn: screenHints },
   texts: { t: 'النصوص', back: true, fn: screenTexts },
   settings: { t: 'الإعدادات', back: true, fn: screenSettings },
+  control: { t: 'لوحة التحكم', back: true, fn: screenControl },
   backups: { t: 'النسخ والتصدير', back: true, fn: screenBackups },
   profile: { t: 'ملفي الشخصي', back: true, fn: screenProfile },
   stats: { t: 'الإحصائيات', back: true, fn: screenStats },
@@ -728,8 +729,10 @@ const ADMIN_TABS = [
   ['backups', '💾 النسخ والتصدير', '#/backups'],
 ];
 function adminTabBar(active) {
+  // زر العودة لواجهة اللوحة (المربعات) يتصدّر الشريط
+
   if (!isAdmin()) return '';
-  return `<div class="admin-tabs">${ADMIN_TABS.map(([k, label, href]) => `<button class="admin-tab${k === active ? ' active' : ''}" data-go="${href}">${label}</button>`).join('')}</div>`;
+  return `<div class="admin-tabs"><button class="admin-tab" data-go="#/control" title="لوحة التحكم">⌂</button>${ADMIN_TABS.map(([k, label, href]) => `<button class="admin-tab${k === active ? ' active' : ''}" data-go="${href}">${label}</button>`).join('')}</div>`;
 }
 
 /* ===== بطاقات ومكوّنات مشتركة ===== */
@@ -3307,7 +3310,7 @@ function screenMore() {
 
   // ٣) الإدارة (للمصرّح لهم فقط) — أدوات البيانات + لوحة التحكم والملاحظات والسجل والتعليمات مجمّعة
   const admin = [];
-  if (isAdmin()) admin.push(['⚙️ لوحة التحكم', '#/members', 'control_panel']);
+  if (isAdmin()) admin.push(['⚙️ لوحة التحكم', '#/control', 'control_panel']);
   if (isAdmin()) admin.push(['📨 ملاحظات الزوار الواردة', '#/feedbacks', 'feedbacks']);
   if (canAdd()) admin.push(['👶 إضافة مولود (مباشرة)', '#/person-edit/0', 'add_person']);
   if (isAdmin()) admin.push(['📥 استيراد ملف Excel', '#/import', 'import']);
@@ -4447,6 +4450,32 @@ function screenAboutEdit() {
 }
 
 /* ===== النصوص: نص الرئيسية + تعريف ألوان الحالة (للمدير) ===== */
+// 🎛️ لوحة التحكم — مربّع لكل خدمة، مرتّبة متباعدة، وتحت كلٍّ منها مسؤولياتها
+function screenControl() {
+  if (!isAdmin()) { view().innerHTML = noPerm(); return; }
+  const tiles = [
+    ['👥', 'المستخدمون', 'الحسابات والأدوار والصلاحيات الدقيقة', '#/members'],
+    ['🗂️', 'الفروع والمشرفون', 'تعريف الفروع وتعيين مشرفيها', '#/branchadmin'],
+    ['⚙️', 'الإعدادات', 'فتح الزوّار • آخر الإضافات • الزيارات', '#/settings'],
+    ['📨', 'الملاحظات الواردة', 'طلبات الزوّار والاعتماد والرد باسم الإدارة', '#/feedbacks'],
+    ['📝', 'النصوص', 'نصوص الواجهة والتهنئة وبنك الردود', '#/texts'],
+    ['📜', 'الوثائق', 'إضافة وثائق القبيلة وتفريغ نصوصها', '#/documents'],
+    ['📖', 'الصفحة التعريفية', 'نبذة القبيلة بمحرّر التنسيق', '#/aboutedit'],
+    ['💡', 'التعليمات', 'نصوص أزرار الإرشاد ⓘ', '#/hints'],
+    ['📋', 'سجل التعديلات', 'من عدّل وماذا — مع التراجع', '#/audit'],
+    ['🗑️', 'سلة المحذوفات', 'استرجاع ما حُذف أو عُدّل', '#/trash'],
+    ['💾', 'النسخ والتصدير', 'نسخ احتياطية واستعادة وExcel/PDF', '#/backups'],
+  ];
+  view().innerHTML = `
+    <div class="cp-grid">${tiles.map(([ic, t, d, h], i) => `
+      <button class="cp-tile cpt-${i % 6}" data-go="${h}">
+        <span class="cp-ico">${ic}</span>
+        <span class="cp-title">${t}</span>
+        <span class="cp-desc">${d}</span>
+      </button>`).join('')}
+    </div>`;
+  bindGo();
+}
 // ⚙️ الإعدادات — مفاتيح تشغيل الموقع مجموعةً في مكانٍ واحد (بدل تناثرها)
 function screenSettings() {
   if (!isAdmin()) { view().innerHTML = noPerm(); return; }
