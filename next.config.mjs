@@ -1,0 +1,78 @@
+// قاعدة بيانات المفرجي — يستخدمها وسيط ‎/sbdb‎ أدناه (لشبكاتٍ تحجب نطاق Supabase مباشرة)
+const ALMFRJE_DB = process.env.ALMFRJE_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://noupszhgfyqhfotokabj.supabase.co';
+
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  reactStrictMode: true,
+  outputFileTracingIncludes: {
+    '/api/setup': ['./database/setup.sql'],
+  },
+  async rewrites() {
+    return [
+      // وسيط قاعدة بيانات المفرجي: بعض الشبكات (خصوصاً على أجهزة الكمبيوتر) تحجب نطاق
+      // Supabase مباشرةً فتظهر شاشة الدخول الخاطئة ويفشل كل شيء. هذا المسار يمرّر
+      // REST/Auth عبر نطاق الموقع نفسه، ويتحوّل إليه المتصفّح تلقائياً عند الحجب.
+      { source: '/sbdb/:path*', destination: `${ALMFRJE_DB}/:path*` },
+      // المفرجي يُخدَم من جذر الدومين / مباشرةً (ليعمل على almfrje.alaoufi.me دون مسار).
+      // المساران /almfrje و/almfrji يبقيان عاملَين كـ alias لنفس التطبيق (توافق قديم).
+      { source: '/', destination: '/almfrje/index.html' },
+      { source: '/almfrji', destination: '/almfrje/index.html' },
+      { source: '/almfrji/', destination: '/almfrje/index.html' },
+      { source: '/almfrje', destination: '/almfrje/index.html' },
+      { source: '/almfrje/', destination: '/almfrje/index.html' },
+      // منصّة الاستشارات — تُخدَم على /con
+      { source: '/con', destination: '/legacy/index.html' },
+      { source: '/con/', destination: '/legacy/index.html' },
+      // تطبيق مراح (ويب) — يُخدم من /mrah (و/mrahi مرادف)
+      { source: '/mrah', destination: '/mrahi/index.html' },
+      { source: '/mrah/', destination: '/mrahi/index.html' },
+      { source: '/mrahi', destination: '/mrahi/index.html' },
+      { source: '/mrahi/', destination: '/mrahi/index.html' },
+      // تطبيق الملاحظات (notes) — مشروعٌ مستقلّ يُخدم من /notes
+      { source: '/notes', destination: '/notes/index.html' },
+      { source: '/notes/', destination: '/notes/index.html' },
+    ];
+  },
+  async headers() {
+    const noCache = [
+      { key: 'Cache-Control', value: 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0, s-maxage=0, private' },
+      { key: 'CDN-Cache-Control', value: 'no-store' },
+      { key: 'Vercel-CDN-Cache-Control', value: 'no-store' },
+      { key: 'Surrogate-Control', value: 'no-store' },
+      { key: 'Pragma', value: 'no-cache' },
+      { key: 'Expires', value: '0' },
+    ];
+    // إعادة تحقّق: تُخزَّن في المتصفّح لكن تُراجَع في كل فتح عبر ETag → 304 سريع إن لم
+    // تتغيّر، ونسخة جديدة فور أي نشر. (للأصول الثابتة: app.js / app.css … — أسرع وبلا قِدَم.)
+    const revalidate = [
+      { key: 'Cache-Control', value: 'no-cache' },
+      { key: 'CDN-Cache-Control', value: 'no-cache' },
+      { key: 'Vercel-CDN-Cache-Control', value: 'no-cache' },
+    ];
+    return [
+      // منصّة الاستشارات على /con (وملفاتها داخل /legacy/)
+      { source: '/con', headers: noCache },
+      { source: '/legacy/:path*', headers: noCache },
+      // تطبيق مراحي — لا تخزين أثناء التطوير/التجربة
+      { source: '/mrah', headers: noCache },
+      { source: '/mrahi', headers: noCache },
+      { source: '/mrahi/:path*', headers: noCache },
+      // نظام المفارجة (الأنساب): صفحة الدخول (index) تبقى بلا تخزين، والأصول الثابتة
+      // (app.js/app.css/الأيقونة…) بإعادة تحقّق ETag — أسرع فتحٍ مع بقائها محدّثة دائماً.
+      { source: '/almfrji', headers: noCache },
+      { source: '/almfrje', headers: noCache },
+      { source: '/almfrje/:path*', headers: revalidate },
+      // تطبيق الملاحظات (notes)
+      { source: '/notes', headers: noCache },
+      { source: '/notes/:path*', headers: noCache },
+      // الصفحة الرئيسية
+      { source: '/', headers: noCache },
+      // كل نقاط الـ API — يجب ألّا تُخزَّن أبداً (محتوى المستخدم)
+      { source: '/api/:path*', headers: noCache },
+      // وسيط قاعدة البيانات — بيانات حيّة لا تُخزَّن
+      { source: '/sbdb/:path*', headers: noCache },
+    ];
+  },
+};
+
+export default nextConfig;

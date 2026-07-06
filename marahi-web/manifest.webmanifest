@@ -1,0 +1,16 @@
+{
+  "name": "مراحي — إدارة الحلال",
+  "short_name": "مراحي",
+  "description": "متابعة الحلال فردياً من الولادة حتى البيع — يعمل أوفلاين ويخزّن على الجهاز.",
+  "lang": "ar",
+  "dir": "rtl",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#FFF8E1",
+  "theme_color": "#2E7D32",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

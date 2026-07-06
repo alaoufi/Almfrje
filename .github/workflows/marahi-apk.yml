@@ -1,0 +1,43 @@
+name: Build Marahi APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - "claude/offline-apk-app-VENky"
+    paths:
+      - "marahi/**"
+      - ".github/workflows/marahi-apk.yml"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: marahi
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x ./gradlew
+
+      - name: Build debug APK
+        run: ./gradlew assembleDebug --no-daemon --stacktrace
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: marahi-debug-apk
+          path: marahi/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error

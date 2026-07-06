@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#4338CA" />
+  <!-- منع التخزين المؤقّت للمستند نهائياً -->
+  <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
+  <title>موقع قبيلة المفارجة</title>
+  <meta name="description" content="تصفّح موقع قبيلة المفارجة وشجرتها وأنسابها وفروعها." />
+  <!-- معاينة المشاركة (Open Graph) — يقرأها واتساب/تويتر من الترويسة قبل تشغيل أي كود -->
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="موقع قبيلة المفارجة" />
+  <meta property="og:title" content="موقع قبيلة المفارجة" />
+  <meta property="og:description" content="تصفّح موقع قبيلة المفارجة وشجرتها وأنسابها وفروعها." />
+  <meta property="og:url" content="https://almfrje.alaoufi.me/" />
+  <meta property="og:image" content="https://almfrje.alaoufi.me/almfrje/icon.svg" />
+  <meta name="twitter:card" content="summary" />
+  <meta name="twitter:title" content="موقع قبيلة المفارجة" />
+  <meta name="twitter:description" content="تصفّح موقع قبيلة المفارجة وشجرتها وأنسابها وفروعها." />
+  <link rel="icon" href="/almfrje/icon.svg" type="image/svg+xml" />
+  <!-- تثبيت كتطبيق (PWA) -->
+  <link rel="manifest" href="/almfrje/manifest.webmanifest" />
+  <link rel="apple-touch-icon" href="/almfrje/icon.svg" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="المفارجة" />
+  <!-- الأصول بإعادة تحقّق (ETag): تُحدَّث فور النشر وتُحمَّل بسرعة (304) إن لم تتغيّر -->
+  <link rel="stylesheet" href="/almfrje/app.css">
+</head>
+<body>
+  <!-- شاشة المصادقة -->
+  <div id="auth" class="auth hidden"></div>
+
+  <!-- التطبيق -->
+  <div id="app" class="hidden">
+    <header class="appbar">
+      <button id="backBtn" class="icon-btn hidden" aria-label="رجوع">‹</button>
+      <h1 id="screenTitle">المفارجة</h1>
+      <button id="shareBtn" class="icon-btn" aria-label="مشاركة الموقع" title="مشاركة الموقع"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg></button>
+      <button id="guideBtn" class="icon-btn" aria-label="دليل الموقع" title="دليل الموقع">📖</button>
+      <button id="refreshBtn" class="icon-btn" aria-label="تحديث" title="تحديث الصفحة">🔄</button>
+      <button id="signoutBtn" class="icon-btn" aria-label="خروج" title="تسجيل الخروج">⎋</button>
+    </header>
+    <main id="view"></main>
+    <nav class="bottomnav" id="bottomnav"></nav>
+  </div>
+
+  <div id="loading" class="loading">… جارٍ التحميل</div>
+  <div id="modalRoot"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <!-- مكتبتا Excel و PDF ثقيلتان وتُستخدمان فقط في الاستيراد/التصدير،
+       لذا تُحمّلان عند الطلب فقط (lazyLib في app.js) لتسريع البدء. -->
+  <!-- احتياطي للاستضافة الثابتة (يُترك فارغاً عند الاعتماد على بيئة alaoufi.me) -->
+  <script src="/almfrje/config.js"></script>
+  <!-- الإعداد التلقائي من متغيّرات بيئة alaoufi.me (مسارٌ قابل للتخزين القصير لتسريع الفتح) -->
+  <script src="/almfrje-config"></script>
+  <script src="/almfrje/app.js"></script>
+</body>
+</html>

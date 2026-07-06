@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <rect width="512" height="512" rx="96" fill="#2E7D32"/>
+  <!-- علامة أذن (Ear tag) -->
+  <circle cx="256" cy="180" r="92" fill="#FFFFFF"/>
+  <circle cx="256" cy="180" r="34" fill="#2E7D32"/>
+  <rect x="176" y="250" width="160" height="150" rx="28" fill="#FFFFFF"/>
+  <rect x="212" y="300" width="88" height="16" rx="8" fill="#2E7D32"/>
+  <rect x="212" y="338" width="88" height="16" rx="8" fill="#2E7D32"/>
+</svg>

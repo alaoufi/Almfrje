@@ -1,0 +1,6 @@
+:root { --brand: #0f766e; --bg: #f3f4f8; --card: #fff; --line: #e3e5ee; --text: #1b1b1f; --muted: #6b7280; }
+* { box-sizing: border-box; }
+body { margin: 0; font-family: system-ui, "Segoe UI", Tahoma, sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; }
+.wrap { max-width: 720px; margin: 0 auto; padding: 24px 16px; }
+h1 { color: var(--brand); margin: 8px 0; }
+.muted { color: var(--muted); }
