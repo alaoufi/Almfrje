@@ -24,7 +24,7 @@ export async function POST(request: NextRequest) {
   const { data: mem } = await admin.from('almfrje_members').select('role,is_active').eq('user_id', who.user.id).maybeSingle();
   if (!mem || !mem.is_active || mem.role !== 'admin') return NextResponse.json({ ok: false, error: 'للمدير فقط' }, { status: 403 });
 
-  let b: { full_name?: string; username?: string; phone?: string; pin?: string; role?: string; branch_ids?: unknown; perms?: unknown };
+  let b: { full_name?: string; username?: string; phone?: string; pin?: string; role?: string; branch_ids?: unknown; perms?: unknown; person_id?: unknown };
   try { b = await request.json(); } catch { return NextResponse.json({ ok: false, error: 'طلب غير صالح' }, { status: 400 }); }
 
   const full_name = String(b.full_name || '').trim();
@@ -32,6 +32,7 @@ export async function POST(request: NextRequest) {
   const username = b.username ? String(b.username).trim() : '';
   const pin = String(b.pin || '').trim();
   const role = ['admin', 'general_manager', 'branch_manager', 'viewer'].includes(String(b.role)) ? String(b.role) : 'viewer';
+  const person_id = Number(b.person_id) > 0 ? Number(b.person_id) : null;   // شخصه في الشجرة (من المنتقي)
   const branch_ids = Array.isArray(b.branch_ids) ? (b.branch_ids as unknown[]).map((x) => Number(x)).filter((x) => Number.isFinite(x) && x > 0) : [];
   // تنقية الصلاحيات: قيم منطقية فقط لمفاتيح معروفة الشكل (تُستخدم لاحقاً في almfrje_perm).
   const perms: Record<string, boolean> = {};
@@ -62,7 +63,7 @@ export async function POST(request: NextRequest) {
   // فعّل صفّ العضو بالدور المطلوب (المُشغّل قد ينشئ الصف؛ نضمن قيمه بـ upsert)
   const { error: ue } = await admin.from('almfrje_members').upsert({
     user_id: uid, full_name, username: username || null, phone, role, is_active: true,
-    branch_ids, branch_id: branch_ids[0] || null, perms,
+    branch_ids, branch_id: branch_ids[0] || null, perms, person_id,
   }, { onConflict: 'user_id' });
   if (ue) return NextResponse.json({ ok: false, error: ue.message }, { status: 400 });
 

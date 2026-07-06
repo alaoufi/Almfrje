@@ -5117,7 +5117,8 @@ function addUserModal() {
 
     document.getElementById('nu_save').addEventListener('click', async () => {
       if (!nuPerson) { toast('اختر الاسم من الشجرة (لا بدّ أن يكون حيّاً)'); return; }
-      const full_name = lineageShort(nuPerson.id, 4);
+      // اسمٌ نظيف بلا علامة الاختصار «…» (كانت تفسد مطابقة نسبه لاحقاً)
+      const full_name = lineage(nuPerson.id).slice(0, 4).map(x => x.name).join(' بن ');
       const phone = normPhone(val('nu_phone'));
       const username = val('nu_user').trim();
       const pin = val('nu_pin').trim();
@@ -5140,7 +5141,7 @@ function addUserModal() {
         const res = await fetch('/api/almfrje-create-user', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
-          body: JSON.stringify({ full_name, username, phone, pin, role, branch_ids: isSup ? branch_ids : [], perms }),
+          body: JSON.stringify({ full_name, username, phone, pin, role, branch_ids: isSup ? branch_ids : [], perms, person_id: nuPerson.id }),
         });
         const j = await res.json().catch(() => ({}));
         if (!res.ok || !j.ok) throw new Error(j.error || 'تعذّر إنشاء الحساب');
@@ -5434,6 +5435,11 @@ function myPresenceBranch() {
   if (_myBranchCache !== undefined) return _myBranchCache;
   let b = null;
   try {
+    // ٠) شخصه المربوط في القاعدة (يُحفظ تلقائياً عند إنشاء الحساب من المنتقي) — الأدقّ.
+    if (me && me.person_id) {
+      const p0 = byId.get(me.person_id);
+      if (p0 && p0.branch_id != null) { _myBranchCache = p0.branch_id; return p0.branch_id; }
+    }
     // ١) شخص مرتبط يدوياً (ملفي الشخصي ← بياناتي في الشجرة).
     if (me && me.user_id) {
       const pid = parseInt(localStorage.getItem('almfrje_me_person_' + me.user_id) || '0', 10);
@@ -5444,10 +5450,16 @@ function myPresenceBranch() {
       const mp = normPhone(me.phone);
       if (mp) { const hit = C.persons.find(p => p.phone && normPhone(p.phone) === mp); if (hit && hit.branch_id != null) b = hit.branch_id; }
     }
-    // ٣) مطابقة باسمه الكامل (نسبه) عند التفرّد.
+    // ٣) مطابقة باسمه الكامل (نسبه) عند التفرّد — كدخول الزائر تماماً.
+    //    نُنقّي الاسم من علامة الاختصار «…» وشوائب الترقيم (كانت تفسد المطابقة).
     if (b == null && me && me.full_name) {
-      const matches = C.persons.filter(p => nameMatch(p, me.full_name));
-      if (matches.length === 1 && matches[0].branch_id != null) b = matches[0].branch_id;
+      const q = String(me.full_name).replace(/[……]/g, ' ').replace(/\.{2,}/g, ' ').trim();
+      const matches = C.persons.filter(p => nameMatch(p, q));
+      if (matches.length === 1 && matches[0].branch_id != null) {
+        b = matches[0].branch_id;
+        // خزّن الربط ليثبت (نفس مفتاح الربط اليدوي في «ملفي الشخصي»)
+        try { localStorage.setItem('almfrje_me_person_' + me.user_id, String(matches[0].id)); } catch (e2) { /* */ }
+      }
     }
     // ٤) مشرفُ فرعٍ واحدٍ محدّد: يُنسب لفرعه. (المشرف العام/متعدّد الفروع لا يُخمَّن
     //    فرعه — كان يُنسب خطأً لأول فرعٍ بالقائمة «مرزوق». يُحسب في الإجمالي بلا فرع،
