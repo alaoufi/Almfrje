@@ -1,5 +1,5 @@
 {
-  "regions": ["fra1"],
+  "regions": ["syd1"],
   "crons": [
     { "path": "/api/almfrje-backup", "schedule": "0 2 * * *" }
   ]
