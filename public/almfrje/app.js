@@ -2875,6 +2875,9 @@ function screenFeedback() {
       <div class="muted" style="font-size:.78rem;margin-top:6px">يُؤخذ تلقائياً من حسابك الذي دخلت به.</div></div>`
       : `<div class="card"><div class="li-title" style="margin-bottom:6px">اسمك</div>
       <div class="field"><input id="fb_name" type="text" placeholder="اكتب اسمك"></div></div>`}
+    ${myPhoneKnown() ? '' : `<div class="card"><div class="li-title" style="margin-bottom:6px">📱 رقم جوالك للتواصل <span style="color:var(--danger)">*</span></div>
+      <div class="field"><input id="fb_phone" type="tel" inputmode="tel" placeholder="05xxxxxxxx — إجباري"></div>
+      <div class="muted" style="font-size:.78rem">للتواصل معك والتحقق من المعلومة — جوالك غير مسجّل لدينا.</div></div>`}
     <div class="card">
       <div class="field"><select id="fb_subject">
         <option value="">— اختر موضوع الملاحظة —</option>
@@ -2892,6 +2895,20 @@ function screenFeedback() {
   sub.addEventListener('change', () => renderFbDynamic(sub.value));
   document.getElementById('fb_send').addEventListener('click', sendFeedback);
   renderFbDynamic('');
+}
+// شخص المستخدم الحالي في الشجرة (زائراً بعد التحقق، أو عضواً مربوطاً) — للجوال والتحقق.
+function myPersonId() {
+  try { const g = parseInt(sessionStorage.getItem('almfrje_guest_pid') || '0', 10); if (g) return g; } catch (e) { /* */ }
+  if (me && me.person_id) return Number(me.person_id) || 0;
+  try { const pid = parseInt(localStorage.getItem('almfrje_me_person_' + (me && me.user_id)) || '0', 10); if (pid) return pid; } catch (e) { /* */ }
+  return 0;
+}
+// هل جوال المُرسِل معروفٌ للنظام؟ (جوال حساب العضو، أو جوال شخصه المسجّل في الشجرة)
+function myPhoneKnown() {
+  if (me && !isGuestUser() && me.phone) return true;
+  try { if (sessionStorage.getItem('almfrje_guest_hasphone') === '1') return true; } catch (e) { /* */ }
+  const pid = myPersonId(); const p = pid && byId.get(pid);
+  return !!(p && p.phone);
 }
 // مطابقة شخص بعدّة كلمات: الكلمة الأولى لاسمه، التالية لأبيه، ثم جدّه… (لتقليص القائمة).
 function personMatchTokens(p, tokens) {
@@ -2994,6 +3011,15 @@ async function sendFeedback() {
   const subject = val('fb_subject').trim();
   if (!subject) { toast('اختر الموضوع'); return; }
   const details = val('fb_details').trim();
+  // جوال المرسل: إجباري إن لم يكن معروفاً؛ وإن كان عضواً بجوالٍ مسجّل يُرفق تلقائياً
+  let sender_phone = '';
+  if (!myPhoneKnown()) {
+    sender_phone = normPhone(document.getElementById('fb_phone') ? val('fb_phone') : '');
+    if (sender_phone.length < 9) { toast('اكتب رقم جوالك للتواصل (إجباري)'); return; }
+  } else if (me && !isGuestUser() && me.phone) {
+    sender_phone = normPhone(me.phone);
+  }
+  const sender_person_id = myPersonId() || null;
   let branch_id = null, error_desc = '', fullDetails = details;
   if (subject === 'إضافة مولود') {
     if (!fbFather) { toast('اختر والد المولود من البحث'); return; }
@@ -3019,7 +3045,7 @@ async function sendFeedback() {
   }
   if (!fullDetails && !error_desc) { toast('اكتب التفاصيل'); return; }
   const ok = await guard(async () => {
-    const { error } = await sb.from('almfrje_feedback').insert({ subject, branch_id, details: fullDetails, error_desc, created_by_name: who });
+    const { error } = await sb.from('almfrje_feedback').insert({ subject, branch_id, details: fullDetails, error_desc, created_by_name: who, sender_phone, sender_person_id });
     if (error) throw error;
   });
   if (ok) {
@@ -3097,6 +3123,33 @@ function parseNewborn(f) {
   try { const o = JSON.parse(f.details); if (o && o.kind === 'newborn') return o; } catch (e) {}
   return null;
 }
+// شخص مُرسِل الملاحظة في الشجرة: من الربط المحفوظ، وإلا بمطابقة اسمه عند التفرّد.
+function feedbackSenderPerson(f) {
+  if (f && f.sender_person_id) { const p = byId.get(Number(f.sender_person_id)); if (p) return p; }
+  if (f && f.created_by_name) {
+    const q = String(f.created_by_name).replace(/[…]/g, ' ');
+    const m = C.persons.filter(p => nameMatch(p, q));
+    if (m.length === 1) return m[0];
+  }
+  return null;
+}
+// حفظ جوال المرسل في ملف شخصه بالشجرة (بعد تحقق الإدارة) — بتأكيد يعرض الاسم والنسب.
+async function addSenderPhone(f) {
+  const p = feedbackSenderPerson(f);
+  if (!p) { toast('تعذّر تحديد شخص المرسل في الشجرة'); return; }
+  if (!f.sender_phone) { toast('لا جوال مرفق مع الملاحظة'); return; }
+  if (p.phone && normPhone(p.phone) === normPhone(f.sender_phone)) { toast('هذا الجوال مسجّل له مسبقاً'); return; }
+  const msg = p.phone
+    ? 'لهذا الشخص جوالٌ مسجّل (' + p.phone + ') — استبداله بجوال المرسل ' + f.sender_phone + '؟\n' + lineageShort(p.id, 6)
+    : 'إضافة الجوال ' + f.sender_phone + ' إلى ملف:\n' + lineageShort(p.id, 6) + '؟';
+  if (!(await confirm2(msg, { title: 'حفظ جوال المرسل', okText: 'حفظ الجوال' }))) return;
+  const who = (me && (me.full_name || me.username)) || '';
+  const ok = await guard(async () => {
+    const { error } = await sb.from('almfrje_persons').update({ phone: f.sender_phone, updated_by_name: who, updated_at: new Date().toISOString() }).eq('id', p.id);
+    if (error) throw error;
+  });
+  if (ok) { toast('حُفظ الجوال في ملف «' + p.name + '» ✓'); await loadAll(); screenFeedbacks(); }
+}
 function parseReorder(f) {
   if (!f || f.subject !== 'إعادة ترتيب الإخوان') return null;
   try { const o = JSON.parse(f.details); if (o && o.kind === 'reorder' && Array.isArray(o.order)) return o; } catch (e) {}
@@ -3149,14 +3202,15 @@ async function screenFeedbacks() {
         ${body}
         ${f.error_desc ? `<div class="li-sub" style="margin-top:4px;white-space:pre-wrap">⚠️ ${esc(f.error_desc)}</div>` : ''}
         ${f.reply ? `<div style="margin-top:8px;padding:8px 10px;background:color-mix(in srgb, var(--brand) 7%, var(--card));border:1px solid var(--line);border-inline-start:3px solid var(--brand);border-radius:8px;font-size:.86rem;line-height:1.8">↩️ <b>ردّ الإدارة:</b> ${esc(f.reply)}<div class="muted" style="font-size:.72rem;margin-top:2px">${esc(f.replied_by_name || '')}${f.replied_at ? ' • ' + fmtDateTime(f.replied_at) : ''}</div></div>` : ''}
-        <div class="muted" style="margin-top:6px;font-size:.74rem">👤 ${esc(f.created_by_name || 'زائر')} • ${fmtDateTime(f.created_at)}${f.status === 'done' && f.done_by_name ? ' • ' + esc(f.done_by_name) : ''}</div>
-        <div class="btn-row" style="margin-top:8px"><button class="btn sm outline" data-fbreply="${f.id}">↩️ ${f.reply ? 'تعديل الرد' : 'رد باسم الإدارة'}</button>${actions}</div>
+        <div class="muted" style="margin-top:6px;font-size:.74rem">👤 ${esc(f.created_by_name || 'زائر')}${f.sender_phone ? ' • 📱 <b>' + esc(f.sender_phone) + '</b>' : ''} • ${fmtDateTime(f.created_at)}${f.status === 'done' && f.done_by_name ? ' • ' + esc(f.done_by_name) : ''}</div>
+        <div class="btn-row" style="margin-top:8px">${(() => { const sp = f.sender_phone && feedbackSenderPerson(f); return (sp && (!sp.phone || normPhone(sp.phone) !== normPhone(f.sender_phone)) && canEditPerson(sp)) ? `<button class="btn sm outline" data-fbphone="${f.id}">📱 حفظ الجوال في ملفه</button>` : ''; })()}<button class="btn sm outline" data-fbreply="${f.id}">↩️ ${f.reply ? 'تعديل الرد' : 'رد باسم الإدارة'}</button>${actions}</div>
       </div>`; }).join('') : '<div class="center-empty">لا توجد عناصر في هذا التبويب.</div>'}`;
   view().querySelectorAll('[data-fbfilter]').forEach(b => b.addEventListener('click', () => { fbFilter = b.dataset.fbfilter; screenFeedbacks(); }));
   view().querySelectorAll('[data-fbdone]').forEach(b => b.addEventListener('click', () => markFeedback(b.dataset.fbdone, 'done')));
   view().querySelectorAll('[data-fbreopen]').forEach(b => b.addEventListener('click', () => markFeedback(b.dataset.fbreopen, 'new')));
   view().querySelectorAll('[data-fbdel]').forEach(b => b.addEventListener('click', () => delFeedback(b.dataset.fbdel)));
   view().querySelectorAll('[data-fbreply]').forEach(b => b.addEventListener('click', () => replyModal(list.find(x => String(x.id) === b.dataset.fbreply))));
+  view().querySelectorAll('[data-fbphone]').forEach(b => b.addEventListener('click', () => addSenderPhone(list.find(x => String(x.id) === b.dataset.fbphone))));
   view().querySelectorAll('[data-rook]').forEach(b => b.addEventListener('click', () => approveReorder(list.find(x => String(x.id) === b.dataset.rook))));
   view().querySelectorAll('[data-rono]').forEach(b => b.addEventListener('click', () => rejectReorder(list.find(x => String(x.id) === b.dataset.rono))));
   view().querySelectorAll('[data-nbok]').forEach(b => b.addEventListener('click', () => approveNewborn(list.find(x => String(x.id) === b.dataset.nbok))));
@@ -5429,7 +5483,7 @@ async function guestGateEnter() {
     const res = await fetch('/api/almfrje-guest-verify', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ input: inp }) });
     const j = await res.json().catch(() => ({}));
     if (res.ok && j.ok) {
-      try { sessionStorage.setItem('almfrje_guest_name', (j.name && String(j.name).trim()) || inp); if (j.branch != null) sessionStorage.setItem('almfrje_guest_branch', String(j.branch)); sessionStorage.removeItem('almfrje_greeted'); } catch (e) { /* */ }
+      try { sessionStorage.setItem('almfrje_guest_name', (j.name && String(j.name).trim()) || inp); if (j.branch != null) sessionStorage.setItem('almfrje_guest_branch', String(j.branch)); if (j.pid) sessionStorage.setItem('almfrje_guest_pid', String(j.pid)); sessionStorage.setItem('almfrje_guest_hasphone', j.has_phone ? '1' : '0'); sessionStorage.removeItem('almfrje_greeted'); } catch (e) { /* */ }
       location.hash = '#/home';
       // رسالة الترحيب تظهر الآن فور الدخول من داخل enterApp (الجزء الأوسط العلوي) — لا نافذة مؤجَّلة هنا
       await browseAsGuest(m);

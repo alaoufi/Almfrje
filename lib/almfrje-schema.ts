@@ -354,8 +354,8 @@ export const ALMFRJE_SCHEMA_SQL = `
       -- ختم إصدار المخطط: يرتفع مع كل تعديلٍ للمخطط، ووجوده بالقيمة الأحدث في القاعدة
       -- دليلٌ قاطع أن قناة الترقية التلقائية (/api/almfrje-setup) تعمل.
       INSERT INTO public.almfrje_settings (key, value)
-        VALUES ('schema_rev', '"2026-07-06-5"'::jsonb)
-        ON CONFLICT (key) DO UPDATE SET value = '"2026-07-06-5"'::jsonb, updated_at = now();
+        VALUES ('schema_rev', '"2026-07-06-6"'::jsonb)
+        ON CONFLICT (key) DO UPDATE SET value = '"2026-07-06-6"'::jsonb, updated_at = now();
 
       -- ملاحظات الزوار: يرسلها أي زائر/عضو، ويراجعها المدير ويضع علامة «تم».
       CREATE TABLE IF NOT EXISTS public.almfrje_feedback (
@@ -375,6 +375,9 @@ export const ALMFRJE_SCHEMA_SQL = `
       ALTER TABLE public.almfrje_feedback ADD COLUMN IF NOT EXISTS reply text default '';
       ALTER TABLE public.almfrje_feedback ADD COLUMN IF NOT EXISTS replied_by_name text default '';
       ALTER TABLE public.almfrje_feedback ADD COLUMN IF NOT EXISTS replied_at timestamptz;
+      -- جوال المرسل (للتواصل والتحقق) وربط شخصه في الشجرة (لإضافة الجوال لملفه بعد التحقق)
+      ALTER TABLE public.almfrje_feedback ADD COLUMN IF NOT EXISTS sender_phone text default '';
+      ALTER TABLE public.almfrje_feedback ADD COLUMN IF NOT EXISTS sender_person_id bigint;
       -- هل قرأ المرسل الرد؟ (يُصفَّر عند كل ردٍّ جديد/معدَّل فتنبثق الرسالة له عند دخوله)
       ALTER TABLE public.almfrje_feedback ADD COLUMN IF NOT EXISTS reply_seen boolean not null default false;
       ALTER TABLE public.almfrje_feedback ENABLE ROW LEVEL SECURITY;
