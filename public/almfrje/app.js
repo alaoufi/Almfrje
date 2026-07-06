@@ -2939,13 +2939,6 @@ function renderFbDynamic(subject) {
       document.getElementById('fb_fselected').innerHTML = p ? '<div style="padding:8px 10px;border:1px solid var(--brand);border-radius:8px;font-size:.9rem">✅ والد المولود: <b>' + esc(lineageShort(p.id, 12)) + '</b></div>' : '';
       fs.value = p ? p.name : '';
     }));
-  } else if (subject === 'إعادة ترتيب الإخوان') {
-    if (!fbFather || !fbOrder || fbOrder.length < 2) { toast('اختر الأب أولاً ورتّب أبناءه'); return; }
-    branch_id = fbFather.branch_id || null;
-    fullDetails = JSON.stringify({
-      kind: 'reorder', father_id: fbFather.id, father: lineageShort(fbFather.id, 12),
-      order: fbOrder, names: fbOrder.map(cid => (byId.get(cid) || { name: String(cid) }).name), by: who,
-    });
   } else if (subject === 'ملاحظة') {
     if (det) det.placeholder = 'اكتب تفاصيل الملاحظة هنا';
     const branchOpts = C.branches.slice().sort((a, b) => String(a.name).localeCompare(String(b.name), 'ar'))
@@ -3011,6 +3004,13 @@ async function sendFeedback() {
       kind: 'newborn', father_id: fbFather.id, father: lineageShort(fbFather.id, 12), name: bname,
       birth: document.getElementById('fb_baby_birth') ? val('fb_baby_birth').trim() : '',
       city: document.getElementById('fb_baby_city') ? val('fb_baby_city').trim() : '', by: who,
+    });
+  } else if (subject === 'إعادة ترتيب الإخوان') {
+    if (!fbFather || !fbOrder || fbOrder.length < 2) { toast('اختر الأب أولاً ورتّب أبناءه'); return; }
+    branch_id = fbFather.branch_id || null;
+    fullDetails = JSON.stringify({
+      kind: 'reorder', father_id: fbFather.id, father: lineageShort(fbFather.id, 12),
+      order: fbOrder, names: fbOrder.map(cid => (byId.get(cid) || { name: String(cid) }).name), by: who,
     });
   } else if (subject === 'ملاحظة') {
     branch_id = val('fb_branch') ? parseInt(val('fb_branch'), 10) : null;
