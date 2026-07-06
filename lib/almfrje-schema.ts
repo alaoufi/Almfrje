@@ -129,16 +129,22 @@ export const ALMFRJE_SCHEMA_SQL = `
       CREATE OR REPLACE FUNCTION public.almfrje_is_admin() RETURNS boolean
         LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $func$
         select exists (select 1 from public.almfrje_members where user_id = auth.uid() and is_active and role = 'admin'); $func$;
+      -- مشرف (فرع أو عام): الدوران المخوّلان بالإضافة والتعديل ضمن نطاقهما
+      CREATE OR REPLACE FUNCTION public.almfrje_is_supervisor() RETURNS boolean
+        LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $func$
+        select exists (select 1 from public.almfrje_members where user_id = auth.uid() and is_active and role in ('branch_manager','general_manager')); $func$;
       CREATE OR REPLACE FUNCTION public.almfrje_my_branch() RETURNS bigint
         LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $func$
         select branch_id from public.almfrje_members where user_id = auth.uid() and is_active limit 1; $func$;
       -- هل يُشرف المستخدم الحالي على هذا الفرع؟ (يدعم branch_id المفرد + مصفوفة branch_ids)
+      -- المشرف العام بلا فروعٍ محدّدة = يشرف على كل الفروع.
       CREATE OR REPLACE FUNCTION public.almfrje_manages_branch(bid bigint) RETURNS boolean
         LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $func$
         select exists (
           select 1 from public.almfrje_members m
            where m.user_id = auth.uid() and m.is_active
-             and (m.branch_id = bid
+             and ((m.role = 'general_manager' and m.branch_id is null and (m.branch_ids is null or m.branch_ids = '[]'::jsonb))
+                  or m.branch_id = bid
                   or (m.branch_ids ? bid::text))); $func$;
       CREATE OR REPLACE FUNCTION public.almfrje_perm(act text) RETURNS boolean
         LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $func$
@@ -151,7 +157,7 @@ export const ALMFRJE_SCHEMA_SQL = `
         select public.almfrje_is_member(); $func$;
       CREATE OR REPLACE FUNCTION public.almfrje_can_edit_person(pid bigint) RETURNS boolean
         LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $func$
-        select public.almfrje_is_admin() or (public.almfrje_role() = 'branch_manager' and public.almfrje_perm('info') and exists (
+        select public.almfrje_is_admin() or (public.almfrje_is_supervisor() and public.almfrje_perm('info') and exists (
           select 1 from public.almfrje_persons p where p.id = pid and public.almfrje_manages_branch(p.branch_id))); $func$;
       CREATE OR REPLACE FUNCTION public.almfrje_descendant_ids(root bigint) RETURNS table(id bigint)
         LANGUAGE sql STABLE AS $func$
@@ -295,7 +301,7 @@ export const ALMFRJE_SCHEMA_SQL = `
       -- نفسه ضمن فرع يديره (لا يكفي تطابق branch_id المُرسَل — نتحقّق من الأب فعلياً).
       DROP POLICY IF EXISTS persons_ins ON public.almfrje_persons; CREATE POLICY persons_ins ON public.almfrje_persons FOR INSERT WITH CHECK (
         public.almfrje_is_admin() or (
-          public.almfrje_role() = 'branch_manager'
+          public.almfrje_is_supervisor()
           and public.almfrje_manages_branch(branch_id)
           and father_id is not null
           and exists (select 1 from public.almfrje_persons f
@@ -303,7 +309,7 @@ export const ALMFRJE_SCHEMA_SQL = `
         ));
       -- التعديل للمدير فقط (ما يضيفه مسؤول الفرع لا يعدّله إلا المدير)
       -- التعديل: المدير على الكل، ومسؤول الفرع ضمن فروعه المصرّح له بها فقط (لا يتجاوزها)
-      DROP POLICY IF EXISTS persons_upd ON public.almfrje_persons; CREATE POLICY persons_upd ON public.almfrje_persons FOR UPDATE USING (public.almfrje_is_admin() or (public.almfrje_role() = 'branch_manager' and public.almfrje_manages_branch(branch_id))) WITH CHECK (public.almfrje_is_admin() or (public.almfrje_role() = 'branch_manager' and public.almfrje_manages_branch(branch_id)));
+      DROP POLICY IF EXISTS persons_upd ON public.almfrje_persons; CREATE POLICY persons_upd ON public.almfrje_persons FOR UPDATE USING (public.almfrje_is_admin() or (public.almfrje_is_supervisor() and public.almfrje_manages_branch(branch_id))) WITH CHECK (public.almfrje_is_admin() or (public.almfrje_is_supervisor() and public.almfrje_manages_branch(branch_id)));
       -- الحذف للمدير فقط
       -- حذف الأسماء منتهٍ نهائياً لأي مستخدم (قرار المالك). لا حذف عبر الواجهة ولا API.
       DROP POLICY IF EXISTS persons_del ON public.almfrje_persons; CREATE POLICY persons_del ON public.almfrje_persons FOR DELETE USING (false);
@@ -348,9 +354,9 @@ export const ALMFRJE_SCHEMA_SQL = `
       ALTER TABLE public.almfrje_feedback ENABLE ROW LEVEL SECURITY;
       DROP POLICY IF EXISTS feedback_ins ON public.almfrje_feedback; CREATE POLICY feedback_ins ON public.almfrje_feedback FOR INSERT WITH CHECK (true);
       -- المدير يرى كل الملاحظات؛ ومسؤول الفرع يرى/يعالج «إضافة مولود» و«ملاحظة» ضمن فروعه فقط (للموافقة/الإجراء).
-      DROP POLICY IF EXISTS feedback_sel ON public.almfrje_feedback; CREATE POLICY feedback_sel ON public.almfrje_feedback FOR SELECT USING (public.almfrje_is_admin() OR (subject in ('إضافة مولود','ملاحظة') AND public.almfrje_role() = 'branch_manager' AND public.almfrje_manages_branch(branch_id)));
-      DROP POLICY IF EXISTS feedback_upd ON public.almfrje_feedback; CREATE POLICY feedback_upd ON public.almfrje_feedback FOR UPDATE USING (public.almfrje_is_admin() OR (subject in ('إضافة مولود','ملاحظة') AND public.almfrje_role() = 'branch_manager' AND public.almfrje_manages_branch(branch_id))) WITH CHECK (public.almfrje_is_admin() OR (subject in ('إضافة مولود','ملاحظة') AND public.almfrje_role() = 'branch_manager' AND public.almfrje_manages_branch(branch_id)));
-      DROP POLICY IF EXISTS feedback_del ON public.almfrje_feedback; CREATE POLICY feedback_del ON public.almfrje_feedback FOR DELETE USING (public.almfrje_is_admin() OR (subject in ('إضافة مولود','ملاحظة') AND public.almfrje_role() = 'branch_manager' AND public.almfrje_manages_branch(branch_id)));
+      DROP POLICY IF EXISTS feedback_sel ON public.almfrje_feedback; CREATE POLICY feedback_sel ON public.almfrje_feedback FOR SELECT USING (public.almfrje_is_admin() OR (subject in ('إضافة مولود','ملاحظة') AND public.almfrje_is_supervisor() AND public.almfrje_manages_branch(branch_id)));
+      DROP POLICY IF EXISTS feedback_upd ON public.almfrje_feedback; CREATE POLICY feedback_upd ON public.almfrje_feedback FOR UPDATE USING (public.almfrje_is_admin() OR (subject in ('إضافة مولود','ملاحظة') AND public.almfrje_is_supervisor() AND public.almfrje_manages_branch(branch_id))) WITH CHECK (public.almfrje_is_admin() OR (subject in ('إضافة مولود','ملاحظة') AND public.almfrje_is_supervisor() AND public.almfrje_manages_branch(branch_id)));
+      DROP POLICY IF EXISTS feedback_del ON public.almfrje_feedback; CREATE POLICY feedback_del ON public.almfrje_feedback FOR DELETE USING (public.almfrje_is_admin() OR (subject in ('إضافة مولود','ملاحظة') AND public.almfrje_is_supervisor() AND public.almfrje_manages_branch(branch_id)));
       GRANT INSERT ON public.almfrje_feedback TO anon, authenticated;
       GRANT SELECT, UPDATE, DELETE ON public.almfrje_feedback TO authenticated;
 
@@ -367,7 +373,7 @@ export const ALMFRJE_SCHEMA_SQL = `
       -- الجدول الكامل (يحوي الجوال/البريد/الملاحظات) للمدير ومشرف الفرع فقط؛ الزائر يقرأ المنظور.
       DROP POLICY IF EXISTS persons_sel ON public.almfrje_persons;
       CREATE POLICY persons_sel ON public.almfrje_persons FOR SELECT
-        USING (public.almfrje_is_admin() OR public.almfrje_role() = 'branch_manager');
+        USING (public.almfrje_is_admin() OR public.almfrje_is_supervisor());
 
       -- الأعضاء: المدير يرى الكل، وغيره صفّه فقط (إخفاء جوالات الآخرين عن الزائر).
       DROP POLICY IF EXISTS members_select ON public.almfrje_members;
