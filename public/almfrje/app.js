@@ -5485,7 +5485,13 @@ async function enterApp(session) {
   me = mem || { user_id: session.user.id, full_name: '', role: 'viewer', is_active: false, perms: {} };
   // المدير: شغّل ترقية المخطّط بتوكنه (idempotent) فتُطبَّق تحديثات البنية الجديدة تلقائياً (مثل دور «مشرف عام»).
   if (me.role === 'admin' && me.is_active) {
-    try { fetch('/api/almfrje-setup', { method: 'POST', headers: { Authorization: 'Bearer ' + session.access_token } }).catch(() => {}); } catch (e) { /* تجاهل */ }
+    try {
+      // ترقية القاعدة تلقائياً بتوكن المدير — ونُظهر له سبب الفشل بدل الصمت (كي لا تضيع الترقيات)
+      fetch('/api/almfrje-setup', { method: 'POST', headers: { Authorization: 'Bearer ' + session.access_token } })
+        .then(r => r.json())
+        .then(j => { if (j && j.ok === false && isAdmin()) toast('⚠️ تعذّرت ترقية القاعدة تلقائياً: ' + (j.reason || j.error || 'راجع الإعداد')); })
+        .catch(() => { /* */ });
+    } catch (e) { /* تجاهل */ }
   }
   // تبنٍّ تلقائي لصلاحية المدير لأول مستخدم (يعالج فخّ «بانتظار التفعيل»).
   if (!me.is_active) {

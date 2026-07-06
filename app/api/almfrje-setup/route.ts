@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { Pool } from 'pg';
 import { ALMFRJE_SCHEMA_SQL } from '@/lib/almfrje-schema';
 import { almfrjeEnv } from '@/lib/almfrje-env';
 
@@ -68,38 +69,75 @@ async function runSql(pat: string, ref: string, query: string) {
   return { ok: r.ok, status: r.status, data };
 }
 
+// احتياطي حين يغيب/يفشل الـPAT: تنفيذ الترقية باتصال Postgres مباشر.
+// لا يُقبل إلا اتصالٌ يحمل مُعرّف مشروع المفرجي نفسه (ref) — حمايةً من الكتابة على قاعدةٍ أخرى.
+function pgConnForRef(ref: string): string | null {
+  const cands: string[] = [];
+  for (const k of ['ALMFRJE_DB_URL', 'POSTGRES_URL_NON_POOLING', 'POSTGRES_URL', 'DATABASE_URL', 'SUPABASE_DB_URL']) {
+    const v = process.env[k];
+    if (v && v.trim()) cands.push(v.trim());
+  }
+  const host = process.env.POSTGRES_HOST, pw = process.env.POSTGRES_PASSWORD;
+  if (host && pw) {
+    const user = process.env.POSTGRES_USER || (host.includes('pooler.supabase.com') ? `postgres.${ref}` : 'postgres');
+    const port = process.env.POSTGRES_PORT || '6543';
+    cands.push(`postgresql://${encodeURIComponent(user)}:${encodeURIComponent(pw)}@${host}:${port}/${process.env.POSTGRES_DATABASE || 'postgres'}`);
+  }
+  for (const c of cands) { if (c.includes(ref)) return c; }
+  return null;
+}
+
+async function runSqlPg(conn: string, query: string) {
+  const pool = new Pool({ connectionString: conn, ssl: { rejectUnauthorized: false }, max: 1, connectionTimeoutMillis: 10000 });
+  try { await pool.query(query); return { ok: true as const, error: null }; }
+  catch (e) { return { ok: false as const, error: e instanceof Error ? e.message : String(e) }; }
+  finally { await pool.end().catch(() => { /* */ }); }
+}
+
 async function handle() {
   const pat = almfrjeEnv().pat;
   // ترقية المفارجة تستهدف قاعدتها وحدها فقط (لا رجوع للقاعدة المشتركة) — عزل تام عن مراحي/الاستشارات.
-  const supaUrl = process.env.ALMFRJE_SUPABASE_URL || '';
+  const supaUrl = almfrjeEnv().url || '';
   const m = supaUrl.match(/https:\/\/([a-z0-9]+)\.supabase\.co/i);
-
-  if (!pat || !m) {
-    // لا يمكن الإنشاء التلقائي بلا PAT — لكن لا تُفشل التطبيق؛ الجداول قد تكون
-    // أُنشئت مسبقاً عبر /api/migrate، فدع التطبيق يحاول الاتصال عادياً.
-    return NextResponse.json({
-      ok: false,
-      reason: !pat ? 'SUPABASE_PAT غير مضاف' : 'تعذّر استخراج project ref',
-    }, { status: 200 });
-  }
+  if (!m) return NextResponse.json({ ok: false, reason: 'تعذّر استخراج project ref' }, { status: 200 });
   const ref = m[1];
 
-  // مجلّد التخزين يُنشأ دائماً (حتى لو سبق إعداد المخطط) — رخيص و idempotent،
-  // ويعالج القواعد القديمة التي أُنشئت قبل إضافة المجلّد التلقائي.
-  try { await runSql(pat, ref, STORAGE_SQL); } catch { /* best-effort */ }
-
   // إن سبق إعداد المخطط بنجاح في هذه الدورة، اكتفِ بذلك (المخطط ثقيل نسبياً).
-  if (_done && _done.ok) return NextResponse.json({ ok: true, cached: true, storage: true });
+  if (_done && _done.ok) return NextResponse.json({ ok: true, cached: true });
 
-  const res = await runSql(pat, ref, ALMFRJE_SCHEMA_SQL);
-  if (!res.ok) {
-    return NextResponse.json({ ok: false, status: res.status, error: res.data }, { status: 200 });
+  // ١) القناة الأولى: Management API بمفتاح PAT
+  let patError: unknown = null;
+  if (pat) {
+    try { await runSql(pat, ref, STORAGE_SQL); } catch { /* best-effort */ }
+    const res = await runSql(pat, ref, ALMFRJE_SCHEMA_SQL);
+    if (res.ok) {
+      try { await runSql(pat, ref, "NOTIFY pgrst, 'reload schema';"); } catch { /* best-effort */ }
+      _done = { ok: true, at: Date.now() };
+      return NextResponse.json({ ok: true, via: 'pat' });
+    }
+    patError = res.data;
   }
-  // حدِّث ذاكرة PostgREST للـ schema حتى تُرى الجداول/الدوال الجديدة عبر REST فوراً.
-  try { await runSql(pat, ref, "NOTIFY pgrst, 'reload schema';"); } catch { /* best-effort */ }
 
-  _done = { ok: true, at: Date.now() };
-  return NextResponse.json({ ok: true });
+  // ٢) القناة الاحتياطية: اتصال Postgres مباشر يخصّ مشروع المفرجي حصراً
+  const conn = pgConnForRef(ref);
+  if (conn) {
+    const r2 = await runSqlPg(conn, ALMFRJE_SCHEMA_SQL);
+    if (r2.ok) {
+      await runSqlPg(conn, STORAGE_SQL).catch?.(() => { /* */ });
+      await runSqlPg(conn, "NOTIFY pgrst, 'reload schema';");
+      _done = { ok: true, at: Date.now() };
+      return NextResponse.json({ ok: true, via: 'pg' });
+    }
+    return NextResponse.json({ ok: false, via: 'pg', error: r2.error, patError }, { status: 200 });
+  }
+
+  return NextResponse.json({
+    ok: false,
+    reason: pat
+      ? 'فشل PAT ولا يوجد اتصال قاعدة مباشر لمشروع المفرجي (أضِف ALMFRJE_DB_URL في Vercel)'
+      : 'لا PAT ولا اتصال قاعدة مباشر — أضِف ALMFRJE_SUPABASE_PAT أو ALMFRJE_DB_URL في Vercel',
+    patError,
+  }, { status: 200 });
 }
 
 export async function GET(request: NextRequest) {
