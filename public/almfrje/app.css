@@ -1038,3 +1038,18 @@ ul.hier ul.hier > .hier-li::before {
 .txg-2 { --txc: #0f8a4d; }   /* دخول الزائر — أخضر */
 .txg-3 { --txc: #0891B2; }   /* الملاحظات والردود — سماوي */
 .txg-4 { --txc: #d9480f; }   /* الإحصاء والحالة — برتقالي */
+
+/* لوحة التحكم: شبكة مربعات الخدمات — متباعدة بلا تداخل، لكلٍّ لونه ومسؤولياته */
+.cp-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+.cp-tile { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 6px;
+  padding: 16px 10px 14px; border: 1px solid var(--line); border-radius: 16px; cursor: pointer;
+  font: inherit; color: var(--text);
+  background: linear-gradient(160deg, color-mix(in srgb, var(--tc) 10%, var(--card)), var(--card) 70%);
+  border-top: 3px solid var(--tc);
+  box-shadow: 0 4px 12px -6px rgba(0,0,0,.35); }
+.cp-tile:active { transform: scale(.97); }
+.cp-ico { font-size: 1.9rem; line-height: 1; filter: drop-shadow(0 2px 3px rgba(0,0,0,.2)); }
+.cp-title { font-weight: 800; font-size: .95rem; color: var(--tc); }
+.cp-desc { font-size: .72rem; color: var(--muted); line-height: 1.7; }
+.cpt-0 { --tc: #4338CA; } .cpt-1 { --tc: #0f8a4d; } .cpt-2 { --tc: #d9480f; }
+.cpt-3 { --tc: #0891B2; } .cpt-4 { --tc: #b8860b; } .cpt-5 { --tc: #9c36b5; }
