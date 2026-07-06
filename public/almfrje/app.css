@@ -1053,3 +1053,20 @@ ul.hier ul.hier > .hier-li::before {
 .cp-desc { font-size: .72rem; color: var(--muted); line-height: 1.7; }
 .cpt-0 { --tc: #4338CA; } .cpt-1 { --tc: #0f8a4d; } .cpt-2 { --tc: #d9480f; }
 .cpt-3 { --tc: #0891B2; } .cpt-4 { --tc: #b8860b; } .cpt-5 { --tc: #9c36b5; }
+
+/* اللوحة: الخدمات الأكثر استخداماً — صفوف بارزة أعلى الشبكة مع عدّاد المعلّق */
+.cp-sec { font-weight: 800; font-size: .92rem; color: var(--muted); margin: 2px 2px 8px; }
+.cp-feat { width: 100%; display: flex; align-items: center; gap: 12px; text-align: start;
+  padding: 13px 14px; margin: 0 0 10px; border: 1px solid var(--line); border-radius: 14px;
+  border-inline-start: 5px solid var(--tc); cursor: pointer; font: inherit; color: var(--text);
+  background: linear-gradient(120deg, color-mix(in srgb, var(--tc) 10%, var(--card)), var(--card) 75%);
+  box-shadow: 0 4px 12px -6px rgba(0,0,0,.35); }
+.cp-feat:active { transform: scale(.98); }
+.cp-feat .cp-ico { font-size: 1.6rem; }
+.cp-feat-tx { flex: 1; display: flex; flex-direction: column; gap: 2px; }
+.cp-feat .cp-title { font-size: 1rem; }
+.cp-feat .cp-desc { font-size: .74rem; }
+.cp-badge { background: var(--danger); color: #fff; border-radius: 999px; min-width: 26px; height: 26px;
+  padding: 0 7px; display: inline-flex; align-items: center; justify-content: center;
+  font-weight: 800; font-size: .82rem; box-shadow: 0 2px 6px rgba(0,0,0,.3); }
+.cp-arrow { color: var(--tc); font-weight: 900; font-size: 1.2rem; }

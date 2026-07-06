@@ -4453,11 +4453,14 @@ function screenAboutEdit() {
 // 🎛️ لوحة التحكم — مربّع لكل خدمة، مرتّبة متباعدة، وتحت كلٍّ منها مسؤولياتها
 function screenControl() {
   if (!isAdmin()) { view().innerHTML = noPerm(); return; }
+  // ⭐ الأكثر استخداماً: بارزة أعلى اللوحة بشكل أعرض — والملاحظات بعدّاد المعلّق
+  const featured = [
+    ['📨', 'الملاحظات الواردة', 'مراجعة طلبات الزوّار واعتمادها والرد باسم الإدارة', '#/feedbacks', C.feedbackPending || 0],
+    ['⚙️', 'الإعدادات', 'فتح الزوّار • آخر الإضافات • الزيارات', '#/settings', 0],
+    ['👥', 'المستخدمون', 'الحسابات والأدوار والصلاحيات الدقيقة', '#/members', 0],
+  ];
   const tiles = [
-    ['👥', 'المستخدمون', 'الحسابات والأدوار والصلاحيات الدقيقة', '#/members'],
     ['🗂️', 'الفروع والمشرفون', 'تعريف الفروع وتعيين مشرفيها', '#/branchadmin'],
-    ['⚙️', 'الإعدادات', 'فتح الزوّار • آخر الإضافات • الزيارات', '#/settings'],
-    ['📨', 'الملاحظات الواردة', 'طلبات الزوّار والاعتماد والرد باسم الإدارة', '#/feedbacks'],
     ['📝', 'النصوص', 'نصوص الواجهة والتهنئة وبنك الردود', '#/texts'],
     ['📜', 'الوثائق', 'إضافة وثائق القبيلة وتفريغ نصوصها', '#/documents'],
     ['📖', 'الصفحة التعريفية', 'نبذة القبيلة بمحرّر التنسيق', '#/aboutedit'],
@@ -4467,8 +4470,16 @@ function screenControl() {
     ['💾', 'النسخ والتصدير', 'نسخ احتياطية واستعادة وExcel/PDF', '#/backups'],
   ];
   view().innerHTML = `
-    <div class="cp-grid">${tiles.map(([ic, t, d, h], i) => `
-      <button class="cp-tile cpt-${i % 6}" data-go="${h}">
+    <div class="cp-sec">⭐ الأكثر استخداماً</div>
+    ${featured.map(([ic, t, d, h, n], i2) => `
+      <button class="cp-feat cpt-${i2 % 6}" data-go="${h}">
+        <span class="cp-ico">${ic}</span>
+        <span class="cp-feat-tx"><span class="cp-title">${t}</span><span class="cp-desc">${d}</span></span>
+        ${n > 0 ? `<span class="cp-badge">${n > 99 ? '99+' : n}</span>` : '<span class="cp-arrow">‹</span>'}
+      </button>`).join('')}
+    <div class="cp-sec" style="margin-top:14px">🗄️ بقية الخدمات</div>
+    <div class="cp-grid">${tiles.map(([ic, t, d, h], i3) => `
+      <button class="cp-tile cpt-${(i3 + 3) % 6}" data-go="${h}">
         <span class="cp-ico">${ic}</span>
         <span class="cp-title">${t}</span>
         <span class="cp-desc">${d}</span>
