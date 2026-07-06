@@ -687,7 +687,7 @@ const ROUTES = {
   stats: { t: 'الإحصائيات', back: true, fn: screenStats },
   dups: { t: 'الأسماء المكرّرة', back: true, fn: screenDuplicates },
   feedback: { t: 'إرسال ملاحظة للإدارة', back: true, fn: screenFeedback },
-  feedbacks: { t: 'ملاحظات الزوار', back: true, fn: screenFeedbacks },
+  feedbacks: { t: 'صندوق الوارد', back: true, fn: screenFeedbacks },
   trash: { t: 'سلة المحذوفات', back: true, fn: screenTrash },
   about: { t: 'نبذة تعريفية', back: true, fn: screenAbout },
   document: { t: 'الوثائق', back: true, fn: screenDocuments },
@@ -892,8 +892,8 @@ function screenHome() {
       <h3 style="margin:0 0 4px">📝 ${esc(feedbackCardTitle)} ${hintBtn('feedback_send')}</h3>
       <p class="muted" style="margin:0 0 8px;font-size:.88rem">${esc(feedbackCardText)}</p>
       <button class="btn" data-go="#/feedback">✉️ أرسل ملاحظة للإدارة</button>
-      ${isAdmin() && (C.feedbackPending || 0) > 0 ? `<button class="btn outline" data-go="#/feedbacks" style="margin-top:8px">📨 عرض الملاحظات الواردة (${C.feedbackPending})</button>` : ''}
-      ${!isAdmin() && isManager() && (C.feedbackPending || 0) > 0 ? `<button class="btn outline" data-go="#/feedbacks" style="margin-top:8px">📨 طلبات وملاحظات تخصّك (${C.feedbackPending})</button>` : ''}
+      ${isAdmin() && (C.feedbackPending || 0) > 0 ? `<button class="btn outline" data-go="#/feedbacks" style="margin-top:8px">📨 صندوق الوارد (${C.feedbackPending})</button>` : ''}
+      ${!isAdmin() && isManager() && (C.feedbackPending || 0) > 0 ? `<button class="btn outline" data-go="#/feedbacks" style="margin-top:8px">📨 صندوق الوارد — يخصّك (${C.feedbackPending})</button>` : ''}
       <div id="fbMyReplies"></div>
     </div>
     <div class="search"><input id="q" placeholder="ابحث بالاسم أو اللقب…"></div><div id="qr"></div>
@@ -3174,8 +3174,8 @@ async function screenFeedbacks() {
   const shown = list.filter(f => fbFilter === 'all' ? true : fbFilter === 'done' ? f.status === 'done' : f.status !== 'done');
   const tab = (k, t) => `<button class="btn sm ${fbFilter === k ? '' : 'outline'}" data-fbfilter="${k}" style="margin:0 3px 6px 0">${t}</button>`;
   view().innerHTML = `
-    <div class="muted" style="margin-bottom:6px">ملاحظات الزوار — الإجمالي ${list.length} • قيد المراجعة ${newCount} • منجزة ${doneCount}</div>
-    <div style="margin-bottom:10px">${tab('new', '🔵 قيد المراجعة (' + newCount + ')')}${tab('done', '✓ منجزة (' + doneCount + ')')}${tab('all', 'الكل (' + list.length + ')')}</div>
+    <div class="muted" style="margin-bottom:6px">📨 صندوق الوارد — بانتظار الحسم ${newCount} • في الأرشيف ${doneCount}</div>
+    <div style="margin-bottom:10px">${tab('new', '📥 ملاحظات الزوار (' + newCount + ')')}${tab('done', '🗂️ الأرشيف (' + doneCount + ')')}</div>
     ${shown.length ? shown.map(f => {
       const nb = parseNewborn(f);
       const ro = parseReorder(f);
@@ -3311,7 +3311,8 @@ function screenMore() {
   // ٣) الإدارة (للمصرّح لهم فقط) — أدوات البيانات + لوحة التحكم والملاحظات والسجل والتعليمات مجمّعة
   const admin = [];
   if (isAdmin()) admin.push(['⚙️ لوحة التحكم', '#/control', 'control_panel']);
-  if (isAdmin()) admin.push(['📨 ملاحظات الزوار الواردة', '#/feedbacks', 'feedbacks']);
+  { const n = (isAdmin() || isManager()) ? (C.feedbackPending || 0) : 0;
+    if (isAdmin() || isManager()) admin.push(['📨 صندوق الوارد' + (n > 0 ? ' <span class="inb-badge">' + (n > 99 ? '99+' : n) + '</span>' : ''), '#/feedbacks', 'feedbacks']); }
   if (canAdd()) admin.push(['👶 إضافة مولود (مباشرة)', '#/person-edit/0', 'add_person']);
   if (isAdmin()) admin.push(['📥 استيراد ملف Excel', '#/import', 'import']);
   if (isAdmin() || isManager()) admin.push(['✏️ تعديل جماعي', '#/bulk', 'bulk']);
@@ -3321,7 +3322,10 @@ function screenMore() {
   if (isAdmin() || isManager()) admin.push(['🔁 كشف الأسماء المكرّرة لنفس الأب', '#/dups', 'dups']);
   if (isManager() && !isAdmin()) admin.push(['📋 سجل تعديلاتي (تراجع)', '#/audit', 'audit']);
   if (isAdmin() || isManager()) admin.push(['📖 تعليمات المدير والمشرف', '#/guideadmin']);
-  if (admin.length) groups.push(['⚙️ الإدارة', admin]);
+  if (admin.length) {
+    const n = (isAdmin() || isManager()) ? (C.feedbackPending || 0) : 0;
+    groups.push(['⚙️ الإدارة' + (n > 0 ? ' <span class="inb-badge">' + (n > 99 ? '99+' : n) + '</span>' : ''), admin]);
+  }
 
   // ٥) حسابي
   const acct = [];
@@ -4279,7 +4283,7 @@ const GUIDE = [
   ]},
   { sec: '🔐 دخول الإدارة والصلاحيات', role: 'admin', items: [
     { t: 'دخول المسؤول / مشرف الفرع', fn: 'دخول الإدارة لإضافة البيانات وتعديلها.', brief: 'من «المزيد ← دخول المسؤول / مشرف الفرع» بالجوال أو اسم المستخدم والرقم السري.', det: 'مدير النظام له صلاحية كاملة على كل الأقسام. مشرف الفرع يضيف ويعدّل ضمن فرعه المصرّح به فقط، ولا يرى أقسام الإدارة العامة. شاشة دخول الإدارة لا تظهر عبر رابطٍ مُرسَل أبداً — أي رابطٍ يُفتح يعرض دخول الزائر فقط.' },
-    { t: 'ملاحظات الزوار الواردة', fn: 'مراجعة ملاحظات الزوار وطلبات إضافة المواليد.', brief: 'قبول الطلب أو رفضه أو وضع علامة «تم».', det: 'المدير يرى كل الملاحظات؛ مشرف الفرع يرى ما يخصّ فرعه (المواليد والملاحظات). إضافة المولود تتم بعد رسائل تأكيدية وكتابة كلمة «اضافة».' },
+    { t: 'صندوق الوارد', fn: 'كل ملاحظات وطلبات الزوار في مكانٍ واحد.', brief: 'تبويبان: 📥 ملاحظات الزوار (بانتظار الحسم) و🗂️ الأرشيف (المحسومة). وشارة عددٍ حمراء تتسلسل من تبويب «المزيد» حتى البند لتقودك إليه، وتنبيهٌ برسائل الصندوق فور دخولك.', det: 'المدير يرى الكل؛ والمشرف ما يخصّ فروعه. من البطاقة: اعتماد المولود أو الترتيب، الرد باسم الإدارة من بنك الردود، حفظ جوال المرسل في ملفه، ثم تنتقل المحسومة للأرشيف.' },
     { t: 'ملفي الشخصي', fn: 'تعديل بيانات حسابك.', brief: 'الاسم والجوال وكلمة المرور، وبياناتك في الشجرة (المدينة/الجوال/سنة الميلاد).', det: 'تغيير الجوال يعني الدخول لاحقاً بالرقم الجديد؛ احفظه.' },
   ]},
   { sec: '🗂️ البيانات (للمدير ومشرف الفرع)', role: 'admin', items: [
@@ -4455,7 +4459,7 @@ function screenControl() {
   if (!isAdmin()) { view().innerHTML = noPerm(); return; }
   // ⭐ الأكثر استخداماً: بارزة أعلى اللوحة بشكل أعرض — والملاحظات بعدّاد المعلّق
   const featured = [
-    ['📨', 'الملاحظات الواردة', 'مراجعة طلبات الزوّار واعتمادها والرد باسم الإدارة', '#/feedbacks', C.feedbackPending || 0],
+    ['📨', 'صندوق الوارد', 'ملاحظات الزوّار: الاعتماد والرد والأرشيف', '#/feedbacks', C.feedbackPending || 0],
     ['⚙️', 'الإعدادات', 'فتح الزوّار • آخر الإضافات • الزيارات', '#/settings', 0],
     ['👥', 'المستخدمون', 'الحسابات والأدوار والصلاحيات الدقيقة', '#/members', 0],
   ];
@@ -5780,7 +5784,15 @@ async function enterApp(session) {
     try { fn = (sessionStorage.getItem('almfrje_guest_name') || '').trim().split(/\s+/)[0] || ''; } catch (e) { /* */ }
     showGreeting(fn);
   } catch (e) { /* تجاهل */ }
-  try { await loadAll(); } catch (e) { toast('خطأ تحميل: ' + e.message); }
+  try { await loadAll();
+  // 📨 تنبيه صاحب الصلاحية فور دخوله بعدد رسائل الصندوق غير المحسومة (مرة لكل جلسة)
+  try {
+    if ((isAdmin() || isManager()) && (C.feedbackPending || 0) > 0 && sessionStorage.getItem('almfrje_inbox_alerted') !== '1') {
+      sessionStorage.setItem('almfrje_inbox_alerted', '1');
+      const n = C.feedbackPending;
+      setTimeout(() => toast('📨 لديك ' + n + (n === 1 ? ' رسالة' : ' رسائل') + ' في صندوق الوارد بانتظار الحسم — المزيد ← صندوق الوارد'), 1400);
+    }
+  } catch (e) { /* */ } } catch (e) { toast('خطأ تحميل: ' + e.message); }
   showLoading(false);
   // الزائر دخل عبر رابط الإدارة سهواً؟ حوّله للرئيسية بدل بقائه على #login
   if (!location.hash || isAdminLoginUrl()) location.hash = '#/home';
