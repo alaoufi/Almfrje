@@ -90,7 +90,7 @@ const HINTS = {
   home: ['الصفحة الرئيسية', 'هنا تجد ملخّص الشجرة: عدد الأفراد والفروع والأجيال، وآخر الإضافات.\n\nالأزرار في الأسفل تنقلك بين الأقسام:\n🏠 الرئيسية • 🔍 البحث • 🌳 الشجرة • 🗂️ الفروع • ☰ المزيد.'],
   nav: ['شريط التنقّل', 'الأزرار في أسفل الشاشة:\n🏠 الرئيسية: الملخّص.\n🔍 البحث: ابحث عن أي شخص.\n🌳 الشجرة: تصفّح الأنساب.\n🗂️ الفروع: قائمة الفروع.\n☰ المزيد: بقية الأدوات.'],
   stats_box: ['الإحصائيات', 'أرقام سريعة: إجمالي الأفراد المسجّلين، عدد الفروع، عدد الأجيال، وآخر إضافة.'],
-  recent: ['آخر الإضافات', 'أحدث الأسماء المُضافة. اضغط أي اسم لرؤية أبيه وجدّه وتاريخ إضافته.\n\nزر «↺ تصفير» (للمدير) يبدأ العدّ من جديد دون حذف أي بيانات.'],
+  recent: ['آخر الإضافات', 'أحدث الأسماء المُضافة. اضغط أي اسم لرؤية أبيه وجدّه وتاريخ إضافته.\n\nللمدير: زر «🙈 إخفاء / 👁 إظهار» يتحكم بظهور البطاقة للجميع، وزر «↺ تصفير» يبدأ العدّ من جديد دون حذف أي بيانات.'],
   // ——— البحث ———
   search: ['البحث', 'اكتب اسماً في الأعلى للبحث الفوري، أو استخدم «بحث متقدّم» لتضييق النتائج بالأب أو الجد أو الفرع.\n\nكل الحقول اختيارية — املأ ما تعرفه فقط.'],
   search_name: ['الاسم', 'اكتب جزءاً من اسم الشخص.\nمثال: تكتب «محمد» فتظهر كل من يحمل هذا الاسم.\nلا يهم التشكيل أو «ال» التعريف.'],
@@ -226,6 +226,7 @@ let _dbProxied = false;   // الاتصال يمرّ عبر وسيط الموق�
 const GUEST_HIDE_DEFAULT = { phone: true, media: true, notes: true };  // ما يُخفى عن الزائر افتراضياً
 let guestHide = { ...GUEST_HIDE_DEFAULT };
 let recentSince = '';      // تاريخ تصفير «آخر الإضافات» (ISO) — يُحدّده المدير
+let recentShow = true;     // إظهار بطاقة «آخر الإضافات» بالرئيسية — يتحكم بها المدير من زرٍّ على البطاقة
 let visitStats = { total: 0, byBranch: {}, byCity: {} };   // إحصاء زيارات الزوّار (من الإعدادات)
 let onlineNow = 0;                 // عدد المتواجدين الآن (من مسار التواجد)
 let onlineByBranch = {};           // تفصيلهم حسب الفرع
@@ -482,6 +483,7 @@ async function loadSettingsOnce() {
     guestHide = Object.assign({ ...GUEST_HIDE_DEFAULT }, (map.guest_hide && typeof map.guest_hide === 'object') ? map.guest_hide : {});
     statLabels = Object.assign({ ...LABELS_DEFAULT }, (map.status_labels && typeof map.status_labels === 'object') ? map.status_labels : {});
     recentSince = typeof map.recent_since === 'string' ? map.recent_since : '';
+    recentShow = map.recent_show !== false;   // الافتراضي: ظاهرة
     bannerText = typeof map.banner_text === 'string' ? map.banner_text : DEFAULT_BANNER;
     bannerSize = (typeof map.banner_size === 'string' && /^[0-9.]+rem$/.test(map.banner_size)) ? map.banner_size : '';
     docTitle = (typeof map.doc_title === 'string' && map.doc_title) ? map.doc_title : DEFAULT_DOC_TITLE;
@@ -898,14 +900,22 @@ function screenHome() {
     <div class="online-home" id="onlineHome">${onlineHomeHtml()}</div>
     ${visitStatsCardHtml()}
     ${branchGroupsHtml()}
-    <div class="card"><div class="recent-head"><h3 style="margin:0">آخر الإضافات${sinceMs ? ` (${newCount})` : ''} ${hintBtn('recent')}</h3></div>
-      ${recent.length ? recent.map(p => `<div class="row click" data-recent="${p.id}"><span class="k">${esc(p.name)}</span><span class="v">${p.created_at ? fmtDate(p.created_at) : esc(branchName(p.branch_id))}</span></div>`).join('') : '<div class="muted" style="padding:6px">لا إضافات جديدة.</div>'}</div>
+    ${(recentShow || isAdmin()) ? `<div class="card"><div class="recent-head"><h3 style="margin:0">آخر الإضافات${sinceMs ? ` (${newCount})` : ''} ${hintBtn('recent')}</h3>${isAdmin() ? `<button class="btn sm outline" id="recentToggle">${recentShow ? '🙈 إخفاء' : '👁 إظهار'}</button>` : ''}</div>
+      ${!recentShow ? '<div class="muted" style="padding:6px">البطاقة مخفية عن الجميع — أنت وحدك تراها الآن (اضغط «إظهار» لإعادتها).</div>'
+        : (recent.length ? recent.map(p => `<div class="row click" data-recent="${p.id}"><span class="k">${esc(p.name)}</span><span class="v">${p.created_at ? fmtDate(p.created_at) : esc(branchName(p.branch_id))}</span></div>`).join('') : '<div class="muted" style="padding:6px">لا إضافات جديدة.</div>')}</div>` : ''}
     ${sitePowered ? `<div style="text-align:center;margin:10px 0 0;font-size:.74rem;opacity:.75">${esc(sitePowered)}</div>` : ''}`;
   const q = document.getElementById('q');
   q.addEventListener('input', debounce(() => instantSearch(q.value, document.getElementById('qr')), 130));
   const pwGo = document.getElementById('pwGo'); if (pwGo) pwGo.addEventListener('click', () => setHash('#/profile'));
   const pwSkip = document.getElementById('pwSkip'); if (pwSkip) pwSkip.addEventListener('click', () => { markPwChanged(); screenHome(); });
   view().querySelectorAll('[data-recent]').forEach(el => el.addEventListener('click', () => recentInfoModal(parseInt(el.dataset.recent, 10))));
+  // إظهار/إخفاء بطاقة «آخر الإضافات» (للمدير) — الإعداد يسري على الجميع
+  const rt = document.getElementById('recentToggle');
+  if (rt) rt.addEventListener('click', async () => {
+    const nv = !recentShow;
+    const ok = await guard(async () => { const { error } = await sb.from('almfrje_settings').upsert({ key: 'recent_show', value: nv, updated_at: new Date().toISOString() }, { onConflict: 'key' }); if (error) throw error; });
+    if (ok) { recentShow = nv; toast(nv ? 'بطاقة «آخر الإضافات» ظاهرة للجميع' : 'أُخفيت «آخر الإضافات» عن الجميع'); screenHome(); }
+  });
   bindGo();
   pingPresence(false);   // تحديث «المتواجدون الآن حسب الفرع» عند فتح الرئيسية
   loadMyReplies();       // ردود الإدارة على ملاحظات هذا المستخدم (إن وُجدت)
@@ -4080,7 +4090,7 @@ const GUIDE = [
     { t: 'الإحصائيات (المربّعات الأربعة)', fn: 'أرقام سريعة عن الشجرة.', brief: 'إجمالي الأفراد، الفروع، الأجيال، الزوّار — وتحتها زر «📈 التقرير الإحصائي الكامل».', det: 'إجمالي الأفراد = كل الأسماء المسجّلة في الشجرة. الفروع = الفروع القائمة فقط (التي أنجب مؤسّسها). الأجيال = أطول سلسلة نسبٍ من الجذر إلى الأحدث. الزوّار = إجمالي كل من دخل الموقع (زائر/مشرف/مدير). وللتفصيل الكامل يفتح الزر أسفلها «التقرير الإحصائي الكامل» (انظر قسم الإحصائيات والتقارير).' },
     { t: 'المتواجدون الآن', fn: 'معرفة من يتصفّح الموقع حالياً.', brief: 'عدد المتواجدين الآن، وأمام كل فرع عدد متواجديه بخط صغير.', det: 'يُحتسب النشِطون خلال آخر ثلاث دقائق، ويُنسب كلٌّ لفرعه. يتحدّث تلقائياً.' },
     { t: 'بطاقة «ملاحظتك تهمنا»', fn: 'قناة تواصل لتصحيح الأخطاء أو طلب إضافة مولود.', brief: 'بطاقة بالرئيسية فيها زر «أرسل ملاحظة للإدارة» — عنوانها ونصّها يحدّدهما المدير من التحكم ← النصوص.', det: 'الملاحظات تظهر للمدير، وللمشرف ما يخصّ فرعه (مع شارة رقمية على تبويب «المزيد» عند وجود طلبات معلّقة ضمن صلاحياته).' },
-    { t: 'آخر الإضافات', fn: 'عرض أحدث الأسماء المُضافة.', brief: 'قائمة بأحدث المضافين، الضغط على الاسم يعرض أباه وجدّه وتاريخ إضافته.', det: 'يصفّرها المدير من التحكم ← النصوص ← إحصائيات الزيارات دون حذف بيانات.' },
+    { t: 'آخر الإضافات', fn: 'عرض أحدث الأسماء المُضافة.', brief: 'قائمة بأحدث المضافين، الضغط على الاسم يعرض أباه وجدّه وتاريخ إضافته.', det: 'المدير يظهرها أو يخفيها عن الجميع بزرٍّ أعلى البطاقة (تبقى ظاهرة له مع ملاحظة). ويصفّرها من التحكم ← النصوص ← إحصائيات الزيارات دون حذف بيانات.' },
     { t: 'قائمة الفروع', fn: 'تصفّح الفروع وأعدادها.', brief: 'الفروع مجمّعة تحت أصولها مع عدد أفراد كل فرع.', det: 'تُعرض الفروع القائمة فقط؛ الضغط على فرع يفتح صفحته.' },
   ]},
   { sec: '🔍 البحث', items: [
