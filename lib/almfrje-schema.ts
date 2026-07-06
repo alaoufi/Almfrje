@@ -355,6 +355,8 @@ export const ALMFRJE_SCHEMA_SQL = `
       ALTER TABLE public.almfrje_feedback ADD COLUMN IF NOT EXISTS reply text default '';
       ALTER TABLE public.almfrje_feedback ADD COLUMN IF NOT EXISTS replied_by_name text default '';
       ALTER TABLE public.almfrje_feedback ADD COLUMN IF NOT EXISTS replied_at timestamptz;
+      -- هل قرأ المرسل الرد؟ (يُصفَّر عند كل ردٍّ جديد/معدَّل فتنبثق الرسالة له عند دخوله)
+      ALTER TABLE public.almfrje_feedback ADD COLUMN IF NOT EXISTS reply_seen boolean not null default false;
       ALTER TABLE public.almfrje_feedback ENABLE ROW LEVEL SECURITY;
       DROP POLICY IF EXISTS feedback_ins ON public.almfrje_feedback; CREATE POLICY feedback_ins ON public.almfrje_feedback FOR INSERT WITH CHECK (true);
       -- المدير يرى كل الملاحظات؛ ومسؤول الفرع يرى/يعالج «إضافة مولود» و«ملاحظة» ضمن فروعه فقط (للموافقة/الإجراء).

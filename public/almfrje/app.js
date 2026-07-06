@@ -2963,7 +2963,8 @@ async function sendFeedback() {
     setTimeout(() => { closeModal(); location.hash = '#/home'; }, 2800);
   }
 }
-// ردود الإدارة على ملاحظات المستخدم الحالي (باسم دخوله) — تُملأ في بطاقة «ملاحظتك تهمنا» بالرئيسية.
+// ردود الإدارة على ملاحظات المستخدم الحالي (باسم دخوله) — تُملأ في بطاقة «ملاحظتك تهمنا»،
+// وغير المقروء منها ينبثق برسالةٍ تبقى تعود مع كل دخول حتى يضغط «قرأتها ✓».
 async function loadMyReplies() {
   const el = document.getElementById('fbMyReplies'); if (!el) return;
   const name = currentUserName(); if (!name) return;
@@ -2973,6 +2974,26 @@ async function loadMyReplies() {
     el.innerHTML = `<div style="margin-top:12px;font-weight:800;font-size:.9rem">↩️ ردود الإدارة على ملاحظاتك</div>` +
       rows.map(r => `<div style="margin-top:6px;padding:8px 10px;background:color-mix(in srgb, var(--brand) 6%, var(--card));border:1px solid var(--line);border-inline-start:3px solid var(--brand);border-radius:8px;font-size:.86rem;line-height:1.8">
         <span class="muted" style="font-size:.72rem">${esc(r.subject)} • ${fmtDateTime(r.replied_at || r.created_at)}</span><br>${esc(r.reply)}</div>`).join('');
+    // الرسالة المنبثقة للردود غير المقروءة — تنتظر خلوّ الشاشة من نافذة الترحيب/التهنئة
+    const unseen = rows.filter(r => !r.reply_seen);
+    if (!unseen.length || window._fbPopupShown) return;
+    window._fbPopupShown = true;   // مرة واحدة لكل فتح صفحة (تعود في الدخول التالي إن لم يؤكد)
+    let tries = 0;
+    const showWhenFree = () => {
+      const root = document.getElementById('modalRoot');
+      if (root && root.innerHTML.trim()) { if (tries++ < 60) setTimeout(showWhenFree, 800); return; }
+      openModal('📨 رسالة من الإدارة', `
+        <div style="text-align:center;font-size:.9rem;color:var(--muted);margin-bottom:8px">وصلك ردٌّ من الإدارة على ما أرسلته:</div>
+        ${unseen.map(r => `<div style="margin:0 0 8px;padding:10px 12px;background:color-mix(in srgb, var(--brand) 7%, var(--card));border:1px solid var(--line);border-inline-start:3px solid var(--brand);border-radius:10px;font-size:.95rem;line-height:1.9">
+          <span class="muted" style="font-size:.74rem">${esc(r.subject)} • ${fmtDateTime(r.replied_at || r.created_at)}</span><br>${esc(r.reply)}</div>`).join('')}
+        <button class="btn" id="fbSeenBtn" style="width:100%">قرأتها ✓</button>`, () => {
+        document.getElementById('fbSeenBtn').addEventListener('click', async () => {
+          try { await fbApi('replyseen', null, { name, ids: unseen.map(r => r.id) }); } catch (e) { /* */ }
+          closeModal();
+        });
+      });
+    };
+    setTimeout(showWhenFree, 600);
   } catch (e) { /* بصمت — البطاقة اختيارية */ }
 }
 // نداء خادم إدارة الملاحظات (يعمل بمفتاح خدمي بعد التحقق — لا يعتمد على RLS).

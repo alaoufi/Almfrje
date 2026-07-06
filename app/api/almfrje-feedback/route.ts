@@ -28,7 +28,7 @@ export async function POST(request: NextRequest) {
 
   const admin: SupabaseClient = createClient(url, service, { auth: { persistSession: false, autoRefreshToken: false } });
 
-  let body: { action?: string; id?: number; reply?: string; name?: string };
+  let body: { action?: string; id?: number; reply?: string; name?: string; ids?: unknown[] };
   try { body = await request.json(); } catch { body = {}; }
   const action = String(body.action || 'list');
   const id = body.id != null ? Number(body.id) : null;
@@ -39,11 +39,22 @@ export async function POST(request: NextRequest) {
     const name = String(body.name || '').trim();
     if (!name) return NextResponse.json({ ok: true, rows: [] });
     const { data, error } = await admin.from('almfrje_feedback')
-      .select('subject,reply,replied_at,created_at')
+      .select('id,subject,reply,replied_at,created_at,reply_seen')
       .eq('created_by_name', name).neq('reply', '')
       .order('replied_at', { ascending: false }).limit(20);
     if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 });
     return NextResponse.json({ ok: true, rows: data || [] });
+  }
+
+  // المرسل ضغط «قرأتها» على الرسالة المنبثقة — لا تنبثق له مجدداً
+  if (action === 'replyseen') {
+    const name = String(body.name || '').trim();
+    const idList = (Array.isArray(body.ids) ? body.ids : []).map((x) => Number(x)).filter((x) => Number.isFinite(x));
+    if (!name || !idList.length) return NextResponse.json({ ok: true });
+    const { error } = await admin.from('almfrje_feedback')
+      .update({ reply_seen: true }).eq('created_by_name', name).in('id', idList);
+    if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 });
+    return NextResponse.json({ ok: true });
   }
 
   const { data: mem } = await admin.from('almfrje_members').select('role,is_active,branch_id,branch_ids,full_name,username').eq('user_id', who.user.id).maybeSingle();
@@ -88,7 +99,7 @@ export async function POST(request: NextRequest) {
     const reply = String(body.reply || '').trim().slice(0, 1000);
     if (!reply) return NextResponse.json({ ok: false, error: 'نصّ الرد فارغ' }, { status: 400 });
     const { error } = await admin.from('almfrje_feedback')
-      .update({ reply, replied_by_name: whoName, replied_at: new Date().toISOString() }).eq('id', id);
+      .update({ reply, replied_by_name: whoName, replied_at: new Date().toISOString(), reply_seen: false }).eq('id', id);
     if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 });
     return NextResponse.json({ ok: true });
   }
