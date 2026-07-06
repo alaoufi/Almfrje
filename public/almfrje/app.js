@@ -214,6 +214,13 @@ let _authUid = null;   // هوية الجلسة الحالية — لتجاهل 
 let imported = false;
 let guestOpen = false;    // إتاحة زر «تصفّح كزائر» بحساب زائر مدمج (قراءة فقط)
 let guestGens = 0;        // عدد الأجيال المطلوبة للتحقق قبل دخول الزائر (0 = بلا تحقّق)
+// بنك الردود الجاهزة (لكل موضوعٍ ردوده) — يحرّره المدير من «النصوص»، ويستعمله المشرف للرد باسم الإدارة
+const DEFAULT_REPLY_BANK = {
+  'إضافة مولود': ['شكراً لإضافتك وتم إجراء اللازم', 'شكراً لإضافتك وهي محل اهتمامنا'],
+  'ملاحظة': ['شكراً لاهتمامك، ملاحظتك محل اهتمامنا'],
+  'اقتراح': ['شكراً لاهتمامك، اقتراحك محل اهتمامنا'],
+};
+let replyBank = JSON.parse(JSON.stringify(DEFAULT_REPLY_BANK));
 let settingsOk = false;   // نجح تحميل الإعدادات من القاعدة؟ (فشلها الكامل = مشكلة اتصال، لا «موقع مغلق»)
 let _dbProxied = false;   // الاتصال يمرّ عبر وسيط الموقع /sbdb (لشبكاتٍ تحجب نطاق القاعدة مباشرة)
 const GUEST_HIDE_DEFAULT = { phone: true, media: true, notes: true };  // ما يُخفى عن الزائر افتراضياً
@@ -492,6 +499,7 @@ async function loadSettingsOnce() {
     feedbackCardTitle = typeof map.feedback_card_title === 'string' && map.feedback_card_title ? map.feedback_card_title : DEFAULT_FB_CARD_TITLE;
     guestPrompt = typeof map.guest_prompt === 'string' && map.guest_prompt ? map.guest_prompt : DEFAULT_GUEST_PROMPT;
     aboutHtml = typeof map.about_html === 'string' && map.about_html ? map.about_html : DEFAULT_ABOUT;
+    replyBank = (map.reply_bank && typeof map.reply_bank === 'object' && !Array.isArray(map.reply_bank)) ? map.reply_bank : JSON.parse(JSON.stringify(DEFAULT_REPLY_BANK));
     occasionText = typeof map.occasion_text === 'string' ? map.occasion_text : '';
     occasionColor = okColor(map.occasion_color);
     congrats = (map.congrats && typeof map.congrats === 'object') ? map.congrats : null;
@@ -877,6 +885,7 @@ function screenHome() {
       <button class="btn" data-go="#/feedback">✉️ أرسل ملاحظة للإدارة</button>
       ${isAdmin() && (C.feedbackPending || 0) > 0 ? `<button class="btn outline" data-go="#/feedbacks" style="margin-top:8px">📨 عرض الملاحظات الواردة (${C.feedbackPending})</button>` : ''}
       ${!isAdmin() && isManager() && (C.feedbackPending || 0) > 0 ? `<button class="btn outline" data-go="#/feedbacks" style="margin-top:8px">📨 طلبات وملاحظات تخصّك (${C.feedbackPending})</button>` : ''}
+      <div id="fbMyReplies"></div>
     </div>
     <div class="search"><input id="q" placeholder="ابحث بالاسم أو اللقب…"></div><div id="qr"></div>
     <div class="stats">
@@ -899,6 +908,7 @@ function screenHome() {
   view().querySelectorAll('[data-recent]').forEach(el => el.addEventListener('click', () => recentInfoModal(parseInt(el.dataset.recent, 10))));
   bindGo();
   pingPresence(false);   // تحديث «المتواجدون الآن حسب الفرع» عند فتح الرئيسية
+  loadMyReplies();       // ردود الإدارة على ملاحظات هذا المستخدم (إن وُجدت)
   // إضافة المولود انتقلت إلى قائمة «المزيد» (للمدير ومشرف الفرع) — لا زرّ عائم بالرئيسية.
 }
 // تصفير «آخر الإضافات» (للمدير فقط): تأكيدان + كتابة الكلمة + إمكانية تراجع.
@@ -2953,15 +2963,47 @@ async function sendFeedback() {
     setTimeout(() => { closeModal(); location.hash = '#/home'; }, 2800);
   }
 }
+// ردود الإدارة على ملاحظات المستخدم الحالي (باسم دخوله) — تُملأ في بطاقة «ملاحظتك تهمنا» بالرئيسية.
+async function loadMyReplies() {
+  const el = document.getElementById('fbMyReplies'); if (!el) return;
+  const name = currentUserName(); if (!name) return;
+  try {
+    const j = await fbApi('myreplies', null, { name });
+    const rows = j.rows || []; if (!rows.length) return;
+    el.innerHTML = `<div style="margin-top:12px;font-weight:800;font-size:.9rem">↩️ ردود الإدارة على ملاحظاتك</div>` +
+      rows.map(r => `<div style="margin-top:6px;padding:8px 10px;background:color-mix(in srgb, var(--brand) 6%, var(--card));border:1px solid var(--line);border-inline-start:3px solid var(--brand);border-radius:8px;font-size:.86rem;line-height:1.8">
+        <span class="muted" style="font-size:.72rem">${esc(r.subject)} • ${fmtDateTime(r.replied_at || r.created_at)}</span><br>${esc(r.reply)}</div>`).join('');
+  } catch (e) { /* بصمت — البطاقة اختيارية */ }
+}
 // نداء خادم إدارة الملاحظات (يعمل بمفتاح خدمي بعد التحقق — لا يعتمد على RLS).
-async function fbApi(action, id) {
+async function fbApi(action, id, extra) {
   const { data: { session } } = await sb.auth.getSession();
   const token = session && session.access_token;
   if (!token) throw new Error('انتهت الجلسة — أعد تسجيل الدخول');
-  const res = await fetch('/api/almfrje-feedback', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token }, body: JSON.stringify({ action, id }) });
+  const res = await fetch('/api/almfrje-feedback', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token }, body: JSON.stringify(Object.assign({ action, id }, extra || {})) });
   const j = await res.json().catch(() => ({}));
   if (!res.ok || !j.ok) throw new Error(j.error || 'تعذّر تنفيذ العملية');
   return j;
+}
+// نافذة الرد باسم الإدارة: ردود جاهزة من البنك (حسب الموضوع) أو ردّ مخصّص.
+function replyModal(f) {
+  const bank = (Array.isArray(replyBank[f.subject]) ? replyBank[f.subject] : []).filter(Boolean);
+  openModal('↩️ الرد باسم الإدارة', `
+    <div class="li-sub" style="margin-bottom:8px">إلى: <b>${esc(f.created_by_name || 'زائر')}</b> — ${esc(f.subject)}</div>
+    ${bank.length ? `<div class="li-sub" style="font-weight:800;margin-bottom:6px">اختر رداً جاهزاً:</div>
+      <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:8px">${bank.map((r, i) => `<button class="btn sm outline" data-rbpick="${i}" style="text-align:right">${esc(r)}</button>`).join('')}</div>` : ''}
+    <div class="field"><textarea id="rb_text" rows="3" placeholder="أو اكتب رداً مخصّصاً">${esc(f.reply || '')}</textarea></div>
+    <button class="btn" id="rb_send">إرسال الرد باسم الإدارة</button>`, () => {
+    document.querySelectorAll('[data-rbpick]').forEach(b => b.addEventListener('click', () => {
+      document.getElementById('rb_text').value = bank[parseInt(b.dataset.rbpick, 10)] || '';
+    }));
+    document.getElementById('rb_send').addEventListener('click', async () => {
+      const t = val('rb_text').trim();
+      if (!t) { toast('اختر رداً جاهزاً أو اكتب رداً'); return; }
+      const ok = await guard(async () => { await fbApi('reply', f.id, { reply: t }); });
+      if (ok) { closeModal(); toast('أُرسل الرد باسم الإدارة ✓'); screenFeedbacks(); }
+    });
+  });
 }
 // عرض الملاحظات للمدير — مرتّب باحترافية: تبويبات (قيد المراجعة/منجزة/الكل) + بطاقات مصنّفة بالنوع.
 // يحلّل طلب «إضافة مولود» المهيكل من حقل التفاصيل (أو null لغير المواليد).
@@ -3008,13 +3050,15 @@ async function screenFeedbacks() {
         ${f.branch_id ? `<div class="li-sub" style="margin-top:4px">🗂️ الفرع: <b>${esc(branchName(f.branch_id))}</b></div>` : ''}
         ${body}
         ${f.error_desc ? `<div class="li-sub" style="margin-top:4px;white-space:pre-wrap">⚠️ ${esc(f.error_desc)}</div>` : ''}
+        ${f.reply ? `<div style="margin-top:8px;padding:8px 10px;background:color-mix(in srgb, var(--brand) 7%, var(--card));border:1px solid var(--line);border-inline-start:3px solid var(--brand);border-radius:8px;font-size:.86rem;line-height:1.8">↩️ <b>ردّ الإدارة:</b> ${esc(f.reply)}<div class="muted" style="font-size:.72rem;margin-top:2px">${esc(f.replied_by_name || '')}${f.replied_at ? ' • ' + fmtDateTime(f.replied_at) : ''}</div></div>` : ''}
         <div class="muted" style="margin-top:6px;font-size:.74rem">👤 ${esc(f.created_by_name || 'زائر')} • ${fmtDateTime(f.created_at)}${f.status === 'done' && f.done_by_name ? ' • ' + esc(f.done_by_name) : ''}</div>
-        <div class="btn-row" style="margin-top:8px">${actions}</div>
+        <div class="btn-row" style="margin-top:8px"><button class="btn sm outline" data-fbreply="${f.id}">↩️ ${f.reply ? 'تعديل الرد' : 'رد باسم الإدارة'}</button>${actions}</div>
       </div>`; }).join('') : '<div class="center-empty">لا توجد عناصر في هذا التبويب.</div>'}`;
   view().querySelectorAll('[data-fbfilter]').forEach(b => b.addEventListener('click', () => { fbFilter = b.dataset.fbfilter; screenFeedbacks(); }));
   view().querySelectorAll('[data-fbdone]').forEach(b => b.addEventListener('click', () => markFeedback(b.dataset.fbdone, 'done')));
   view().querySelectorAll('[data-fbreopen]').forEach(b => b.addEventListener('click', () => markFeedback(b.dataset.fbreopen, 'new')));
   view().querySelectorAll('[data-fbdel]').forEach(b => b.addEventListener('click', () => delFeedback(b.dataset.fbdel)));
+  view().querySelectorAll('[data-fbreply]').forEach(b => b.addEventListener('click', () => replyModal(list.find(x => String(x.id) === b.dataset.fbreply))));
   view().querySelectorAll('[data-nbok]').forEach(b => b.addEventListener('click', () => approveNewborn(list.find(x => String(x.id) === b.dataset.nbok))));
   view().querySelectorAll('[data-nbno]').forEach(b => b.addEventListener('click', () => rejectNewborn(list.find(x => String(x.id) === b.dataset.nbno))));
 }
@@ -4293,6 +4337,13 @@ function screenTexts() {
       <p class="muted" style="font-size:.85rem;margin-top:-2px">تظهر للمُرسِل في موديل بعد إرسال ملاحظته.</p>
       ${fTextarea('النص', 'tx_fbthanks', feedbackThanks)}
       <button class="btn sm" id="tx_fbthanksSave" style="margin-top:6px">حفظ النص</button></div>
+    <div class="card"><h3>🏦 بنك الردود الجاهزة</h3>
+      <p class="muted" style="font-size:.85rem;margin-top:-2px">يستخدمها المشرف للرد على الملاحظات باسم الإدارة. <b>كل سطرٍ = ردّ جاهز</b> — عدّل أو أضِف سطراً جديداً لكل بند.</p>
+      ${fTextarea('👶 ردود «إضافة مولود»', 'tx_rb_newborn', (Array.isArray(replyBank['إضافة مولود']) ? replyBank['إضافة مولود'] : []).join('\n'))}
+      ${fTextarea('📝 ردود «ملاحظة»', 'tx_rb_note', (Array.isArray(replyBank['ملاحظة']) ? replyBank['ملاحظة'] : []).join('\n'))}
+      ${fTextarea('💡 ردود «اقتراح»', 'tx_rb_sugg', (Array.isArray(replyBank['اقتراح']) ? replyBank['اقتراح'] : []).join('\n'))}
+      <button class="btn sm" id="tx_rbSave" style="margin-top:6px">حفظ بنك الردود</button>
+      <button class="btn sm outline" id="tx_rbReset" style="margin-top:6px">استرجاع الافتراضي</button></div>
     <div class="card"><h3>🌿 ترحيب الزائر — عند نجاح التحقق ${hintBtn('guest_ok')}</h3>
       <p class="muted" style="font-size:.85rem;margin-top:-2px">يظهر للزائر بعد مطابقة اسمه. اكتب <b>{name}</b> مكان اسم الزائر.</p>
       ${fTextarea('النص', 'tx_gok', guestWelcomeOk)}
@@ -4430,6 +4481,19 @@ function screenTexts() {
     const txt = val('tx_fbthanks').trim() || DEFAULT_FB_THANKS;
     const ok = await guard(async () => { const { error } = await sb.from('almfrje_settings').upsert({ key: 'feedback_thanks', value: txt, updated_at: new Date().toISOString() }, { onConflict: 'key' }); if (error) throw error; });
     if (ok) { feedbackThanks = txt; toast('تم حفظ رسالة الشكر'); }
+  });
+  // بنك الردود الجاهزة: كل سطرٍ في الحقل = ردّ مستقل
+  const rbLines = (idv) => val(idv).split('\n').map(s => s.trim()).filter(Boolean);
+  document.getElementById('tx_rbSave').addEventListener('click', async () => {
+    const bank = { 'إضافة مولود': rbLines('tx_rb_newborn'), 'ملاحظة': rbLines('tx_rb_note'), 'اقتراح': rbLines('tx_rb_sugg') };
+    const ok = await guard(async () => { const { error } = await sb.from('almfrje_settings').upsert({ key: 'reply_bank', value: bank, updated_at: new Date().toISOString() }, { onConflict: 'key' }); if (error) throw error; });
+    if (ok) { replyBank = bank; toast('تم حفظ بنك الردود'); }
+  });
+  document.getElementById('tx_rbReset').addEventListener('click', async () => {
+    if (!(await confirm2('استرجاع الردود الافتراضية؟ سيستبدل ما كتبته.'))) return;
+    const bank = JSON.parse(JSON.stringify(DEFAULT_REPLY_BANK));
+    const ok = await guard(async () => { const { error } = await sb.from('almfrje_settings').upsert({ key: 'reply_bank', value: bank, updated_at: new Date().toISOString() }, { onConflict: 'key' }); if (error) throw error; });
+    if (ok) { replyBank = bank; toast('استُرجع الافتراضي'); screenTexts(); }
   });
   document.getElementById('tx_gokSave').addEventListener('click', async () => {
     const txt = val('tx_gok').trim() || DEFAULT_GUEST_OK;

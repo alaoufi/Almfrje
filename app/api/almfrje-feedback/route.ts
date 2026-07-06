@@ -27,6 +27,25 @@ export async function POST(request: NextRequest) {
   if (!who || !who.user) return NextResponse.json({ ok: false, error: 'جلسة غير صالحة' }, { status: 401 });
 
   const admin: SupabaseClient = createClient(url, service, { auth: { persistSession: false, autoRefreshToken: false } });
+
+  let body: { action?: string; id?: number; reply?: string; name?: string };
+  try { body = await request.json(); } catch { body = {}; }
+  const action = String(body.action || 'list');
+  const id = body.id != null ? Number(body.id) : null;
+
+  // ردود الإدارة على ملاحظات المرسل نفسه — متاحة لأي جلسةٍ صالحة (زائر/عضو) باسم دخوله.
+  // تُعاد حقول محدودة فقط (الموضوع/الرد/التواريخ) — لا تفاصيل ولا أسماء رادّين.
+  if (action === 'myreplies') {
+    const name = String(body.name || '').trim();
+    if (!name) return NextResponse.json({ ok: true, rows: [] });
+    const { data, error } = await admin.from('almfrje_feedback')
+      .select('subject,reply,replied_at,created_at')
+      .eq('created_by_name', name).neq('reply', '')
+      .order('replied_at', { ascending: false }).limit(20);
+    if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 });
+    return NextResponse.json({ ok: true, rows: data || [] });
+  }
+
   const { data: mem } = await admin.from('almfrje_members').select('role,is_active,branch_id,branch_ids,full_name,username').eq('user_id', who.user.id).maybeSingle();
   if (!mem || !mem.is_active) return NextResponse.json({ ok: false, error: 'الحساب غير مفعّل' }, { status: 403 });
   const isAdmin = mem.role === 'admin';
@@ -42,11 +61,6 @@ export async function POST(request: NextRequest) {
 
   type Row = { id: number; subject: string; branch_id: number | null; details: string; status: string };
   const canTouch = (r: Row) => isAdmin || (isMgr && ['إضافة مولود', 'ملاحظة'].includes(r.subject) && (allBranches || (r.branch_id != null && myBranches.has(Number(r.branch_id)))));
-
-  let body: { action?: string; id?: number };
-  try { body = await request.json(); } catch { body = {}; }
-  const action = String(body.action || 'list');
-  const id = body.id != null ? Number(body.id) : null;
 
   if (action === 'list' || action === 'count') {
     const { data, error } = await admin.from('almfrje_feedback').select('*').order('created_at', { ascending: false }).limit(3000);
@@ -66,6 +80,15 @@ export async function POST(request: NextRequest) {
       ? { status: 'done', done_by_name: whoName, done_at: new Date().toISOString() }
       : { status: 'new', done_at: null, done_by_name: '' };
     const { error } = await admin.from('almfrje_feedback').update(upd).eq('id', id);
+    if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 });
+    return NextResponse.json({ ok: true });
+  }
+
+  if (action === 'reply') {
+    const reply = String(body.reply || '').trim().slice(0, 1000);
+    if (!reply) return NextResponse.json({ ok: false, error: 'نصّ الرد فارغ' }, { status: 400 });
+    const { error } = await admin.from('almfrje_feedback')
+      .update({ reply, replied_by_name: whoName, replied_at: new Date().toISOString() }).eq('id', id);
     if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 });
     return NextResponse.json({ ok: true });
   }
