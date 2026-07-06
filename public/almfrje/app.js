@@ -2986,7 +2986,8 @@ function renderFbDynamic(subject) {
     wrap.innerHTML = '';
   }
   // «إضافة مولود» تكتفي بحقول المولود — أخفِ مربّع التفاصيل العام.
-  if (det) { const fld = det.closest('.field'); if (fld) fld.style.display = (subject === 'إضافة مولود' || subject === 'إعادة ترتيب الإخوان') ? 'none' : ''; }
+  // لا شيء قبل اختيار الموضوع؛ وبعده يظهر ما يناسبه فقط (مولود/ترتيب: حقولهما الخاصة بلا مربع التفاصيل)
+  if (det) { const fld = det.closest('.field'); if (fld) fld.style.display = (!subject || subject === 'إضافة مولود' || subject === 'إعادة ترتيب الإخوان') ? 'none' : ''; }
 }
 // قائمة الإخوان بالسهمين ▲▼ داخل نموذج «إعادة ترتيب الإخوان»
 function renderFbOrder() {
