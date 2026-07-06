@@ -56,14 +56,14 @@ export async function POST(request: NextRequest) {
   if (names.length < 3) return NextResponse.json({ ok: false, error: 'اكتب اسمك ثم أباك ثم جدّك (٣ أسماء على الأقل بالترتيب)' });
 
   // تحميل الأشخاص (صفحات)
-  type P = { id: number; name: string; father_id: number | null; status: string; branch_id: number | null; city: string | null };
+  type P = { id: number; name: string; father_id: number | null; status: string; branch_id: number | null; city: string | null; phone?: string | null };
   const persons: P[] = [];
   // تحميلٌ كامل ومرتّب: ترتيب ثابت بالمعرّف (يمنع فجوات/تكرار الترقيم)، مع الخطو بعدد الصفوف
   // الفعلي المُرجَع والتوقّف عند صفحةٍ فارغة فقط — فيُجلَب كل الأشخاص ولو كان حدّ صفوف الخادم
   // أقلّ من حجم الصفحة. أي نقصٍ هنا يكسر سلسلة النسب لمن غاب أبوه/جدّه من الذاكرة.
   const PAGE = 1000;
   for (let from = 0; from < 200000; ) {
-    const { data, error } = await admin.from('almfrje_persons').select('id,name,father_id,status,branch_id,city').order('id', { ascending: true }).range(from, from + PAGE - 1);
+    const { data, error } = await admin.from('almfrje_persons').select('id,name,father_id,status,branch_id,city,phone').order('id', { ascending: true }).range(from, from + PAGE - 1);
     if (error) break;
     const rows = (data || []) as P[];
     if (rows.length === 0) break;
@@ -107,7 +107,7 @@ export async function POST(request: NextRequest) {
       while (cur != null && out.length < 4 && guard++ < 20) { const p = byId.get(String(cur)); if (!p) break; out.push(p.name); cur = p.father_id; }
       return out.join(' بن ');
     })();
-    return NextResponse.json({ ok: true, branch: liveMatches[0].branch_id, name: fullName });
+    return NextResponse.json({ ok: true, branch: liveMatches[0].branch_id, name: fullName, pid: liveMatches[0].id, has_phone: !!(liveMatches[0].phone && String(liveMatches[0].phone).trim()) });
   }
   if (liveMatches.length > 1) {
     return NextResponse.json({ ok: false, error: 'اسمك يطابق أكثر من شخص حيّ — أضِف اسم جدٍّ آخر للتمييز.' });
