@@ -337,6 +337,12 @@ export const ALMFRJE_SCHEMA_SQL = `
 
       GRANT SELECT ON public.almfrje_settings TO anon, authenticated;
 
+      -- ختم إصدار المخطط: يرتفع مع كل تعديلٍ للمخطط، ووجوده بالقيمة الأحدث في القاعدة
+      -- دليلٌ قاطع أن قناة الترقية التلقائية (/api/almfrje-setup) تعمل.
+      INSERT INTO public.almfrje_settings (key, value)
+        VALUES ('schema_rev', '"2026-07-06-1"'::jsonb)
+        ON CONFLICT (key) DO UPDATE SET value = '"2026-07-06-1"'::jsonb, updated_at = now();
+
       -- ملاحظات الزوار: يرسلها أي زائر/عضو، ويراجعها المدير ويضع علامة «تم».
       CREATE TABLE IF NOT EXISTS public.almfrje_feedback (
         id bigint generated always as identity primary key,
