@@ -219,6 +219,7 @@ const DEFAULT_REPLY_BANK = {
   'إضافة مولود': ['شكراً لإضافتك وتم إجراء اللازم', 'شكراً لإضافتك وهي محل اهتمامنا'],
   'ملاحظة': ['شكراً لاهتمامك، ملاحظتك محل اهتمامنا'],
   'اقتراح': ['شكراً لاهتمامك، اقتراحك محل اهتمامنا'],
+  'إعادة ترتيب الإخوان': ['تم اعتماد الترتيب المقترح وتطبيقه — شكراً لمساهمتك', 'شكراً لاهتمامك — لم يُعتمد الترتيب المقترح حالياً'],
 };
 let replyBank = JSON.parse(JSON.stringify(DEFAULT_REPLY_BANK));
 let settingsOk = false;   // نجح تحميل الإعدادات من القاعدة؟ (فشلها الكامل = مشكلة اتصال، لا «موقع مغلق»)
@@ -2855,7 +2856,8 @@ function screenStats() {
 
 /* ===== ملاحظات الزوار ===== */
 // نموذج إرسال ملاحظة/خطأ للإدارة — متاح للجميع (زائر/عضو).
-let fbFather = null;     // والد المولود (عند موضوع «إضافة مولود»)
+let fbFather = null;     // والد المولود (عند موضوع «إضافة مولود») أو الأب (عند «إعادة ترتيب الإخوان»)
+let fbOrder = null;      // الترتيب المقترح لأبنائه (مصفوفة معرّفات)
 let fbSender = null;     // المُرسِل يعرّف نفسه من الشجرة
 let fbFilter = 'new';    // تبويب شاشة المدير: new | done | all
 function screenFeedback() {
@@ -2878,6 +2880,7 @@ function screenFeedback() {
         <option value="إضافة مولود">👶 إضافة مولود</option>
         <option value="ملاحظة">📝 ملاحظة / تصحيح</option>
         <option value="اقتراح">💡 اقتراح</option>
+        <option value="إعادة ترتيب الإخوان">↕️ إعادة ترتيب الإخوان</option>
       </select></div>
       <div id="fb_dynamic"></div>
       <div class="field"><textarea id="fb_details" rows="4" placeholder="اكتب التفاصيل هنا"></textarea></div>
@@ -2917,7 +2920,7 @@ function fbPickerSearch(term, resEl, aliveOnly, onPick) {
 function renderFbDynamic(subject) {
   const wrap = document.getElementById('fb_dynamic');
   const det = document.getElementById('fb_details');
-  fbFather = null;
+  fbFather = null; fbOrder = null;
   if (subject === 'إضافة مولود') {
     wrap.innerHTML = `
       <div class="field">
@@ -2936,6 +2939,13 @@ function renderFbDynamic(subject) {
       document.getElementById('fb_fselected').innerHTML = p ? '<div style="padding:8px 10px;border:1px solid var(--brand);border-radius:8px;font-size:.9rem">✅ والد المولود: <b>' + esc(lineageShort(p.id, 12)) + '</b></div>' : '';
       fs.value = p ? p.name : '';
     }));
+  } else if (subject === 'إعادة ترتيب الإخوان') {
+    if (!fbFather || !fbOrder || fbOrder.length < 2) { toast('اختر الأب أولاً ورتّب أبناءه'); return; }
+    branch_id = fbFather.branch_id || null;
+    fullDetails = JSON.stringify({
+      kind: 'reorder', father_id: fbFather.id, father: lineageShort(fbFather.id, 12),
+      order: fbOrder, names: fbOrder.map(cid => (byId.get(cid) || { name: String(cid) }).name), by: who,
+    });
   } else if (subject === 'ملاحظة') {
     if (det) det.placeholder = 'اكتب تفاصيل الملاحظة هنا';
     const branchOpts = C.branches.slice().sort((a, b) => String(a.name).localeCompare(String(b.name), 'ar'))
@@ -2943,12 +2953,46 @@ function renderFbDynamic(subject) {
     wrap.innerHTML = `
       <div class="field"><select id="fb_branch"><option value="">— اختر الفرع (اختياري) —</option>${branchOpts}</select></div>
       <div class="field"><textarea id="fb_error" rows="3" placeholder="صِف الخطأ والتصحيح المقترح (اختياري)"></textarea></div>`;
+  } else if (subject === 'إعادة ترتيب الإخوان') {
+    wrap.innerHTML = `
+      <div class="field">
+        <input id="fb_rsearch" type="text" placeholder="الأب: اكتب اسمه ثم اسم أبيه (مثال: سالم خالد) *">
+        <div id="fb_rresults" style="max-height:200px;overflow:auto"></div>
+        <div id="fb_rselected" class="muted" style="margin-top:6px"></div>
+      </div>
+      <div id="fb_rkids"></div>`;
+    const rsi = document.getElementById('fb_rsearch');
+    rsi.addEventListener('input', () => fbPickerSearch(rsi.value, document.getElementById('fb_rresults'), false, (p) => {
+      const ks = childrenOf(p.id);
+      if (ks.length < 2) { toast('هذا الأب ليس له أكثر من ابنٍ واحد — لا حاجة لترتيب'); return; }
+      fbFather = p; fbOrder = ks.map(k => k.id);
+      document.getElementById('fb_rselected').innerHTML = '<div style="padding:8px 10px;border:1px solid var(--brand);border-radius:8px;font-size:.9rem">✅ الأب: <b>' + esc(lineageShort(p.id, 12)) + '</b></div>';
+      rsi.value = p.name;
+      renderFbOrder();
+    }));
   } else {
     if (det) det.placeholder = subject === 'اقتراح' ? 'اكتب اقتراحك هنا' : 'اكتب التفاصيل هنا';
     wrap.innerHTML = '';
   }
   // «إضافة مولود» تكتفي بحقول المولود — أخفِ مربّع التفاصيل العام.
-  if (det) { const fld = det.closest('.field'); if (fld) fld.style.display = (subject === 'إضافة مولود') ? 'none' : ''; }
+  if (det) { const fld = det.closest('.field'); if (fld) fld.style.display = (subject === 'إضافة مولود' || subject === 'إعادة ترتيب الإخوان') ? 'none' : ''; }
+}
+// قائمة الإخوان بالسهمين ▲▼ داخل نموذج «إعادة ترتيب الإخوان»
+function renderFbOrder() {
+  const box = document.getElementById('fb_rkids'); if (!box || !fbFather || !fbOrder) return;
+  box.innerHTML = '<div class="li-sub" style="font-weight:800;margin:10px 0 4px">رتّب الإخوان بالسهمين ثم أرسل للإدارة:</div>' +
+    fbOrder.map((cid, i) => {
+      const c = byId.get(cid);
+      return `<div class="row child-row"><span class="reorder-arrows"><button class="reorder-up" data-fbup="${i}" aria-label="أعلى">▲</button><button class="reorder-down" data-fbdn="${i}" aria-label="أسفل">▼</button></span><span class="k">${i + 1}. <span class="${c ? nameCls(c) : ''}">${esc(c ? c.name : String(cid))}</span></span></div>`;
+    }).join('');
+  box.querySelectorAll('[data-fbup]').forEach(b => b.addEventListener('click', () => {
+    const i = parseInt(b.dataset.fbup, 10);
+    if (i > 0) { const t = fbOrder[i - 1]; fbOrder[i - 1] = fbOrder[i]; fbOrder[i] = t; renderFbOrder(); }
+  }));
+  box.querySelectorAll('[data-fbdn]').forEach(b => b.addEventListener('click', () => {
+    const i = parseInt(b.dataset.fbdn, 10);
+    if (i < fbOrder.length - 1) { const t = fbOrder[i + 1]; fbOrder[i + 1] = fbOrder[i]; fbOrder[i] = t; renderFbOrder(); }
+  }));
 }
 async function sendFeedback() {
   const who = currentUserName() || (document.getElementById('fb_name') ? val('fb_name').trim() : '');
@@ -3052,6 +3096,11 @@ function parseNewborn(f) {
   try { const o = JSON.parse(f.details); if (o && o.kind === 'newborn') return o; } catch (e) {}
   return null;
 }
+function parseReorder(f) {
+  if (!f || f.subject !== 'إعادة ترتيب الإخوان') return null;
+  try { const o = JSON.parse(f.details); if (o && o.kind === 'reorder' && Array.isArray(o.order)) return o; } catch (e) {}
+  return null;
+}
 async function screenFeedbacks() {
   if (!isAdmin() && !isManager()) { view().innerHTML = noPerm(); return; }
   showLoading(true);
@@ -3061,7 +3110,7 @@ async function screenFeedbacks() {
   showLoading(false);
   const newCount = list.filter(f => f.status !== 'done').length;
   const doneCount = list.length - newCount;
-  const icon = { 'إضافة مولود': '👶', 'ملاحظة': '📝', 'اقتراح': '💡' };
+  const icon = { 'إضافة مولود': '👶', 'ملاحظة': '📝', 'اقتراح': '💡', 'إعادة ترتيب الإخوان': '↕️' };
   const shown = list.filter(f => fbFilter === 'all' ? true : fbFilter === 'done' ? f.status === 'done' : f.status !== 'done');
   const tab = (k, t) => `<button class="btn sm ${fbFilter === k ? '' : 'outline'}" data-fbfilter="${k}" style="margin:0 3px 6px 0">${t}</button>`;
   view().innerHTML = `
@@ -3069,14 +3118,22 @@ async function screenFeedbacks() {
     <div style="margin-bottom:10px">${tab('new', '🔵 قيد المراجعة (' + newCount + ')')}${tab('done', '✓ منجزة (' + doneCount + ')')}${tab('all', 'الكل (' + list.length + ')')}</div>
     ${shown.length ? shown.map(f => {
       const nb = parseNewborn(f);
-      const body = nb
+      const ro = parseReorder(f);
+      const body = ro
+        ? `<div class="li-sub" style="margin-top:4px">👨‍👦 الأب: <b>${esc(ro.father || '')}</b></div>
+           <div class="li-sub" style="margin-top:4px;line-height:2">الترتيب المقترح:<br>${(ro.names || []).map((n, i) => (i + 1) + '. ' + esc(n)).join('<br>')}</div>`
+        : nb
         ? `<div class="li-sub" style="margin-top:4px">👶 المولود: <b>${esc(nb.name)}</b></div>
            <div class="li-sub">الأب: ${esc(nb.father || '')}</div>
            ${nb.birth ? `<div class="li-sub">سنة الولادة: ${esc(nb.birth)}</div>` : ''}
            ${nb.city ? `<div class="li-sub">المدينة: ${esc(nb.city)}</div>` : ''}
            ${f.status !== 'done' ? `<div style="margin-top:8px;padding:8px 10px;border:1px solid var(--danger);border-radius:8px;color:var(--danger);font-weight:700;font-size:.85rem;line-height:1.7">⚠️ تأكّد من الاسم وأبيه وجدّه — اسأل وتأكّد قبل الإضافة.</div>` : ''}`
         : `${f.details ? `<div class="li-sub" style="margin-top:4px;white-space:pre-wrap">${esc(f.details)}</div>` : ''}`;
-      const actions = nb
+      const actions = ro
+        ? (f.status !== 'done'
+            ? `<button class="btn sm" data-rook="${f.id}">✅ اعتماد وتطبيق</button><button class="btn sm danger" data-rono="${f.id}">❌ رفض</button>`
+            : `<span class="badge add">✓ عولج</span> <button class="btn sm danger" data-fbdel="${f.id}">حذف السجل</button>`)
+        : nb
         ? (f.status !== 'done'
             ? `${canApproveBirth() ? `<button class="btn sm" data-nbok="${f.id}">✅ موافقة وإضافة</button>` : ''}<button class="btn sm danger" data-nbno="${f.id}">❌ رفض وحذف</button>`
             : `<span class="badge add">✓ أُضيف للشجرة</span> <button class="btn sm danger" data-fbdel="${f.id}">حذف السجل</button>`)
@@ -3099,8 +3156,38 @@ async function screenFeedbacks() {
   view().querySelectorAll('[data-fbreopen]').forEach(b => b.addEventListener('click', () => markFeedback(b.dataset.fbreopen, 'new')));
   view().querySelectorAll('[data-fbdel]').forEach(b => b.addEventListener('click', () => delFeedback(b.dataset.fbdel)));
   view().querySelectorAll('[data-fbreply]').forEach(b => b.addEventListener('click', () => replyModal(list.find(x => String(x.id) === b.dataset.fbreply))));
+  view().querySelectorAll('[data-rook]').forEach(b => b.addEventListener('click', () => approveReorder(list.find(x => String(x.id) === b.dataset.rook))));
+  view().querySelectorAll('[data-rono]').forEach(b => b.addEventListener('click', () => rejectReorder(list.find(x => String(x.id) === b.dataset.rono))));
   view().querySelectorAll('[data-nbok]').forEach(b => b.addEventListener('click', () => approveNewborn(list.find(x => String(x.id) === b.dataset.nbok))));
   view().querySelectorAll('[data-nbno]').forEach(b => b.addEventListener('click', () => rejectNewborn(list.find(x => String(x.id) === b.dataset.nbno))));
+}
+// اعتماد طلب «إعادة ترتيب الإخوان»: يتحقق من الصلاحية وثبات القائمة ثم يطبّق الترتيب،
+// وبعده يُفتح الرد الجاهز ليصل المرسلَ باسم الإدارة.
+async function approveReorder(f) {
+  const o = parseReorder(f); if (!o) { toast('بيانات الطلب غير صالحة'); return; }
+  const father = byId.get(o.father_id);
+  if (!father) { toast('لم يُعثر على الأب في الشجرة'); return; }
+  if (!canReorder(father)) { toast('ليست لديك صلاحية الترتيب لهذا الفرع'); return; }
+  const cur = childrenOf(father.id).map(c => c.id);
+  const same = cur.length === o.order.length &&
+    cur.slice().sort((a, b) => a - b).join(',') === o.order.slice().map(Number).sort((a, b) => a - b).join(',');
+  if (!same) { toast('تغيّرت قائمة الأبناء منذ إرسال الطلب — راجع الترتيب يدوياً من ملف الأب'); return; }
+  if (!(await confirm2('اعتماد الترتيب المقترح لأبناء «' + father.name + '»؟\n' + (o.names || []).map((n, i) => (i + 1) + '. ' + n).join('\n'), { title: 'اعتماد إعادة الترتيب', okText: 'اعتماد وتطبيق' }))) return;
+  const who = (me && (me.full_name || me.username)) || '';
+  const ok = await guard(async () => {
+    for (let i = 0; i < o.order.length; i++) {
+      const { error } = await sb.from('almfrje_persons').update({ sort: i + 1, updated_by_name: who, updated_at: new Date().toISOString() }).eq('id', Number(o.order[i]));
+      if (error) throw error;
+    }
+    await fbApi('done', f.id);
+  });
+  if (ok) { toast('اعتُمد الترتيب وطُبّق ✓'); await loadAll(); screenFeedbacks(); replyModal(f); }
+}
+// رفض الطلب: يُعلَّم «تم» (لا يُحذف) ثم يُفتح الرد ليُبلَّغ المرسل باسم الإدارة.
+async function rejectReorder(f) {
+  if (!(await confirm2('رفض طلب إعادة الترتيب؟ سيبقى في السجل معلَّماً «تم»، ويمكنك الرد على مرسله.', { title: 'رفض الطلب', okText: 'رفض', danger: true }))) return;
+  const ok = await guard(async () => { await fbApi('done', f.id); });
+  if (ok) { toast('رُفض الطلب'); screenFeedbacks(); replyModal(f); }
 }
 // موافقة المدير/مشرف الفرع على طلب إضافة مولود → يُضاف فعلياً للشجرة.
 async function approveNewborn(f) {
@@ -4127,7 +4214,7 @@ const GUIDE = [
     { t: 'قسم الوثائق', fn: 'عرض الوثائق التاريخية الأصلية للقبيلة.', brief: 'بطاقة بالرئيسية تفتح قسم الوثائق (صفحة عرضٍ ثلاثية الأبعاد).', det: 'كل وثيقة تُعرض في إطارٍ مجسّم مع «فتح بالحجم الكامل» للتكبير (وسهم رجوع)، وتحتها تفريغ نصّها إن وُجد (يُخفى إن تُرك فارغاً). أولها «📜 وثيقة لزمة ولد حسين عام ١١٧٣هـ في فارع الناصبية». يستطيع المدير إضافة وثيقة جديدة أو تعديل عنوانها/صورتها/نصّها أو حذفها.' },
   ]},
   { sec: '✉️ ملاحظات الزوار', items: [
-    { t: 'إرسال ملاحظة للإدارة', fn: 'إبلاغ الإدارة بخطأ أو طلب إضافة/تصحيح.', brief: 'يُؤخذ اسمك الذي دخلت به تلقائياً، وتكتب ملاحظتك.', det: 'طلب إضافة مولود يصل منظّماً (اسم الأب والمولود وسنة الولادة والمدينة)، فيوافق عليه المدير أو مشرف الفرع بعد رسائل تأكيدية وكتابة كلمة «اضافة».' },
+    { t: 'إرسال ملاحظة للإدارة', fn: 'إبلاغ الإدارة بخطأ أو طلب إضافة/تصحيح/ترتيب.', brief: 'يُؤخذ اسمك الذي دخلت به تلقائياً، وتختار الموضوع: إضافة مولود • ملاحظة • اقتراح • إعادة ترتيب الإخوان.', det: 'طلب إضافة مولود يصل منظّماً فيوافق عليه المدير أو المشرف بعد تأكيدات. وطلب «إعادة ترتيب الإخوان»: تختار الأب فتظهر قائمة أبنائه ترتّبها بالسهمين ▲▼ ثم ترسلها، فتعتمدها الإدارة أو ترفضها مع ردٍّ يصلك باسمها.' },
   ]},
   { sec: '🔐 دخول الإدارة والصلاحيات', role: 'admin', items: [
     { t: 'دخول المسؤول / مشرف الفرع', fn: 'دخول الإدارة لإضافة البيانات وتعديلها.', brief: 'من «المزيد ← دخول المسؤول / مشرف الفرع» بالجوال أو اسم المستخدم والرقم السري.', det: 'مدير النظام له صلاحية كاملة على كل الأقسام. مشرف الفرع يضيف ويعدّل ضمن فرعه المصرّح به فقط، ولا يرى أقسام الإدارة العامة. شاشة دخول الإدارة لا تظهر عبر رابطٍ مُرسَل أبداً — أي رابطٍ يُفتح يعرض دخول الزائر فقط.' },
@@ -4383,6 +4470,7 @@ function screenTexts() {
       ${fTextarea('👶 ردود «إضافة مولود»', 'tx_rb_newborn', (Array.isArray(replyBank['إضافة مولود']) ? replyBank['إضافة مولود'] : []).join('\n'))}
       ${fTextarea('📝 ردود «ملاحظة»', 'tx_rb_note', (Array.isArray(replyBank['ملاحظة']) ? replyBank['ملاحظة'] : []).join('\n'))}
       ${fTextarea('💡 ردود «اقتراح»', 'tx_rb_sugg', (Array.isArray(replyBank['اقتراح']) ? replyBank['اقتراح'] : []).join('\n'))}
+      ${fTextarea('↕️ ردود «إعادة ترتيب الإخوان»', 'tx_rb_reorder', (Array.isArray(replyBank['إعادة ترتيب الإخوان']) ? replyBank['إعادة ترتيب الإخوان'] : []).join('\n'))}
       <button class="btn sm" id="tx_rbSave" style="margin-top:6px">حفظ بنك الردود</button>
       <button class="btn sm outline" id="tx_rbReset" style="margin-top:6px">استرجاع الافتراضي</button></div>
     <div class="card"><h3>🌿 ترحيب الزائر — عند نجاح التحقق ${hintBtn('guest_ok')}</h3>
@@ -4531,7 +4619,7 @@ function screenTexts() {
   // بنك الردود الجاهزة: كل سطرٍ في الحقل = ردّ مستقل
   const rbLines = (idv) => val(idv).split('\n').map(s => s.trim()).filter(Boolean);
   document.getElementById('tx_rbSave').addEventListener('click', async () => {
-    const bank = { 'إضافة مولود': rbLines('tx_rb_newborn'), 'ملاحظة': rbLines('tx_rb_note'), 'اقتراح': rbLines('tx_rb_sugg') };
+    const bank = { 'إضافة مولود': rbLines('tx_rb_newborn'), 'ملاحظة': rbLines('tx_rb_note'), 'اقتراح': rbLines('tx_rb_sugg'), 'إعادة ترتيب الإخوان': rbLines('tx_rb_reorder') };
     const ok = await guard(async () => { const { error } = await sb.from('almfrje_settings').upsert({ key: 'reply_bank', value: bank, updated_at: new Date().toISOString() }, { onConflict: 'key' }); if (error) throw error; });
     if (ok) { replyBank = bank; toast('تم حفظ بنك الردود'); }
   });

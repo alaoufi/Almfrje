@@ -71,7 +71,7 @@ export async function POST(request: NextRequest) {
   const whoName = mem.full_name || mem.username || '';
 
   type Row = { id: number; subject: string; branch_id: number | null; details: string; status: string };
-  const canTouch = (r: Row) => isAdmin || (isMgr && ['إضافة مولود', 'ملاحظة'].includes(r.subject) && (allBranches || (r.branch_id != null && myBranches.has(Number(r.branch_id)))));
+  const canTouch = (r: Row) => isAdmin || (isMgr && ['إضافة مولود', 'ملاحظة', 'إعادة ترتيب الإخوان'].includes(r.subject) && (allBranches || (r.branch_id != null && myBranches.has(Number(r.branch_id)))));
 
   if (action === 'list' || action === 'count') {
     const { data, error } = await admin.from('almfrje_feedback').select('*').order('created_at', { ascending: false }).limit(3000);

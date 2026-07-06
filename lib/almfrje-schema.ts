@@ -354,8 +354,8 @@ export const ALMFRJE_SCHEMA_SQL = `
       -- ختم إصدار المخطط: يرتفع مع كل تعديلٍ للمخطط، ووجوده بالقيمة الأحدث في القاعدة
       -- دليلٌ قاطع أن قناة الترقية التلقائية (/api/almfrje-setup) تعمل.
       INSERT INTO public.almfrje_settings (key, value)
-        VALUES ('schema_rev', '"2026-07-06-4"'::jsonb)
-        ON CONFLICT (key) DO UPDATE SET value = '"2026-07-06-4"'::jsonb, updated_at = now();
+        VALUES ('schema_rev', '"2026-07-06-5"'::jsonb)
+        ON CONFLICT (key) DO UPDATE SET value = '"2026-07-06-5"'::jsonb, updated_at = now();
 
       -- ملاحظات الزوار: يرسلها أي زائر/عضو، ويراجعها المدير ويضع علامة «تم».
       CREATE TABLE IF NOT EXISTS public.almfrje_feedback (
@@ -380,9 +380,9 @@ export const ALMFRJE_SCHEMA_SQL = `
       ALTER TABLE public.almfrje_feedback ENABLE ROW LEVEL SECURITY;
       DROP POLICY IF EXISTS feedback_ins ON public.almfrje_feedback; CREATE POLICY feedback_ins ON public.almfrje_feedback FOR INSERT WITH CHECK (true);
       -- المدير يرى كل الملاحظات؛ ومسؤول الفرع يرى/يعالج «إضافة مولود» و«ملاحظة» ضمن فروعه فقط (للموافقة/الإجراء).
-      DROP POLICY IF EXISTS feedback_sel ON public.almfrje_feedback; CREATE POLICY feedback_sel ON public.almfrje_feedback FOR SELECT USING (public.almfrje_is_admin() OR (subject in ('إضافة مولود','ملاحظة') AND public.almfrje_is_supervisor() AND public.almfrje_manages_branch(branch_id)));
-      DROP POLICY IF EXISTS feedback_upd ON public.almfrje_feedback; CREATE POLICY feedback_upd ON public.almfrje_feedback FOR UPDATE USING (public.almfrje_is_admin() OR (subject in ('إضافة مولود','ملاحظة') AND public.almfrje_is_supervisor() AND public.almfrje_manages_branch(branch_id))) WITH CHECK (public.almfrje_is_admin() OR (subject in ('إضافة مولود','ملاحظة') AND public.almfrje_is_supervisor() AND public.almfrje_manages_branch(branch_id)));
-      DROP POLICY IF EXISTS feedback_del ON public.almfrje_feedback; CREATE POLICY feedback_del ON public.almfrje_feedback FOR DELETE USING (public.almfrje_is_admin() OR (subject in ('إضافة مولود','ملاحظة') AND public.almfrje_is_supervisor() AND public.almfrje_manages_branch(branch_id)));
+      DROP POLICY IF EXISTS feedback_sel ON public.almfrje_feedback; CREATE POLICY feedback_sel ON public.almfrje_feedback FOR SELECT USING (public.almfrje_is_admin() OR (subject in ('إضافة مولود','ملاحظة','إعادة ترتيب الإخوان') AND public.almfrje_is_supervisor() AND public.almfrje_manages_branch(branch_id)));
+      DROP POLICY IF EXISTS feedback_upd ON public.almfrje_feedback; CREATE POLICY feedback_upd ON public.almfrje_feedback FOR UPDATE USING (public.almfrje_is_admin() OR (subject in ('إضافة مولود','ملاحظة','إعادة ترتيب الإخوان') AND public.almfrje_is_supervisor() AND public.almfrje_manages_branch(branch_id))) WITH CHECK (public.almfrje_is_admin() OR (subject in ('إضافة مولود','ملاحظة','إعادة ترتيب الإخوان') AND public.almfrje_is_supervisor() AND public.almfrje_manages_branch(branch_id)));
+      DROP POLICY IF EXISTS feedback_del ON public.almfrje_feedback; CREATE POLICY feedback_del ON public.almfrje_feedback FOR DELETE USING (public.almfrje_is_admin() OR (subject in ('إضافة مولود','ملاحظة','إعادة ترتيب الإخوان') AND public.almfrje_is_supervisor() AND public.almfrje_manages_branch(branch_id)));
       GRANT INSERT ON public.almfrje_feedback TO anon, authenticated;
       GRANT SELECT, UPDATE, DELETE ON public.almfrje_feedback TO authenticated;
 
