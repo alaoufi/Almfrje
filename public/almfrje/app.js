@@ -1994,7 +1994,9 @@ function screenTree(arg) {
   const rs = roots();
   let rootId = parseInt(arg, 10);
   // افتراض المشرف: فرعه عند فتح الشجرة بلا تحديد، مع تفعيل التتبّع.
-  if ((!arg || !byId.has(rootId)) && !isAdmin() && isManager() && !getTracked()) { const b = myBranches()[0], r = b && branchRoot(b); if (r) { setTracked(b); rootId = r.id; } }
+  // التتبّع التلقائي لمشرف الفرع فقط (فرعه محدّد). المشرف العام يتنقّل بين كل الفروع
+  // بلا تثبيت — التثبيت التلقائي كان يعلّقه على أول فرعٍ بالقائمة (مرزوق) أينما ذهب.
+  if ((!arg || !byId.has(rootId)) && !isAdmin() && isManager() && !isGeneralManager() && !getTracked()) { const b = myBranches()[0], r = b && branchRoot(b); if (r) { setTracked(b); rootId = r.id; } }
   if (!rootId || !byId.has(rootId)) rootId = rs.length ? rs[0].id : 0;
   if (!rootId) { view().innerHTML = '<div class="center-empty">لا توجد بيانات بعد.</div>'; return; }
   const rootOpts = rs.map(r => ({ k: String(r.id), ar: r.name }));
@@ -5499,6 +5501,12 @@ async function enterApp(session) {
   showLoading(true);
   let { data: mem } = await sb.from('almfrje_members').select('*').eq('user_id', session.user.id).maybeSingle();
   me = mem || { user_id: session.user.id, full_name: '', role: 'viewer', is_active: false, perms: {} };
+  // علاجٌ لمرة واحدة: التتبّع الذي ثُبّت تلقائياً بالخطأ للمشرف العام (كان يعلّقه على فرع مرزوق)
+  try {
+    if (isGeneralManager() && localStorage.getItem('almfrje_track_healed') !== '1') {
+      localStorage.setItem('almfrje_track_healed', '1'); setTracked(0);
+    }
+  } catch (e) { /* */ }
   // المدير: شغّل ترقية المخطّط بتوكنه (idempotent) فتُطبَّق تحديثات البنية الجديدة تلقائياً (مثل دور «مشرف عام»).
   if (me.role === 'admin' && me.is_active) {
     try {
