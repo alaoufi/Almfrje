@@ -680,6 +680,7 @@ const ROUTES = {
   audit: { t: 'سجل التعديلات', back: true, fn: screenAudit },
   hints: { t: 'تعديل التعليمات', back: true, fn: screenHints },
   texts: { t: 'النصوص', back: true, fn: screenTexts },
+  settings: { t: 'الإعدادات', back: true, fn: screenSettings },
   backups: { t: 'النسخ والتصدير', back: true, fn: screenBackups },
   profile: { t: 'ملفي الشخصي', back: true, fn: screenProfile },
   stats: { t: 'الإحصائيات', back: true, fn: screenStats },
@@ -718,6 +719,7 @@ function addFab(label, onClick) { const f = document.createElement('button'); f.
 const ADMIN_TABS = [
   ['members', '👥 المستخدمون', '#/members'],
   ['branchadmin', '🗂️ الفروع والمشرفون', '#/branchadmin'],
+  ['settings', '⚙️ الإعدادات', '#/settings'],
   ['texts', '📝 النصوص', '#/texts'],
   ['aboutedit', '📖 الصفحة التعريفية', '#/aboutedit'],
   ['hints', '💡 التعليمات', '#/hints'],
@@ -4287,9 +4289,10 @@ const GUIDE = [
     { t: 'كشف الأسماء المكرّرة', fn: 'إظهار تكرار اسمٍ لأكثر من ابنٍ لنفس الأب.', brief: 'قائمة بالحالات المتشابهة لمراجعتها.', det: 'لا يُحتسب التكرار إن كان أحد المتشابهين متوفّى؛ فقط عند كونهما حيَّيْن.' },
   ]},
   { sec: '⚙️ لوحة التحكم (لمدير النظام)', role: 'admin', items: [
-    { t: 'المستخدمون والصلاحيات', fn: 'إدارة الحسابات والأدوار والصلاحيات الدقيقة.', brief: 'إضافة/تفعيل/إيقاف المستخدمين، وتحديد أدوارهم وفروعهم وصلاحياتهم.', det: 'الأدوار: مدير النظام (كل شيء) • مشرف عام (كل الفروع أو فروعٍ تحدّدها) • مشرف فرع (فروعه المحدّدة) • زائر (تصفّح). عند إضافة مستخدم يُختار اسمه من الشجرة بالبحث (يُطابَق باسمٍ مسجَّل، ولا بدّ أن يكون حيّاً)، ثم يُحدَّد رقم جواله ورقمه السري. وللمشرفَين تُحدَّد الفروع والصلاحيات داخلها: إضافة مولود، تأكيد إضافة مولود، تعديل ترتيب الأبناء، تعديل الملف الشخصي (الجوال/الحالة/الحالة الوظيفية/المدينة…). يطّلع المشرف على فروعه ويتّخذ الإجراء فيها بكامل المسؤولية، ويُذكَّر عند الحفظ بأنّ ما يُضيفه/يعدّله مسجَّلٌ باسمه. كل إجراء يُسجَّل باسم من قام به ووقته. أدوات إدارة الموقع للمدير وحده. ومن هنا أيضاً «فتح الموقع للزوّار» وما يُخفى عن الزائر.' },
+    { t: 'المستخدمون والصلاحيات', fn: 'إدارة الحسابات والأدوار والصلاحيات الدقيقة.', brief: 'إضافة/تفعيل/إيقاف المستخدمين، وتحديد أدوارهم وفروعهم وصلاحياتهم.', det: 'الأدوار: مدير النظام (كل شيء) • مشرف عام (كل الفروع أو فروعٍ تحدّدها) • مشرف فرع (فروعه المحدّدة) • زائر (تصفّح). عند إضافة مستخدم يُختار اسمه من الشجرة بالبحث (يُطابَق باسمٍ مسجَّل، ولا بدّ أن يكون حيّاً)، ثم يُحدَّد رقم جواله ورقمه السري. وللمشرفَين تُحدَّد الفروع والصلاحيات داخلها: إضافة مولود، تأكيد إضافة مولود، تعديل ترتيب الأبناء، تعديل الملف الشخصي (الجوال/الحالة/الحالة الوظيفية/المدينة…). يطّلع المشرف على فروعه ويتّخذ الإجراء فيها بكامل المسؤولية، ويُذكَّر عند الحفظ بأنّ ما يُضيفه/يعدّله مسجَّلٌ باسمه. كل إجراء يُسجَّل باسم من قام به ووقته. أدوات إدارة الموقع للمدير وحده.' },
+    { t: 'الإعدادات', fn: 'مفاتيح تشغيل الموقع مجموعةً في مكانٍ واحد.', brief: 'التحكم ← ⚙️ الإعدادات.', det: 'فتح/إغلاق الموقع للزوّار وما يُخفى عنهم والتحقّق بالاسم • إظهار/إخفاء بطاقة «آخر الإضافات» وتصفيرها • إحصائيات الزيارات (الإجمالي/حسب الفرع/حسب المنطقة) وتصفيرها.' },
     { t: 'الفروع والمشرفون', fn: 'تعريف الفروع وتعيين مشرفيها.', brief: 'عيّن أي جدٍّ كفرع وحدّد مشرفيه.', det: 'الفرع = جدّ وكل ذرّيته. كل مشرف يرى ويضيف في فرعه فقط.' },
-    { t: 'النصوص', fn: 'تحرير نصوص الواجهة الظاهرة للجميع.', brief: 'عنوان الموقع وسطر «powered by» وكلمة المناسبات وتهنئة المناسبات وبطاقة الملاحظات ودعوة الزائر ورسالة الشكر وترحيب الزائر وألوان الحالة.', det: 'وفيها إحصائيات الزيارات (الإجمالي/حسب الفرع/حسب المنطقة) وتصفير الزيارات وتصفير «آخر الإضافات». «كلمة المناسبات» تظهر تحت عنوان شاشة الدخول بخط غامق ولونٍ تختاره. و«تهنئة/مبارَكة المناسبات» رسالةٌ من الإدارة تظهر بعد الدخول مباشرةً وكشريطٍ ذهبي أعلى الرئيسية: تختار نصّها ولون خطّها، ووقت نشرها (فوري أو بتوقيتٍ محدّد بيومٍ وساعة)، ومدّة عرضها (بالساعات أو الأيام، أو دائمة)، وعنوان شريطها (الافتراضي «🎊 تهنئة من الإدارة» أو عنوان مخصّص أو بدون عنوان)، مع تعديلها أو حذفها في أي وقت.' },
+    { t: 'النصوص', fn: 'تحرير نصوص الواجهة الظاهرة للجميع.', brief: 'عنوان الموقع وسطر «powered by» وكلمة المناسبات وتهنئة المناسبات وبطاقة الملاحظات ودعوة الزائر ورسالة الشكر وترحيب الزائر وألوان الحالة.', det: '«كلمة المناسبات» تظهر تحت عنوان شاشة الدخول بخط غامق ولونٍ تختاره. و«تهنئة/مبارَكة المناسبات» رسالةٌ من الإدارة تظهر بعد الدخول مباشرةً وكشريطٍ ذهبي أعلى الرئيسية: تختار نصّها ولون خطّها، ووقت نشرها (فوري أو بتوقيتٍ محدّد بيومٍ وساعة)، ومدّة عرضها (بالساعات أو الأيام، أو دائمة)، وعنوان شريطها (الافتراضي «🎊 تهنئة من الإدارة» أو عنوان مخصّص أو بدون عنوان)، مع تعديلها أو حذفها في أي وقت.' },
     { t: 'الصفحة التعريفية', fn: 'تحرير صفحة «نبذة تعريفية».', brief: 'محرّر نصٍّ غني بأدوات تنسيق الخطوط.', det: 'غامق/مائل/تسطير، حجم ولون الخط، المحاذاة، نقاط، عنوان، مع معاينة وحفظ واسترجاع الافتراضي.' },
     { t: 'التعليمات', fn: 'تعديل نصوص أزرار التعليمات (ⓘ).', brief: 'لكل ميزة نصّ تعليمة قابل للتعديل.', det: 'عدّل النص واحفظ، أو «استرجاع الأصلي» لإعادة النص الافتراضي.' },
     { t: 'سجل التعديلات', fn: 'سجلّ من قام بالتعديل وإمكانية التراجع.', brief: 'يحفظ آخر تعديل لكل شخص فقط.', det: 'يُرجع إليه عند الخلاف، ويمكن التراجع عن أي تعديل، وتصفير السجل بالكامل.' },
@@ -4444,7 +4447,8 @@ function screenAboutEdit() {
 }
 
 /* ===== النصوص: نص الرئيسية + تعريف ألوان الحالة (للمدير) ===== */
-function screenTexts() {
+// ⚙️ الإعدادات — مفاتيح تشغيل الموقع مجموعةً في مكانٍ واحد (بدل تناثرها)
+function screenSettings() {
   if (!isAdmin()) { view().innerHTML = noPerm(); return; }
   const vb = visitStats.byBranch || {}, vc = visitStats.byCity || {};
   const branchRows = Object.keys(vb).length
@@ -4453,6 +4457,65 @@ function screenTexts() {
   const cityRows = Object.keys(vc).length
     ? Object.entries(vc).sort((a, b) => b[1] - a[1]).map(([c, n]) => `<div class="row"><span class="k">📍 ${esc(c)}</span><span class="v">${n}</span></div>`).join('')
     : '<div class="muted" style="font-size:.85rem;padding:4px 0">لا مناطق مسجّلة بعد.</div>';
+  view().innerHTML = adminTabBar('settings') + `
+    <div class="card"><div class="li-title">👁 فتح الموقع للزوّار (تصفّح مباشر) ${hintBtn('guest_browse')}</div>
+      <div class="li-sub">${guestOpen ? 'مفتوح — يدخل الزائر مباشرةً للتصفّح (قراءة فقط) دون تسجيل. دخول الإدارة من «المزيد ← دخول المسؤول».' : 'مغلق — تظهر شاشة الدخول للجميع (للمسؤولين فقط).'}</div>
+      <button class="btn sm ${guestOpen ? 'danger' : ''}" id="guestToggle" style="margin-top:6px">${guestOpen ? '🔒 إغلاق الموقع عن الزوّار' : '👁 فتح الموقع للزوّار'}</button>
+      ${guestOpen ? `<div style="margin-top:10px"><div class="li-sub" style="font-weight:700;margin-bottom:4px">ماذا يُخفى عن الزائر؟</div>
+        <label class="perm-chk"><input type="checkbox" data-ghide="phone" ${guestHide.phone ? 'checked' : ''}><span>أرقام الجوال والبريد</span></label>
+        <label class="perm-chk"><input type="checkbox" data-ghide="media" ${guestHide.media ? 'checked' : ''}><span>الصور والمستندات</span></label>
+        <label class="perm-chk"><input type="checkbox" data-ghide="notes" ${guestHide.notes ? 'checked' : ''}><span>الملاحظات والحالة الوظيفية</span></label>
+        <div class="muted" style="font-size:.78rem;margin-top:4px">تُحفظ التغييرات فور التأشير. الأسماء والنسب والأجيال والمدن وتواريخ الميلاد/الوفاة تبقى ظاهرة.</div>
+        <div style="margin-top:12px;border-top:1px solid var(--line,#e5e5e5);padding-top:10px"><div class="li-sub" style="font-weight:700;margin-bottom:4px">🔐 تحقّق دخول الزائر بالاسم</div>
+          <div class="muted" style="font-size:.78rem;margin-bottom:8px;line-height:1.9">عند التفعيل: يكتب الزائر اسمه ثم آباءه، ويدخل <b>تلقائياً بلا زر</b> بمجرد أن يصبح اسمه مميّزاً (غير مكرّر). وإن تكرّر يُطلب اسم جدٍّ إضافي تلقائياً حتى يتفرّد. (تُتجاهل المسافة و«بن»/«ابن»/«ال» والهمزات، وصاحب الاسم يجب أن يكون حيّاً.)</div>
+          <label class="perm-chk"><input type="checkbox" id="guestVerifyChk" ${guestGens > 0 ? 'checked' : ''}><span>اشتراط التحقّق بالاسم قبل دخول الزائر</span></label>
+        </div></div>` : ''}</div>
+    <div class="card"><div class="li-title">🕘 بطاقة «آخر الإضافات» في الرئيسية</div>
+      <div class="li-sub">${recentShow ? 'ظاهرة للجميع حالياً.' : 'مخفية عن الجميع حالياً (يراها المدير وحده بملاحظة).'} والتصفير يبدأ عدّ الإضافات من جديد دون حذف أي بيانات.</div>
+      <button class="btn sm ${recentShow ? 'outline' : ''}" id="recent_toggle" style="margin-top:6px">${recentShow ? '🙈 إخفاء «آخر الإضافات» عن الجميع' : '👁 إظهار «آخر الإضافات» للجميع'}</button>
+      <button class="btn sm outline" id="recent_reset" style="margin-top:6px">↺ تصفير «آخر الإضافات»</button></div>
+<div class="card"><h3>📊 إحصائيات الزيارات</h3>
+      <div class="row"><span class="k">إجمالي من دخل الموقع</span><span class="v" style="font-size:1.2rem;color:var(--brand)" id="visitsTotalSt">${visitStats.total || 0}</span></div>
+      <div class="row"><span class="k">🟢 المتواجدون الآن</span><span class="v" style="font-size:1.2rem;color:#1c8b4d" id="onlineNowSt">${onlineNow}</span></div>
+      <div class="li-sub" style="margin-top:6px;font-weight:800;color:var(--text)">المتواجدون الآن حسب الفرع</div>
+      <div id="onlineByBranchSt"><div class="muted" style="font-size:.85rem;padding:4px 0">…</div></div>
+      <div class="li-sub" style="margin-top:10px;font-weight:800;color:var(--text)">إجمالي الزيارات حسب الفرع</div>${branchRows}
+      <div class="li-sub" style="margin-top:10px;font-weight:800;color:var(--text)">حسب المنطقة (المدينة)</div>${cityRows}
+      <button class="btn sm danger" id="visits_reset" style="margin-top:10px">↺ تصفير إحصاء الزيارات</button>
+            <p class="muted" style="font-size:.78rem;margin-top:6px">يُحتسب كل من يدخل الموقع (زائر/مشرف/مدير). «المتواجدون الآن» = نشِطون خلال آخر ٣ دقائق.</p></div>
+    `;
+  const gTg = document.getElementById('guestToggle');
+  if (gTg) gTg.addEventListener('click', async () => {
+    const ok = await guard(async () => { const { error } = await sb.from('almfrje_settings').upsert({ key: 'guest_open', value: !guestOpen, updated_at: new Date().toISOString() }, { onConflict: 'key' }); if (error) throw error; });
+    if (ok) { guestOpen = !guestOpen; toast(guestOpen ? 'الموقع مفتوح للزوّار' : 'الموقع مغلق (للمسؤولين فقط)'); screenSettings(); }
+  });
+  view().querySelectorAll('input[data-ghide]').forEach(cb => cb.addEventListener('change', async () => {
+    const next = Object.assign({ ...GUEST_HIDE_DEFAULT }, guestHide, { [cb.dataset.ghide]: cb.checked });
+    const ok = await guard(async () => { const { error } = await sb.from('almfrje_settings').upsert({ key: 'guest_hide', value: next, updated_at: new Date().toISOString() }, { onConflict: 'key' }); if (error) throw error; });
+    if (ok) { guestHide = next; toast('تم الحفظ'); } else { cb.checked = !cb.checked; }
+  }));
+  const gvc = document.getElementById('guestVerifyChk');
+  if (gvc) gvc.addEventListener('change', async () => {
+    const n = gvc.checked ? 2 : 0;   // 2 = تحقّق تلقائي (اسمان فأكثر حتى التميّز)؛ 0 = دخول مباشر
+    const ok = await guard(async () => { const { error } = await sb.from('almfrje_settings').upsert({ key: 'guest_verify_gens', value: n, updated_at: new Date().toISOString() }, { onConflict: 'key' }); if (error) throw error; });
+    if (ok) { guestGens = n; toast(n > 0 ? 'فُعِّل التحقّق بالاسم (دخول تلقائي عند التميّز)' : 'أُلغي التحقّق (دخول مباشر)'); } else { gvc.checked = !gvc.checked; }
+  });
+  { const rb = document.getElementById('visits_reset'); if (rb) rb.addEventListener('click', async () => {
+    if (!(await confirm2('تصفير إحصاء الزيارات بالكامل؟ يبدأ العدّ من جديد.', { title: 'تصفير الزيارات', okText: 'تصفير', danger: true }))) return;
+    const ok = await guard(async () => { const { error } = await sb.from('almfrje_settings').upsert({ key: 'visit_stats', value: { total: 0, byBranch: {}, byCity: {}, updated_at: new Date().toISOString() }, updated_at: new Date().toISOString() }, { onConflict: 'key' }); if (error) throw error; });
+    if (ok) { visitStats = { total: 0, byBranch: {}, byCity: {} }; toast('تم تصفير الزيارات'); screenSettings(); }
+  }); }
+  pingPresence(false);   // تحديث «المتواجدون الآن» وتفصيلهم حسب الفرع عند فتح البطاقة
+  { const rrc = document.getElementById('recent_reset'); if (rrc) rrc.addEventListener('click', resetRecent); }
+  { const rtg = document.getElementById('recent_toggle'); if (rtg) rtg.addEventListener('click', async () => {
+    const nv = !recentShow;
+    const ok = await guard(async () => { const { error } = await sb.from('almfrje_settings').upsert({ key: 'recent_show', value: nv, updated_at: new Date().toISOString() }, { onConflict: 'key' }); if (error) throw error; });
+    if (ok) { recentShow = nv; toast(nv ? 'بطاقة «آخر الإضافات» ظاهرة للجميع' : 'أُخفيت «آخر الإضافات» عن الجميع'); screenSettings(); }
+  }); }
+}
+function screenTexts() {
+  if (!isAdmin()) { view().innerHTML = noPerm(); return; }
+
   view().innerHTML = adminTabBar('texts') + `
     <div class="tx-group txg-0${txOpen.has(0) ? ' open' : ''}"><button class="tx-group-title" data-txg="0"><span class="txg-ico">${txOpen.has(0) ? '▾' : '▸'}</span><span class="txg-label">🏠 الرئيسية والهوية</span><span class="txg-count">4</span></button><div class="tx-group-items"><div class="card"><h3>🏷️ عنوان الموقع وسطر «powered by» ${hintBtn('site_title')}</h3>
       <p class="muted" style="font-size:.85rem;margin-top:-2px">يظهران في شاشات الدخول (الزائر والمسؤول) وفي تذييل قائمة «المزيد».</p>
@@ -4526,18 +4589,7 @@ function screenTexts() {
       ${fTextarea('↕️ ردود «إعادة ترتيب الإخوان»', 'tx_rb_reorder', (Array.isArray(replyBank['إعادة ترتيب الإخوان']) ? replyBank['إعادة ترتيب الإخوان'] : []).join('\n'))}
       <button class="btn sm" id="tx_rbSave" style="margin-top:6px">حفظ بنك الردود</button>
       <button class="btn sm outline" id="tx_rbReset" style="margin-top:6px">استرجاع الافتراضي</button></div>
-    </div></div><div class="tx-group txg-4${txOpen.has(4) ? ' open' : ''}"><button class="tx-group-title" data-txg="4"><span class="txg-ico">${txOpen.has(4) ? '▾' : '▸'}</span><span class="txg-label">📊 الإحصاء وألوان الحالة</span><span class="txg-count">2</span></button><div class="tx-group-items"><div class="card"><h3>📊 إحصائيات الزيارات</h3>
-      <div class="row"><span class="k">إجمالي من دخل الموقع</span><span class="v" style="font-size:1.2rem;color:var(--brand)" id="visitsTotalSt">${visitStats.total || 0}</span></div>
-      <div class="row"><span class="k">🟢 المتواجدون الآن</span><span class="v" style="font-size:1.2rem;color:#1c8b4d" id="onlineNowSt">${onlineNow}</span></div>
-      <div class="li-sub" style="margin-top:6px;font-weight:800;color:var(--text)">المتواجدون الآن حسب الفرع</div>
-      <div id="onlineByBranchSt"><div class="muted" style="font-size:.85rem;padding:4px 0">…</div></div>
-      <div class="li-sub" style="margin-top:10px;font-weight:800;color:var(--text)">إجمالي الزيارات حسب الفرع</div>${branchRows}
-      <div class="li-sub" style="margin-top:10px;font-weight:800;color:var(--text)">حسب المنطقة (المدينة)</div>${cityRows}
-      <button class="btn sm danger" id="visits_reset" style="margin-top:10px">↺ تصفير إحصاء الزيارات</button>
-      <button class="btn sm outline" id="recent_reset" style="margin-top:10px">↺ تصفير «آخر الإضافات»</button>
-      <button class="btn sm ${recentShow ? 'outline' : ''}" id="recent_toggle" style="margin-top:10px">${recentShow ? '🙈 إخفاء «آخر الإضافات» عن الجميع' : '👁 إظهار «آخر الإضافات» للجميع'}</button>
-      <p class="muted" style="font-size:.78rem;margin-top:6px">يُحتسب كل من يدخل الموقع (زائر/مشرف/مدير). «المتواجدون الآن» = نشِطون خلال آخر ٣ دقائق. وتصفير «آخر الإضافات» يبدأ عدّ الإضافات من جديد دون حذف بيانات.</p></div>
-    <div class="card"><h3>🎨 تعريف ألوان الحالة ${hintBtn('status_labels')}</h3>
+    </div></div><div class="tx-group txg-4${txOpen.has(4) ? ' open' : ''}"><button class="tx-group-title" data-txg="4"><span class="txg-ico">${txOpen.has(4) ? '▾' : '▸'}</span><span class="txg-label">🎨 ألوان الحالة</span><span class="txg-count">1</span></button><div class="tx-group-items"><div class="card"><h3>🎨 تعريف ألوان الحالة ${hintBtn('status_labels')}</h3>
       <p class="muted" style="font-size:.85rem;margin-top:-2px">تظهر دلالة الألوان أسفل قوائم الشجرة (الشجرة/العرض الهرمي/الأعمدة/الذرية). عدّل المسميات كما تريد.</p>
       ${fInput('الاسم بلون عادي يعني', 'tx_alive', statLabels.alive)}
       ${fInput('الاسم بلون رمادي يعني', 'tx_dead', statLabels.dead)}
@@ -4555,18 +4607,7 @@ function screenTexts() {
     if (open) txOpen.add(gi); else txOpen.delete(gi);
     const ico = b.querySelector('.txg-ico'); if (ico) ico.textContent = open ? '▾' : '▸';
   }));
-  { const rb = document.getElementById('visits_reset'); if (rb) rb.addEventListener('click', async () => {
-    if (!(await confirm2('تصفير إحصاء الزيارات بالكامل؟ يبدأ العدّ من جديد.', { title: 'تصفير الزيارات', okText: 'تصفير', danger: true }))) return;
-    const ok = await guard(async () => { const { error } = await sb.from('almfrje_settings').upsert({ key: 'visit_stats', value: { total: 0, byBranch: {}, byCity: {}, updated_at: new Date().toISOString() }, updated_at: new Date().toISOString() }, { onConflict: 'key' }); if (error) throw error; });
-    if (ok) { visitStats = { total: 0, byBranch: {}, byCity: {} }; toast('تم تصفير الزيارات'); screenTexts(); }
-  }); }
-  pingPresence(false);   // تحديث «المتواجدون الآن» وتفصيلهم حسب الفرع عند فتح البطاقة
-  { const rrc = document.getElementById('recent_reset'); if (rrc) rrc.addEventListener('click', resetRecent); }
-  { const rtg = document.getElementById('recent_toggle'); if (rtg) rtg.addEventListener('click', async () => {
-    const nv = !recentShow;
-    const ok = await guard(async () => { const { error } = await sb.from('almfrje_settings').upsert({ key: 'recent_show', value: nv, updated_at: new Date().toISOString() }, { onConflict: 'key' }); if (error) throw error; });
-    if (ok) { recentShow = nv; toast(nv ? 'بطاقة «آخر الإضافات» ظاهرة للجميع' : 'أُخفيت «آخر الإضافات» عن الجميع'); screenTexts(); }
-  }); }
+
   document.getElementById('tx_titleSave').addEventListener('click', async () => {
     const t = val('tx_title').trim(); const pw = val('tx_powered').trim();   // يُسمح بفراغ العنوان (لإخفائه)
     const ok = await guard(async () => {
@@ -5057,39 +5098,13 @@ function screenMembers() {
     <div class="card"><div class="li-title">➕ إضافة مستخدم جديد ${hintBtn('add_user')}</div>
       <div class="li-sub">أنشئ حساباً وحدّد الفروع التي يُشرف عليها وصلاحياته.</div>
       <button class="btn sm" id="addUserBtn" style="margin-top:6px">➕ إضافة مستخدم</button></div>
-    <div class="card"><div class="li-title">👁 فتح الموقع للزوّار (تصفّح مباشر) ${hintBtn('guest_browse')}</div>
-      <div class="li-sub">${guestOpen ? 'مفتوح — يدخل الزائر مباشرةً للتصفّح (قراءة فقط) دون تسجيل. دخول الإدارة من «المزيد ← دخول المسؤول».' : 'مغلق — تظهر شاشة الدخول للجميع (للمسؤولين فقط).'}</div>
-      <button class="btn sm ${guestOpen ? 'danger' : ''}" id="guestToggle" style="margin-top:6px">${guestOpen ? '🔒 إغلاق الموقع عن الزوّار' : '👁 فتح الموقع للزوّار'}</button>
-      ${guestOpen ? `<div style="margin-top:10px"><div class="li-sub" style="font-weight:700;margin-bottom:4px">ماذا يُخفى عن الزائر؟</div>
-        <label class="perm-chk"><input type="checkbox" data-ghide="phone" ${guestHide.phone ? 'checked' : ''}><span>أرقام الجوال والبريد</span></label>
-        <label class="perm-chk"><input type="checkbox" data-ghide="media" ${guestHide.media ? 'checked' : ''}><span>الصور والمستندات</span></label>
-        <label class="perm-chk"><input type="checkbox" data-ghide="notes" ${guestHide.notes ? 'checked' : ''}><span>الملاحظات والحالة الوظيفية</span></label>
-        <div class="muted" style="font-size:.78rem;margin-top:4px">تُحفظ التغييرات فور التأشير. الأسماء والنسب والأجيال والمدن وتواريخ الميلاد/الوفاة تبقى ظاهرة.</div>
-        <div style="margin-top:12px;border-top:1px solid var(--line,#e5e5e5);padding-top:10px"><div class="li-sub" style="font-weight:700;margin-bottom:4px">🔐 تحقّق دخول الزائر بالاسم</div>
-          <div class="muted" style="font-size:.78rem;margin-bottom:8px;line-height:1.9">عند التفعيل: يكتب الزائر اسمه ثم آباءه، ويدخل <b>تلقائياً بلا زر</b> بمجرد أن يصبح اسمه مميّزاً (غير مكرّر). وإن تكرّر يُطلب اسم جدٍّ إضافي تلقائياً حتى يتفرّد. (تُتجاهل المسافة و«بن»/«ابن»/«ال» والهمزات، وصاحب الاسم يجب أن يكون حيّاً.)</div>
-          <label class="perm-chk"><input type="checkbox" id="guestVerifyChk" ${guestGens > 0 ? 'checked' : ''}><span>اشتراط التحقّق بالاسم قبل دخول الزائر</span></label>
-        </div></div>` : ''}</div>
+
     <div class="card"><h3>المستخدمون (${list.length}) ${hintBtn('member_role')}</h3>
       <p class="muted" style="font-size:.85rem;margin-top:-4px">اضغط على اسم لعرض تفاصيله والتحكّم به.</p>
       <div class="mlist">${list.map(memberRow).join('')}</div>
     </div>`;
   const au = document.getElementById('addUserBtn'); if (au) au.addEventListener('click', addUserModal);
-  const gTg = document.getElementById('guestToggle');
-  if (gTg) gTg.addEventListener('click', async () => {
-    const ok = await guard(async () => { const { error } = await sb.from('almfrje_settings').upsert({ key: 'guest_open', value: !guestOpen, updated_at: new Date().toISOString() }, { onConflict: 'key' }); if (error) throw error; });
-    if (ok) { guestOpen = !guestOpen; toast(guestOpen ? 'الموقع مفتوح للزوّار' : 'الموقع مغلق (للمسؤولين فقط)'); screenMembers(); }
-  });
-  view().querySelectorAll('input[data-ghide]').forEach(cb => cb.addEventListener('change', async () => {
-    const next = Object.assign({ ...GUEST_HIDE_DEFAULT }, guestHide, { [cb.dataset.ghide]: cb.checked });
-    const ok = await guard(async () => { const { error } = await sb.from('almfrje_settings').upsert({ key: 'guest_hide', value: next, updated_at: new Date().toISOString() }, { onConflict: 'key' }); if (error) throw error; });
-    if (ok) { guestHide = next; toast('تم الحفظ'); } else { cb.checked = !cb.checked; }
-  }));
-  const gvc = document.getElementById('guestVerifyChk');
-  if (gvc) gvc.addEventListener('change', async () => {
-    const n = gvc.checked ? 2 : 0;   // 2 = تحقّق تلقائي (اسمان فأكثر حتى التميّز)؛ 0 = دخول مباشر
-    const ok = await guard(async () => { const { error } = await sb.from('almfrje_settings').upsert({ key: 'guest_verify_gens', value: n, updated_at: new Date().toISOString() }, { onConflict: 'key' }); if (error) throw error; });
-    if (ok) { guestGens = n; toast(n > 0 ? 'فُعِّل التحقّق بالاسم (دخول تلقائي عند التميّز)' : 'أُلغي التحقّق (دخول مباشر)'); } else { gvc.checked = !gvc.checked; }
-  });
+
   bindMemberRows();
 }
 // صف عضو: اسم فقط (مطويّ)، أو اسم + بطاقة كاملة (مفتوح)
