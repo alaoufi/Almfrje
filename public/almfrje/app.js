@@ -227,7 +227,8 @@ let _dbProxied = false;   // الاتصال يمرّ عبر وسيط الموق�
 const GUEST_HIDE_DEFAULT = { phone: true, media: true, notes: true };  // ما يُخفى عن الزائر افتراضياً
 let guestHide = { ...GUEST_HIDE_DEFAULT };
 let recentSince = '';      // تاريخ تصفير «آخر الإضافات» (ISO) — يُحدّده المدير
-let recentShow = true;     // إظهار بطاقة «آخر الإضافات» بالرئيسية — يتحكم بها المدير من زرٍّ على البطاقة
+let recentShow = true;
+const txOpen = new Set([0]);   // مجموعات «النصوص» المفتوحة (الأولى مفتوحة افتراضياً)     // إظهار بطاقة «آخر الإضافات» بالرئيسية — يتحكم بها المدير من زرٍّ على البطاقة
 let visitStats = { total: 0, byBranch: {}, byCity: {} };   // إحصاء زيارات الزوّار (من الإعدادات)
 let onlineNow = 0;                 // عدد المتواجدين الآن (من مسار التواجد)
 let onlineByBranch = {};           // تفصيلهم حسب الفرع
@@ -4398,23 +4399,25 @@ function screenTexts() {
     ? Object.entries(vc).sort((a, b) => b[1] - a[1]).map(([c, n]) => `<div class="row"><span class="k">📍 ${esc(c)}</span><span class="v">${n}</span></div>`).join('')
     : '<div class="muted" style="font-size:.85rem;padding:4px 0">لا مناطق مسجّلة بعد.</div>';
   view().innerHTML = adminTabBar('texts') + `
-    <div class="card"><h3>📊 إحصائيات الزيارات</h3>
-      <div class="row"><span class="k">إجمالي من دخل الموقع</span><span class="v" style="font-size:1.2rem;color:var(--brand)" id="visitsTotalSt">${visitStats.total || 0}</span></div>
-      <div class="row"><span class="k">🟢 المتواجدون الآن</span><span class="v" style="font-size:1.2rem;color:#1c8b4d" id="onlineNowSt">${onlineNow}</span></div>
-      <div class="li-sub" style="margin-top:6px;font-weight:800;color:var(--text)">المتواجدون الآن حسب الفرع</div>
-      <div id="onlineByBranchSt"><div class="muted" style="font-size:.85rem;padding:4px 0">…</div></div>
-      <div class="li-sub" style="margin-top:10px;font-weight:800;color:var(--text)">إجمالي الزيارات حسب الفرع</div>${branchRows}
-      <div class="li-sub" style="margin-top:10px;font-weight:800;color:var(--text)">حسب المنطقة (المدينة)</div>${cityRows}
-      <button class="btn sm danger" id="visits_reset" style="margin-top:10px">↺ تصفير إحصاء الزيارات</button>
-      <button class="btn sm outline" id="recent_reset" style="margin-top:10px">↺ تصفير «آخر الإضافات»</button>
-      <button class="btn sm ${recentShow ? 'outline' : ''}" id="recent_toggle" style="margin-top:10px">${recentShow ? '🙈 إخفاء «آخر الإضافات» عن الجميع' : '👁 إظهار «آخر الإضافات» للجميع'}</button>
-      <p class="muted" style="font-size:.78rem;margin-top:6px">يُحتسب كل من يدخل الموقع (زائر/مشرف/مدير). «المتواجدون الآن» = نشِطون خلال آخر ٣ دقائق. وتصفير «آخر الإضافات» يبدأ عدّ الإضافات من جديد دون حذف بيانات.</p></div>
-    <div class="card"><h3>🏷️ عنوان الموقع وسطر «powered by» ${hintBtn('site_title')}</h3>
+    <div class="tx-group txg-0${txOpen.has(0) ? ' open' : ''}"><button class="tx-group-title" data-txg="0"><span class="txg-ico">${txOpen.has(0) ? '▾' : '▸'}</span><span class="txg-label">🏠 الرئيسية والهوية</span><span class="txg-count">4</span></button><div class="tx-group-items"><div class="card"><h3>🏷️ عنوان الموقع وسطر «powered by» ${hintBtn('site_title')}</h3>
       <p class="muted" style="font-size:.85rem;margin-top:-2px">يظهران في شاشات الدخول (الزائر والمسؤول) وفي تذييل قائمة «المزيد».</p>
       ${fInput('عنوان الموقع', 'tx_title', siteTitle)}
       ${fInput('سطر الإسناد (powered by) — اتركه فارغاً لإخفائه', 'tx_powered', sitePowered)}
       <button class="btn sm" id="tx_titleSave" style="margin-top:6px">حفظ</button></div>
-    <div class="card"><h3>🎉 كلمة المناسبات (شاشة الدخول) ${hintBtn('occasion')}</h3>
+    <div class="card"><h3>📝 نص الرئيسية ${hintBtn('banner')}</h3>
+      <p class="muted" style="font-size:.85rem;margin-top:-2px">يظهر أعلى الصفحة الرئيسية للجميع. النص الطويل يُقصَر تلقائياً مع زرّ «المزيد…» يفتح صفحة النبذة.</p>
+      ${fTextarea('النص', 'tx_banner', bannerText)}
+      ${fSelect('حجم الخط', 'tx_banner_size', [{ k: '', ar: 'افتراضي' }, { k: '0.95rem', ar: 'صغير' }, { k: '1.05rem', ar: 'متوسط' }, { k: '1.2rem', ar: 'كبير' }, { k: '1.35rem', ar: 'كبير جداً' }], bannerSize)}
+      <button class="btn sm" id="tx_bannerSave" style="margin-top:6px">حفظ</button></div>
+    <div class="card"><h3>📜 قسم الوثائق</h3>
+      <p class="muted" style="font-size:.85rem;margin-top:-2px">إدارة الوثائق (إضافة صورة + تفريغ نصّها) من القسم المخصّص.</p>
+      <button class="btn sm outline" data-go="#/documents" style="margin-top:6px">فتح قسم الوثائق</button></div>
+    <div class="card"><h3>📤 نصّ المشاركة</h3>
+      <p class="muted" style="font-size:.85rem;margin-top:-2px">العنوان والنص يظهران معاً في رسالة المشاركة (زرّ المشاركة). <b>ملاحظة:</b> «بطاقة المعاينة» الصغيرة في واتساب لها عنوانٌ ثابت في الترويسة (لا يُعدَّل من هنا).</p>
+      ${fInput('العنوان', 'tx_share_title', shareTitle)}
+      ${fInput('النص', 'tx_share_text', shareText)}
+      <button class="btn sm" id="tx_shareSave" style="margin-top:6px">حفظ</button></div>
+    </div></div><div class="tx-group txg-1${txOpen.has(1) ? ' open' : ''}"><button class="tx-group-title" data-txg="1"><span class="txg-ico">${txOpen.has(1) ? '▾' : '▸'}</span><span class="txg-label">🎉 المناسبات</span><span class="txg-count">2</span></button><div class="tx-group-items"><div class="card"><h3>🎉 كلمة المناسبات (شاشة الدخول) ${hintBtn('occasion')}</h3>
       <p class="muted" style="font-size:.85rem;margin-top:-2px">تظهر تحت العنوان مباشرة في شاشة الدخول بخط غامق وباللون الذي تختاره. اتركها فارغة لإخفائها.</p>
       ${fInput('الكلمة', 'tx_occ', occasionText)}
       <div class="field"><label>لون الكلمة</label><input type="color" id="tx_occ_color" value="${okColor(occasionColor)}" style="width:60px;height:38px;padding:2px;border:1px solid var(--line);border-radius:8px;background:var(--card)"></div>
@@ -4439,28 +4442,23 @@ function screenTexts() {
         <button class="btn sm" id="tx_congSave">💾 حفظ / تعديل</button>
         <button class="btn sm danger" id="tx_congDel">🗑️ حذف التهنئة</button>
       </div></div>
-    <div class="card"><h3>✉️ بطاقة «ملاحظتك تهمنا» ${hintBtn('feedback_card')}</h3>
+    </div></div><div class="tx-group txg-2${txOpen.has(2) ? ' open' : ''}"><button class="tx-group-title" data-txg="2"><span class="txg-ico">${txOpen.has(2) ? '▾' : '▸'}</span><span class="txg-label">🚪 دخول الزائر وترحيبه</span><span class="txg-count">3</span></button><div class="tx-group-items"><div class="card"><h3>🚪 دعوة الزائر للدخول ${hintBtn('guest_prompt')}</h3>
+      <p class="muted" style="font-size:.85rem;margin-top:-2px">يظهر للزائر فوق حقل كتابة الاسم في شاشة الدخول.</p>
+      ${fInput('النص', 'tx_gprompt', guestPrompt)}
+      <button class="btn sm" id="tx_gpromptSave" style="margin-top:6px">حفظ</button></div>
+    <div class="card"><h3>🌿 ترحيب الزائر — عند نجاح التحقق ${hintBtn('guest_ok')}</h3>
+      <p class="muted" style="font-size:.85rem;margin-top:-2px">يظهر للزائر بعد مطابقة اسمه. اكتب <b>{name}</b> مكان اسم الزائر.</p>
+      ${fTextarea('النص', 'tx_gok', guestWelcomeOk)}
+      <button class="btn sm" id="tx_gokSave" style="margin-top:6px">حفظ</button></div>
+    <div class="card"><h3>🙏 ترحيب الزائر — عند فشل التحقق ${hintBtn('guest_fail')}</h3>
+      <p class="muted" style="font-size:.85rem;margin-top:-2px">يظهر إذا لم يُطابق الاسم. اكتب <b>{name}</b> مكان اسم الزائر.</p>
+      ${fTextarea('النص', 'tx_gfail', guestWelcomeFail)}
+      <button class="btn sm" id="tx_gfailSave" style="margin-top:6px">حفظ</button></div>
+    </div></div><div class="tx-group txg-3${txOpen.has(3) ? ' open' : ''}"><button class="tx-group-title" data-txg="3"><span class="txg-ico">${txOpen.has(3) ? '▾' : '▸'}</span><span class="txg-label">✉️ الملاحظات والردود</span><span class="txg-count">3</span></button><div class="tx-group-items"><div class="card"><h3>✉️ بطاقة «ملاحظتك تهمنا» ${hintBtn('feedback_card')}</h3>
       <p class="muted" style="font-size:.85rem;margin-top:-2px">عنوان البطاقة ونصّها التعريفي في الرئيسية (لإرسال الملاحظة).</p>
       ${fInput('العنوان', 'tx_fbcard_title', feedbackCardTitle)}
       ${fTextarea('النص', 'tx_fbcard', feedbackCardText)}
       <button class="btn sm" id="tx_fbcardSave" style="margin-top:6px">حفظ</button></div>
-    <div class="card"><h3>🚪 دعوة الزائر للدخول ${hintBtn('guest_prompt')}</h3>
-      <p class="muted" style="font-size:.85rem;margin-top:-2px">يظهر للزائر فوق حقل كتابة الاسم في شاشة الدخول.</p>
-      ${fInput('النص', 'tx_gprompt', guestPrompt)}
-      <button class="btn sm" id="tx_gpromptSave" style="margin-top:6px">حفظ</button></div>
-    <div class="card"><h3>📝 نص الرئيسية ${hintBtn('banner')}</h3>
-      <p class="muted" style="font-size:.85rem;margin-top:-2px">يظهر أعلى الصفحة الرئيسية للجميع. النص الطويل يُقصَر تلقائياً مع زرّ «المزيد…» يفتح صفحة النبذة.</p>
-      ${fTextarea('النص', 'tx_banner', bannerText)}
-      ${fSelect('حجم الخط', 'tx_banner_size', [{ k: '', ar: 'افتراضي' }, { k: '0.95rem', ar: 'صغير' }, { k: '1.05rem', ar: 'متوسط' }, { k: '1.2rem', ar: 'كبير' }, { k: '1.35rem', ar: 'كبير جداً' }], bannerSize)}
-      <button class="btn sm" id="tx_bannerSave" style="margin-top:6px">حفظ</button></div>
-    <div class="card"><h3>📜 قسم الوثائق</h3>
-      <p class="muted" style="font-size:.85rem;margin-top:-2px">إدارة الوثائق (إضافة صورة + تفريغ نصّها) من القسم المخصّص.</p>
-      <button class="btn sm outline" data-go="#/documents" style="margin-top:6px">فتح قسم الوثائق</button></div>
-    <div class="card"><h3>📤 نصّ المشاركة</h3>
-      <p class="muted" style="font-size:.85rem;margin-top:-2px">العنوان والنص يظهران معاً في رسالة المشاركة (زرّ المشاركة). <b>ملاحظة:</b> «بطاقة المعاينة» الصغيرة في واتساب لها عنوانٌ ثابت في الترويسة (لا يُعدَّل من هنا).</p>
-      ${fInput('العنوان', 'tx_share_title', shareTitle)}
-      ${fInput('النص', 'tx_share_text', shareText)}
-      <button class="btn sm" id="tx_shareSave" style="margin-top:6px">حفظ</button></div>
     <div class="card"><h3>💬 رسالة الشكر بعد إرسال ملاحظة ${hintBtn('feedback_thanks')}</h3>
       <p class="muted" style="font-size:.85rem;margin-top:-2px">تظهر للمُرسِل في موديل بعد إرسال ملاحظته.</p>
       ${fTextarea('النص', 'tx_fbthanks', feedbackThanks)}
@@ -4473,14 +4471,17 @@ function screenTexts() {
       ${fTextarea('↕️ ردود «إعادة ترتيب الإخوان»', 'tx_rb_reorder', (Array.isArray(replyBank['إعادة ترتيب الإخوان']) ? replyBank['إعادة ترتيب الإخوان'] : []).join('\n'))}
       <button class="btn sm" id="tx_rbSave" style="margin-top:6px">حفظ بنك الردود</button>
       <button class="btn sm outline" id="tx_rbReset" style="margin-top:6px">استرجاع الافتراضي</button></div>
-    <div class="card"><h3>🌿 ترحيب الزائر — عند نجاح التحقق ${hintBtn('guest_ok')}</h3>
-      <p class="muted" style="font-size:.85rem;margin-top:-2px">يظهر للزائر بعد مطابقة اسمه. اكتب <b>{name}</b> مكان اسم الزائر.</p>
-      ${fTextarea('النص', 'tx_gok', guestWelcomeOk)}
-      <button class="btn sm" id="tx_gokSave" style="margin-top:6px">حفظ</button></div>
-    <div class="card"><h3>🙏 ترحيب الزائر — عند فشل التحقق ${hintBtn('guest_fail')}</h3>
-      <p class="muted" style="font-size:.85rem;margin-top:-2px">يظهر إذا لم يُطابق الاسم. اكتب <b>{name}</b> مكان اسم الزائر.</p>
-      ${fTextarea('النص', 'tx_gfail', guestWelcomeFail)}
-      <button class="btn sm" id="tx_gfailSave" style="margin-top:6px">حفظ</button></div>
+    </div></div><div class="tx-group txg-4${txOpen.has(4) ? ' open' : ''}"><button class="tx-group-title" data-txg="4"><span class="txg-ico">${txOpen.has(4) ? '▾' : '▸'}</span><span class="txg-label">📊 الإحصاء وألوان الحالة</span><span class="txg-count">2</span></button><div class="tx-group-items"><div class="card"><h3>📊 إحصائيات الزيارات</h3>
+      <div class="row"><span class="k">إجمالي من دخل الموقع</span><span class="v" style="font-size:1.2rem;color:var(--brand)" id="visitsTotalSt">${visitStats.total || 0}</span></div>
+      <div class="row"><span class="k">🟢 المتواجدون الآن</span><span class="v" style="font-size:1.2rem;color:#1c8b4d" id="onlineNowSt">${onlineNow}</span></div>
+      <div class="li-sub" style="margin-top:6px;font-weight:800;color:var(--text)">المتواجدون الآن حسب الفرع</div>
+      <div id="onlineByBranchSt"><div class="muted" style="font-size:.85rem;padding:4px 0">…</div></div>
+      <div class="li-sub" style="margin-top:10px;font-weight:800;color:var(--text)">إجمالي الزيارات حسب الفرع</div>${branchRows}
+      <div class="li-sub" style="margin-top:10px;font-weight:800;color:var(--text)">حسب المنطقة (المدينة)</div>${cityRows}
+      <button class="btn sm danger" id="visits_reset" style="margin-top:10px">↺ تصفير إحصاء الزيارات</button>
+      <button class="btn sm outline" id="recent_reset" style="margin-top:10px">↺ تصفير «آخر الإضافات»</button>
+      <button class="btn sm ${recentShow ? 'outline' : ''}" id="recent_toggle" style="margin-top:10px">${recentShow ? '🙈 إخفاء «آخر الإضافات» عن الجميع' : '👁 إظهار «آخر الإضافات» للجميع'}</button>
+      <p class="muted" style="font-size:.78rem;margin-top:6px">يُحتسب كل من يدخل الموقع (زائر/مشرف/مدير). «المتواجدون الآن» = نشِطون خلال آخر ٣ دقائق. وتصفير «آخر الإضافات» يبدأ عدّ الإضافات من جديد دون حذف بيانات.</p></div>
     <div class="card"><h3>🎨 تعريف ألوان الحالة ${hintBtn('status_labels')}</h3>
       <p class="muted" style="font-size:.85rem;margin-top:-2px">تظهر دلالة الألوان أسفل قوائم الشجرة (الشجرة/العرض الهرمي/الأعمدة/الذرية). عدّل المسميات كما تريد.</p>
       ${fInput('الاسم بلون عادي يعني', 'tx_alive', statLabels.alive)}
@@ -4491,7 +4492,14 @@ function screenTexts() {
         <span class="n-alive">${esc(statLabels.alive)}</span>
         <span class="n-died">${esc(statLabels.dead)}</span>
         <span class="n-noissue">${esc(statLabels.noissue)}</span>
-      </div></div>`;
+      </div></div></div></div>`;
+  // طيّ/فتح مجموعات النصوص في المكان (تبقى مستمعات الأزرار سليمة)
+  view().querySelectorAll('[data-txg]').forEach(b => b.addEventListener('click', () => {
+    const gi = parseInt(b.dataset.txg, 10), grp = b.closest('.tx-group');
+    const open = grp.classList.toggle('open');
+    if (open) txOpen.add(gi); else txOpen.delete(gi);
+    const ico = b.querySelector('.txg-ico'); if (ico) ico.textContent = open ? '▾' : '▸';
+  }));
   { const rb = document.getElementById('visits_reset'); if (rb) rb.addEventListener('click', async () => {
     if (!(await confirm2('تصفير إحصاء الزيارات بالكامل؟ يبدأ العدّ من جديد.', { title: 'تصفير الزيارات', okText: 'تصفير', danger: true }))) return;
     const ok = await guard(async () => { const { error } = await sb.from('almfrje_settings').upsert({ key: 'visit_stats', value: { total: 0, byBranch: {}, byCity: {}, updated_at: new Date().toISOString() }, updated_at: new Date().toISOString() }, { onConflict: 'key' }); if (error) throw error; });

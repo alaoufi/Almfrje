@@ -1016,3 +1016,25 @@ ul.hier ul.hier > .hier-li::before {
   box-shadow: 0 5px 12px -10px color-mix(in srgb, var(--brand) 85%, transparent),
               0 0 0 var(--brand-d), inset 0 1px 0 rgba(255,255,255,.28);
 }
+
+/* مجموعات شاشة «النصوص»: قابلة للطيّ/التمدد وبلونٍ مميّز لكل قسم */
+.tx-group { margin: 0 0 12px; border: 1px solid var(--line); border-radius: 14px; overflow: hidden;
+  background: color-mix(in srgb, var(--txc) 4%, var(--card));
+  border-inline-start: 5px solid var(--txc);
+  box-shadow: 0 2px 8px -4px rgba(0,0,0,.25); }
+.tx-group-title { width: 100%; display: flex; align-items: center; gap: 8px; padding: 13px 14px;
+  background: color-mix(in srgb, var(--txc) 10%, var(--card));
+  border: 0; font: inherit; font-weight: 800; font-size: 1rem; color: var(--txc);
+  cursor: pointer; text-align: start; }
+.txg-ico { font-size: .9rem; width: 14px; }
+.txg-label { flex: 1; }
+.txg-count { background: var(--txc); color: #fff; border-radius: 999px; min-width: 22px; height: 22px;
+  padding: 0 6px; display: inline-flex; align-items: center; justify-content: center; font-size: .74rem; }
+.tx-group-items { display: none; padding: 10px 10px 2px; }
+.tx-group.open .tx-group-items { display: block; }
+.tx-group .card { box-shadow: none; border: 1px solid var(--line); }
+.txg-0 { --txc: #4338CA; }   /* الرئيسية والهوية — بنفسجي */
+.txg-1 { --txc: #b8860b; }   /* المناسبات — ذهبي */
+.txg-2 { --txc: #0f8a4d; }   /* دخول الزائر — أخضر */
+.txg-3 { --txc: #0891B2; }   /* الملاحظات والردود — سماوي */
+.txg-4 { --txc: #d9480f; }   /* الإحصاء والحالة — برتقالي */
