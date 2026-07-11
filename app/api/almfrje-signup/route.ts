@@ -25,6 +25,29 @@ export async function POST(request: NextRequest) {
 
   const admin0 = createClient(url, service, { auth: { persistSession: false, autoRefreshToken: false } });
 
+  // العضو يحدّث بيانات حسابه لنفسه (الجوال/اسم المستخدم) — الاسم ممنوع من هنا
+  if (String(b.action || '') === 'myaccount') {
+    const { data: memRow } = await admin0.from('almfrje_members').select('user_id,phone,is_active').eq('user_id', who.user.id).maybeSingle();
+    if (!memRow) return NextResponse.json({ ok: false, error: 'لا حساب عضوية' }, { status: 404 });
+    const newPhone = normalizePhone(b.phone);
+    const username = b.username === undefined ? undefined : String(b.username || '').trim().slice(0, 40) || null;
+    if (newPhone && newPhone.length < 9) return NextResponse.json({ ok: false, error: 'رقم جوال غير صحيح' }, { status: 400 });
+    const upd: Record<string, unknown> = {};
+    if (username !== undefined) upd.username = username;
+    if (newPhone && newPhone !== normalizePhone(memRow.phone)) {
+      const { data: dup } = await admin0.from('almfrje_members').select('user_id').eq('phone', newPhone).neq('user_id', who.user.id).limit(1);
+      if (dup && dup.length) return NextResponse.json({ ok: false, error: 'هذا الجوال مستخدم بحسابٍ آخر' }, { status: 409 });
+      const { error: ae } = await admin0.auth.admin.updateUserById(who.user.id, { email: `${newPhone}@almfrje.app`, email_confirm: true } as never);
+      if (ae) return NextResponse.json({ ok: false, error: ae.message }, { status: 400 });
+      upd.phone = newPhone;
+    }
+    if (Object.keys(upd).length) {
+      const { error: ue2 } = await admin0.from('almfrje_members').update(upd).eq('user_id', who.user.id);
+      if (ue2) return NextResponse.json({ ok: false, error: ue2.message }, { status: 400 });
+    }
+    return NextResponse.json({ ok: true, phone_changed: !!upd.phone });
+  }
+
   // كشف الأعضاء المطهَّر للمشرفين: أسماء وأدوار وحالات وربط الشخص فقط — بلا جوالات
   // (جوالات الأعضاء محمية حمايةً مطلقة: المدير وصاحب الرقم فقط)
   if (String(b.action || '') === 'roster') {
