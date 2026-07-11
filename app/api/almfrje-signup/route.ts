@@ -29,7 +29,7 @@ export async function POST(request: NextRequest) {
   const birth = String(b.birth || '').trim().slice(0, 30);
   if (!Number.isFinite(pid) || pid <= 0) return NextResponse.json({ ok: false, error: 'مُعرّف الشخص ناقص — ادخل باسمك أولاً' }, { status: 400 });
   if (phone.length < 9) return NextResponse.json({ ok: false, error: 'أدخل رقم جوال صحيح (إجباري)' }, { status: 400 });
-  if (password && password.length < 4) return NextResponse.json({ ok: false, error: 'كلمة المرور ٤ أحرف/أرقام على الأقل' }, { status: 400 });
+  if (password.length < 4) return NextResponse.json({ ok: false, error: 'كلمة المرور إجبارية — ٤ أحرف/أرقام على الأقل' }, { status: 400 });
 
   const admin = createClient(url, service, { auth: { persistSession: false, autoRefreshToken: false } });
 
@@ -57,9 +57,8 @@ export async function POST(request: NextRequest) {
   }
   const full_name = names.join(' بن ');
 
-  const pw = password || phone;   // بلا كلمة مرور → الافتراضية رقم الجوال (ويُخبَر بذلك)
   const { data: created, error: ce } = await admin.auth.admin.createUser({
-    email: `${phone}@almfrje.app`, password: `${pw}@Almfrje`, email_confirm: true,
+    email: `${phone}@almfrje.app`, password: `${password}@Almfrje`, email_confirm: true,
     user_metadata: { full_name, phone },
   });
   if (ce || !created || !created.user) {
@@ -80,5 +79,5 @@ export async function POST(request: NextRequest) {
   if (birth && !String(person.birth || '').trim()) patch.birth = birth;
   if (Object.keys(patch).length) { try { await admin.from('almfrje_persons').update(patch).eq('id', pid); } catch { /* */ } }
 
-  return NextResponse.json({ ok: true, defaulted_pw: !password });
+  return NextResponse.json({ ok: true });
 }
