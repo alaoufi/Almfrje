@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
   const { data: who } = await caller.auth.getUser();
   if (!who || !who.user) return NextResponse.json({ ok: false, error: 'جلسة غير صالحة' }, { status: 401 });
 
-  let b: { action?: unknown; pid?: unknown; phone?: unknown; password?: unknown; nickname?: unknown; city?: unknown; birth?: unknown; publish?: unknown };
+  let b: { action?: unknown; pid?: unknown; phone?: unknown; password?: unknown; nickname?: unknown; city?: unknown; birth?: unknown; publish?: unknown; username?: unknown };
   try { b = await request.json(); } catch { return NextResponse.json({ ok: false, error: 'طلب غير صالح' }, { status: 400 }); }
 
   const admin0 = createClient(url, service, { auth: { persistSession: false, autoRefreshToken: false } });
