@@ -5395,7 +5395,10 @@ function screenProfile() {
       <div class="li-sub">${arOf(ROLES, me.role)}${me.username ? ' • @' + esc(me.username) : ''}</div></div></div></div>
 
     <div class="card"><h3>البيانات الأساسية</h3>
-      ${fInput('الاسم الكامل', 'pf_name', me.full_name || '')}
+      <div class="field"><label>الاسم الكامل</label>
+        <div style="padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:color-mix(in srgb, var(--muted) 8%, var(--card));font-weight:700">${esc(me.full_name || '—')} 🔒</div>
+        <div class="muted" style="font-size:.75rem;margin-top:3px">الاسم لا يُعدَّل من هنا — تصحيحه لدى الإدارة حصراً.</div>
+      </div>
       ${fInput('رقم الجوال (يُستخدم للدخول)', 'pf_phone', me.phone || '', 'tel', 'inputmode="tel"')}
       ${fInput('اسم المستخدم (اختياري)', 'pf_user', me.username || '', 'text', 'autocomplete="off"')}
       <button class="btn" id="pf_saveInfo">حفظ البيانات</button>
@@ -5456,23 +5459,19 @@ function screenProfile() {
     }
   });
   document.getElementById('pf_saveInfo').addEventListener('click', async () => {
-    const full_name = val('pf_name').trim();
     const phone = normPhone(val('pf_phone'));
     const username = val('pf_user').trim();
-    if (!full_name) { toast('أدخل الاسم'); return; }
-    if (phone.length < 7) { toast('أدخل رقم جوال صحيح'); return; }
+    if (phone.length < 9) { toast('أدخل رقم جوال صحيح'); return; }
     const phoneChanged = phone !== normPhone(me.phone || '');
     if (phoneChanged && !(await confirm2('تغيير الجوال يعني الدخول لاحقاً بالرقم الجديد. متابعة؟'))) return;
+    // الحفظ الذاتي عبر الخادم (سياسة القاعدة تمنع الكتابة المباشرة لغير المدير) — الاسم لا يمرّ من هنا أبداً
     const ok = await guard(async () => {
-      // إن تغيّر الجوال، حدّث بريد المصادقة المشتق منه أيضاً
-      if (phoneChanged) {
-        const { error: ae } = await sb.auth.updateUser({ email: phoneToEmail(phone) });
-        if (ae) throw ae;
-      }
-      const { error } = await sb.from('almfrje_members').update({ full_name, phone, username: username || null }).eq('user_id', me.user_id);
-      if (error) throw error;
+      const { data: { session } } = await sb.auth.getSession();
+      const res = await fetch('/api/almfrje-signup', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + (session && session.access_token) }, body: JSON.stringify({ action: 'myaccount', phone, username }) });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok || !j.ok) throw new Error(j.error || 'تعذّر الحفظ');
     });
-    if (ok) { me.full_name = full_name; me.phone = phone; me.username = username || null; toast(phoneChanged ? 'تم الحفظ — استخدم الجوال الجديد بالدخول القادم' : 'تم حفظ البيانات'); }
+    if (ok) { me.phone = phone; me.username = username || null; toast(phoneChanged ? 'تم الحفظ — استخدم الجوال الجديد بالدخول القادم' : 'تم حفظ البيانات'); }
   });
 
   document.getElementById('pf_savePin').addEventListener('click', async () => {
