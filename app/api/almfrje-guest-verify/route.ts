@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { almfrjeEnv } from '@/lib/almfrje-env';
+import { normalizePhone } from '@/lib/almfrje-phone';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -110,7 +111,7 @@ export async function POST(request: NextRequest) {
     // هل له حسابُ عضوٍ مسبقاً؟ (بربط شخصه أو بجواله) — ليُدعى للدخول بدل التسجيل
     let hasAccount = false;
     try {
-      const ph = String(liveMatches[0].phone || '').replace(/\D/g, '');
+      const ph = normalizePhone(liveMatches[0].phone);
       const cond = ph ? `person_id.eq.${liveMatches[0].id},phone.eq.${ph}` : `person_id.eq.${liveMatches[0].id}`;
       const { data: mem } = await admin.from('almfrje_members').select('user_id').or(cond).limit(1);
       hasAccount = !!(mem && mem.length);

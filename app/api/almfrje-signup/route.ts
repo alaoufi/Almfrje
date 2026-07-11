@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { almfrjeEnv } from '@/lib/almfrje-env';
+import { normalizePhone } from '@/lib/almfrje-phone';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -22,7 +23,7 @@ export async function POST(request: NextRequest) {
   let b: { pid?: unknown; phone?: unknown; password?: unknown; nickname?: unknown; city?: unknown; birth?: unknown };
   try { b = await request.json(); } catch { return NextResponse.json({ ok: false, error: 'طلب غير صالح' }, { status: 400 }); }
   const pid = Number(b.pid);
-  const phone = String(b.phone || '').replace(/\D/g, '');
+  const phone = normalizePhone(b.phone);
   const password = String(b.password || '').trim();
   const nickname = String(b.nickname || '').trim().slice(0, 60);
   const city = String(b.city || '').trim().slice(0, 60);
