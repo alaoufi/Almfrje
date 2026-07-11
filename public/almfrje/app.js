@@ -3207,8 +3207,9 @@ function guestOnboard() {
     if (root && root.innerHTML.trim()) { if (tries++ < 90) { setTimeout(show, 700); return; } window._onbPoll = false; return; }
     window._onbPoll = false;
     openModal('🌿 التسجيل مطلوب للدخول على الموقع', `
-      <div style="font-size:.95rem;line-height:1.9;margin-bottom:8px;text-align:center;background:#fff5f5;border:1px solid #e03131;border-radius:10px;padding:8px 10px;color:#c92a2a;font-weight:700">التسجيل مطلوبٌ للدخول على الموقع</div>
-      <div style="font-size:.9rem;line-height:1.9;margin-bottom:8px">أهلاً <b>${esc(name)}</b>! أكمل بياناتك لإنشاء حسابك — <b>خطوة واحدة لا تتكرر</b>:</div>
+      <div class="signup-compact">
+      <div style="font-size:.85rem;line-height:1.6;margin-bottom:6px;text-align:center;background:#fff5f5;border:1px solid #e03131;border-radius:8px;padding:5px 8px;color:#c92a2a;font-weight:700">التسجيل مطلوبٌ للدخول على الموقع</div>
+      <div style="font-size:.82rem;line-height:1.6;margin-bottom:6px">أهلاً <b>${esc(name)}</b>! أكمل بياناتك — <b>خطوة واحدة لا تتكرر</b>:</div>
       <div class="field"><input id="go_phone" class="req-in" type="tel" inputmode="tel" placeholder="📱 رقم الجوال — إجباري *"></div>
       <div class="field"><input id="go_pw" class="req-in" type="password" placeholder="🔒 كلمة المرور — إجباري *"></div>
       <div class="field"><input id="go_nick" type="text" placeholder="اللقب (اختياري)"></div>
@@ -3216,13 +3217,14 @@ function guestOnboard() {
         <div class="field"><input id="go_city" type="text" placeholder="المدينة (اختياري)"></div>
         <div class="field"><input id="go_birth" type="text" placeholder="سنة الميلاد مثل 1410هـ (اختياري)"></div>
       </div>
-      <div style="border:1px solid var(--line);border-radius:10px;padding:8px 10px;margin-bottom:10px">
-        <div style="font-weight:800;font-size:.88rem;margin-bottom:6px">🔒 لخصوصيتك — رقم جوالك:</div>
+      <div style="border:1px solid var(--line);border-radius:8px;padding:5px 8px;margin-bottom:6px">
+        <div style="font-weight:800;font-size:.82rem;margin-bottom:3px">🔒 لخصوصيتك — رقم جوالك:</div>
         <label class="perm-chk"><input type="radio" name="go_priv" value="publish"><span>أسمح بنشره في دليل الموقع</span></label>
         <label class="perm-chk"><input type="radio" name="go_priv" value="private" checked><span>استخدام الموقع فقط (لا يُنشر)</span></label>
       </div>
       <button class="btn" id="go_send" style="width:100%">✅ تسجيل بياناتي</button>
-      <button class="btn outline" id="go_backlogin" style="width:100%;margin-top:8px">→ رجوع لصفحة الدخول</button>`, () => {
+      <button class="btn outline" id="go_backlogin" style="width:100%;margin-top:6px">→ رجوع لصفحة الدخول</button>
+      </div>`, () => {
       document.getElementById('go_backlogin').addEventListener('click', async () => { try { await sb.auth.signOut(); } catch (e0) { /* */ } location.hash = ''; location.reload(); });
       document.getElementById('go_send').addEventListener('click', async () => {
         const phone = normPhone(val('go_phone'));
