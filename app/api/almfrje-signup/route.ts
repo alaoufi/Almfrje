@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
   const { data: who } = await caller.auth.getUser();
   if (!who || !who.user) return NextResponse.json({ ok: false, error: 'جلسة غير صالحة' }, { status: 401 });
 
-  let b: { pid?: unknown; phone?: unknown; password?: unknown; nickname?: unknown; city?: unknown; birth?: unknown };
+  let b: { pid?: unknown; phone?: unknown; password?: unknown; nickname?: unknown; city?: unknown; birth?: unknown; publish?: unknown };
   try { b = await request.json(); } catch { return NextResponse.json({ ok: false, error: 'طلب غير صالح' }, { status: 400 }); }
   const pid = Number(b.pid);
   const phone = normalizePhone(b.phone);
@@ -28,6 +28,7 @@ export async function POST(request: NextRequest) {
   const nickname = String(b.nickname || '').trim().slice(0, 60);
   const city = String(b.city || '').trim().slice(0, 60);
   const birth = String(b.birth || '').trim().slice(0, 30);
+  const publish = b.publish === true;   // «أسمح بنشره في دليل الموقع» — وإلا فللموقع فقط
   if (!Number.isFinite(pid) || pid <= 0) return NextResponse.json({ ok: false, error: 'مُعرّف الشخص ناقص — ادخل باسمك أولاً' }, { status: 400 });
   if (phone.length < 9) return NextResponse.json({ ok: false, error: 'أدخل رقم جوال صحيح (إجباري)' }, { status: 400 });
   if (password.length < 4) return NextResponse.json({ ok: false, error: 'كلمة المرور إجبارية — ٤ أحرف/أرقام على الأقل' }, { status: 400 });
@@ -68,13 +69,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: false, error: m }, { status: 400 });
   }
   const { error: ue } = await admin.from('almfrje_members').upsert({
-    user_id: created.user.id, full_name, phone, role: 'viewer', is_active: false, person_id: pid, perms: {},
+    user_id: created.user.id, full_name, phone, role: 'viewer', is_active: false, person_id: pid, perms: {}, phone_public: publish,
   }, { onConflict: 'user_id' });
   if (ue) return NextResponse.json({ ok: false, error: ue.message }, { status: 400 });
 
   // استكمال بيانات شخصه — تعبئة الفارغ فقط
   const patch: Record<string, string> = {};
-  if (!String(person.phone || '').trim()) patch.phone = phone;
+  if (publish && !String(person.phone || '').trim()) patch.phone = phone;   // يُنشر في ملفه فقط بموافقته
   if (nickname && !String(person.nickname || '').trim()) patch.nickname = nickname;
   if (city && !String(person.city || '').trim()) patch.city = city;
   if (birth && !String(person.birth || '').trim()) patch.birth = birth;

@@ -3174,12 +3174,18 @@ function guestOnboard() {
         <div class="field"><input id="go_city" type="text" placeholder="المدينة (اختياري)"></div>
         <div class="field"><input id="go_birth" type="text" placeholder="سنة الميلاد مثل 1410هـ (اختياري)"></div>
       </div>
+      <div style="border:1px solid var(--line);border-radius:10px;padding:8px 10px;margin-bottom:10px">
+        <div style="font-weight:800;font-size:.88rem;margin-bottom:6px">🔒 لخصوصيتك — رقم جوالك:</div>
+        <label class="perm-chk"><input type="radio" name="go_priv" value="publish"><span>أسمح بنشره في دليل الموقع</span></label>
+        <label class="perm-chk"><input type="radio" name="go_priv" value="private" checked><span>استخدام الموقع فقط (لا يُنشر)</span></label>
+      </div>
       <button class="btn" id="go_send" style="width:100%">✅ تسجيل بياناتي</button>`, () => {
       document.getElementById('go_send').addEventListener('click', async () => {
         const phone = normPhone(val('go_phone'));
         if (phone.length < 9) { toast('رقم الجوال إجباري — اكتبه صحيحاً'); return; }
         if (val('go_pw').trim().length < 4) { toast('كلمة المرور إجبارية — ٤ أحرف/أرقام على الأقل'); return; }
-        const body = { pid, phone, password: val('go_pw').trim(), nickname: val('go_nick').trim(), city: val('go_city').trim(), birth: val('go_birth').trim() };
+        const priv = document.querySelector('input[name=\"go_priv\"]:checked');
+        const body = { pid, phone, password: val('go_pw').trim(), nickname: val('go_nick').trim(), city: val('go_city').trim(), birth: val('go_birth').trim(), publish: !!(priv && priv.value === 'publish') };
         const ok = await guard(async () => {
           const { data: { session } } = await sb.auth.getSession();
           const res = await fetch('/api/almfrje-signup', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + (session && session.access_token) }, body: JSON.stringify(body) });
@@ -5389,7 +5395,7 @@ function screenMembers() {
         ${pend.map(m => { const p = m.person_id ? byId.get(Number(m.person_id)) : null; return `
         <div style="border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-bottom:8px">
           <div style="font-weight:800">${esc(m.full_name || '—')}</div>
-          <div class="li-sub" style="margin-top:2px">📱 ${esc(m.phone || '—')}${p && p.phone && normPhone(p.phone) !== normPhone(m.phone || '') ? ' <span style="color:var(--danger);font-weight:700">≠ جوال ملفه (' + esc(p.phone) + ')</span>' : ''}</div>
+          <div class="li-sub" style="margin-top:2px">📱 ${esc(m.phone || '—')} <span style="font-size:.72rem;padding:2px 8px;border-radius:999px;background:${m.phone_public ? '#e6f7ee;color:#0f8a4d' : '#fff4e6;color:#d9480f'}">${m.phone_public ? '✓ يسمح بنشره في الدليل' : '🔒 للموقع فقط'}</span>${p && p.phone && normPhone(p.phone) !== normPhone(m.phone || '') ? ' <span style="color:var(--danger);font-weight:700">≠ جوال ملفه (' + esc(p.phone) + ')</span>' : ''}</div>
           ${p ? `<div class="li-sub">🌳 ${esc(lineageShort(p.id, 6))}</div>
           <div class="li-sub">${p.nickname ? 'اللقب: ' + esc(p.nickname) + ' • ' : ''}${p.city ? 'المدينة: ' + esc(p.city) + ' • ' : ''}${p.birth ? 'الميلاد: ' + esc(p.birth) : ''}</div>` : '<div class="li-sub" style="color:var(--danger)">⚠️ لا ربط بشخصٍ في الشجرة</div>'}
           <div class="btn-row" style="margin-top:8px">
