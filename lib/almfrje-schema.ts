@@ -28,6 +28,8 @@ export const ALMFRJE_SCHEMA_SQL = `
         ON public.almfrje_members (lower(username)) WHERE username IS NOT NULL AND username <> '';
       -- إشراف على عدّة فروع: مصفوفة معرّفات الفروع (تُضاف على القواعد القائمة أيضاً)
       ALTER TABLE public.almfrje_members ADD COLUMN IF NOT EXISTS branch_ids jsonb not null default '[]'::jsonb;
+      -- موافقة الخصوصية عند التسجيل الذاتي: نشر الجوال في دليل الموقع أم استخدامٌ للموقع فقط
+      ALTER TABLE public.almfrje_members ADD COLUMN IF NOT EXISTS phone_public boolean not null default false;
       -- ربط العضو بشخصه في الشجرة (يُحفظ تلقائياً عند إنشاء الحساب من المنتقي) —
       -- منه يُعرف فرعه الحقيقي (للمتواجدين وغيرها) دون تخمين.
       ALTER TABLE public.almfrje_members ADD COLUMN IF NOT EXISTS person_id bigint references public.almfrje_persons(id) on delete set null;
@@ -354,8 +356,8 @@ export const ALMFRJE_SCHEMA_SQL = `
       -- ختم إصدار المخطط: يرتفع مع كل تعديلٍ للمخطط، ووجوده بالقيمة الأحدث في القاعدة
       -- دليلٌ قاطع أن قناة الترقية التلقائية (/api/almfrje-setup) تعمل.
       INSERT INTO public.almfrje_settings (key, value)
-        VALUES ('schema_rev', '"2026-07-06-7"'::jsonb)
-        ON CONFLICT (key) DO UPDATE SET value = '"2026-07-06-7"'::jsonb, updated_at = now();
+        VALUES ('schema_rev', '"2026-07-06-8"'::jsonb)
+        ON CONFLICT (key) DO UPDATE SET value = '"2026-07-06-8"'::jsonb, updated_at = now();
 
       -- ملاحظات الزوار: يرسلها أي زائر/عضو، ويراجعها المدير ويضع علامة «تم».
       CREATE TABLE IF NOT EXISTS public.almfrje_feedback (
