@@ -734,7 +734,7 @@ function render() {
   bindHints(view());   // فعّل أزرار (i) في كل شاشة
   bindEyes(view());    // فعّل أزرار العين في كل شاشة
   // تبويبات لوحة التحكم (تظهر في شاشات المدير فقط)
-  view().querySelectorAll('.admin-tab').forEach(b => b.addEventListener('click', () => setHash(b.dataset.go)));
+  view().querySelectorAll('.admin-tab').forEach(b => b.addEventListener('click', () => setHash(b.dataset.go)));  guestOnboard();   // التسجيل الإجباري للزائر المتحقَّق (يلاحقه في كل الشاشات حتى يسجّل)
 }
 function addFab(label, onClick) { const f = document.createElement('button'); f.className = 'fab'; f.textContent = label; f.addEventListener('click', onClick); document.body.appendChild(f); }
 // شريط تبويبات لوحة التحكم (للمدير) — كل شاشة إدارية تعرضه أعلاها.
@@ -947,7 +947,6 @@ function screenHome() {
   bindGo();
   pingPresence(false);   // تحديث «المتواجدون الآن حسب الفرع» عند فتح الرئيسية
   loadMyReplies();       // ردود الإدارة على ملاحظات هذا المستخدم (إن وُجدت)
-  guestOnboard();        // استكمال بيانات الزائر المتحقَّق أو دعوته للدخول بحسابه
   // إضافة المولود انتقلت إلى قائمة «المزيد» (للمدير ومشرف الفرع) — لا زرّ عائم بالرئيسية.
 }
 // تصفير «آخر الإضافات» (للمدير فقط): تأكيدان + كتابة الكلمة + إمكانية تراجع.
@@ -3119,20 +3118,23 @@ async function loadMyReplies() {
 // فيُنشأ حسابه بانتظار التفعيل؛ وإن كان له حساب دُعي للدخول به ليطّلع على رسائله.
 function guestOnboard() {
   if (!isGuestUser()) return;
-  let pid = 0, hasacct = null, shown = '1';
+  let pid = 0, hasacct = null;
   try {
     pid = parseInt(sessionStorage.getItem('almfrje_guest_pid') || '0', 10);
     hasacct = sessionStorage.getItem('almfrje_guest_hasacct');
-    shown = sessionStorage.getItem('almfrje_onboard') || '';
   } catch (e) { /* */ }
-  if (!pid || shown === '1' || hasacct == null) return;
-  try { sessionStorage.setItem('almfrje_onboard', '1'); } catch (e) { /* */ }
+  if (!pid || hasacct == null) return;
+  if (window._onbPoll) return;   // لا تكرار لمؤقّتات الانتظار
   const name = currentUserName();
-  let tries = 0;
-  const showWhenFree = () => {
-    const root = document.getElementById('modalRoot');
-    if (root && root.innerHTML.trim()) { if (tries++ < 60) setTimeout(showWhenFree, 800); return; }
-    if (hasacct === '1') {
+  // له حساب: دعوة للدخول — مرة واحدة لكل جلسة (غير قسرية)
+  if (hasacct === '1') {
+    try { if (sessionStorage.getItem('almfrje_onboard') === '1') return; sessionStorage.setItem('almfrje_onboard', '1'); } catch (e) { /* */ }
+    window._onbPoll = true;
+    let tries = 0;
+    const show = () => {
+      const root = document.getElementById('modalRoot');
+      if (root && root.innerHTML.trim()) { if (tries++ < 60) { setTimeout(show, 800); return; } window._onbPoll = false; return; }
+      window._onbPoll = false;
       openModal('🔐 أنت مسجّلٌ لدينا', `
         <div style="font-size:.95rem;line-height:1.9;text-align:center">حيّاك الله <b>${esc(name)}</b> 🌿<br>لديك حسابٌ مسجّل — ادخل به لتطّلع على <b>رسائلك وردود الإدارة</b> وكل جديدٍ يخصّك.</div>
         <button class="btn" id="go_login" style="width:100%;margin-top:10px">🔐 دخول بحسابي (الجوال وكلمة المرور)</button>
@@ -3140,20 +3142,28 @@ function guestOnboard() {
         document.getElementById('go_login').addEventListener('click', () => { closeModal(); setHash('#adminlogin'); });
         document.getElementById('go_skip').addEventListener('click', closeModal);
       });
-      return;
-    }
-    openModal('🌿 حيّاك الله — أكمل بياناتك', `
-      <div style="font-size:.9rem;line-height:1.9;margin-bottom:8px">أهلاً <b>${esc(name)}</b>! بياناتك في الشجرة غير مكتملة — أكملها ليُنشأ لك <b>حسابٌ خاص</b> تطّلع به على رسائلك:</div>
+    };
+    setTimeout(show, 900);
+    return;
+  }
+  // لا حساب له: التسجيل إجباري — لا يُتجاوز (لا زر تخطٍّ ولا إغلاق) حتى يسجّل
+  try { if (sessionStorage.getItem('almfrje_signed') === '1') return; } catch (e) { /* */ }
+  window._onbPoll = true;
+  let tries = 0;
+  const show = () => {
+    const root = document.getElementById('modalRoot');
+    if (root && root.innerHTML.trim()) { if (tries++ < 90) { setTimeout(show, 700); return; } window._onbPoll = false; return; }
+    window._onbPoll = false;
+    openModal('🌿 حيّاك الله — أكمل تسجيلك', `
+      <div style="font-size:.9rem;line-height:1.9;margin-bottom:8px">أهلاً <b>${esc(name)}</b>! لإتمام دخولك يلزم استكمال بياناتك وإنشاء حسابك — <b>خطوة واحدة لا تتكرر</b>:</div>
       <div class="field"><input id="go_phone" class="req-in" type="tel" inputmode="tel" placeholder="📱 رقم الجوال — إجباري *"></div>
+      <div class="field"><input id="go_pw" class="req-in" type="password" placeholder="🔒 كلمة المرور — إجباري *"></div>
       <div class="field"><input id="go_nick" type="text" placeholder="اللقب (اختياري)"></div>
       <div class="grid2">
         <div class="field"><input id="go_city" type="text" placeholder="المدينة (اختياري)"></div>
         <div class="field"><input id="go_birth" type="text" placeholder="سنة الميلاد مثل 1410هـ (اختياري)"></div>
       </div>
-      <div class="field"><input id="go_pw" class="req-in" type="password" placeholder="🔒 كلمة المرور — إجباري *"></div>
-      <button class="btn" id="go_send" style="width:100%">✅ تسجيل بياناتي</button>
-      <button class="btn outline" id="go_later" style="width:100%;margin-top:8px">لاحقاً — متابعة كزائر</button>`, () => {
-      document.getElementById('go_later').addEventListener('click', closeModal);
+      <button class="btn" id="go_send" style="width:100%">✅ تسجيل بياناتي</button>`, () => {
       document.getElementById('go_send').addEventListener('click', async () => {
         const phone = normPhone(val('go_phone'));
         if (phone.length < 9) { toast('رقم الجوال إجباري — اكتبه صحيحاً'); return; }
@@ -3164,14 +3174,15 @@ function guestOnboard() {
           const res = await fetch('/api/almfrje-signup', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + (session && session.access_token) }, body: JSON.stringify(body) });
           const j = await res.json().catch(() => ({}));
           if (!res.ok || !j.ok) throw new Error(j.error || 'تعذّر التسجيل');
+          try { sessionStorage.setItem('almfrje_signed', '1'); } catch (e) { /* */ }
           closeModal();
           openModal('✅ شكراً لك', `<div style="text-align:center;font-size:1rem;line-height:2;padding:6px 0">استُلمت بياناتك وسوف <b>يُفعَّل حسابك لاحقاً</b> بعد مراجعة الإدارة.<br>يمكنك بعدها الدخول على حسابك من «المزيد ← دخول المسؤول»<br>📱 برقم جوالك وكلمة المرور التي اخترتها.</div>`);
         });
         if (!ok) { /* بقيت النافذة ليصحح */ }
       });
-    });
+    }, { noClose: true, noBgClose: true });
   };
-  setTimeout(showWhenFree, 900);
+  setTimeout(show, 900);
 }
 // نداء خادم إدارة الملاحظات (يعمل بمفتاح خدمي بعد التحقق — لا يعتمد على RLS).
 async function fbApi(action, id, extra) {
@@ -4364,7 +4375,7 @@ const GUIDE = [
     { t: 'إرسال ملاحظة للإدارة', fn: 'إبلاغ الإدارة بخطأ أو طلب إضافة/تصحيح/ترتيب.', brief: 'يُؤخذ اسمك الذي دخلت به تلقائياً، وتختار الموضوع: إضافة مولود • ملاحظة • اقتراح • إعادة ترتيب الإخوان.', det: 'طلب إضافة مولود يصل منظّماً فيوافق عليه المدير أو المشرف بعد تأكيدات. وطلب «إعادة ترتيب الإخوان»: تختار الأب فتظهر قائمة أبنائه ترتّبها بالسهمين ▲▼ ثم ترسلها، فتعتمدها الإدارة أو ترفضها مع ردٍّ يصلك باسمها.' },
   ]},
   { sec: '🔐 دخول الإدارة والصلاحيات', role: 'admin', items: [
-    { t: 'استكمال بياناتك وإنشاء حساب (للزائر)', fn: 'يحوّل دخولك بالاسم إلى حسابٍ خاص.', brief: 'بعد دخولك باسمك: إن لم يكن لك حساب تُفتح لك حقول (الجوال إجباري، واللقب والمدينة وسنة الميلاد وكلمة المرور اختيارية).', det: 'بعد التسجيل: «شكراً لك — سوف يُفعَّل حسابك لاحقاً» بعد مراجعة الإدارة، ثم تدخل من «دخول المسؤول» برقم جوالك وكلمة مرورك (الافتراضية رقم جوالك إن لم تختر غيرها). وإن كان لك حسابٌ مسبقاً دُعيت للدخول به لتطّلع على رسائلك التي تظهر واضحةً في الرئيسية.' },
+    { t: 'استكمال بياناتك وإنشاء حساب (للزائر)', fn: 'يحوّل دخولك بالاسم إلى حسابٍ خاص.', brief: 'بعد دخولك باسمك: إن لم يكن لك حساب يلزمك استكمال التسجيل (الجوال وكلمة المرور إجباريان بحقولٍ حمراء، واللقب والمدينة وسنة الميلاد اختيارية) — خطوة واحدة لا تُتجاوز ولا تتكرر.', det: 'بعد التسجيل: «شكراً لك — سوف يُفعَّل حسابك لاحقاً» بعد مراجعة الإدارة، ثم تدخل من «دخول المسؤول» برقم جوالك وكلمة مرورك (الافتراضية رقم جوالك إن لم تختر غيرها). وإن كان لك حسابٌ مسبقاً دُعيت للدخول به لتطّلع على رسائلك التي تظهر واضحةً في الرئيسية.' },
     { t: 'دخول المسؤول / مشرف الفرع', fn: 'دخول الإدارة لإضافة البيانات وتعديلها.', brief: 'من «المزيد ← دخول المسؤول / مشرف الفرع» بالجوال أو اسم المستخدم والرقم السري.', det: 'مدير النظام له صلاحية كاملة على كل الأقسام. مشرف الفرع يضيف ويعدّل ضمن فرعه المصرّح به فقط، ولا يرى أقسام الإدارة العامة. شاشة دخول الإدارة لا تظهر عبر رابطٍ مُرسَل أبداً — أي رابطٍ يُفتح يعرض دخول الزائر فقط.' },
     { t: 'صندوق الوارد', fn: 'كل ملاحظات وطلبات الزوار في مكانٍ واحد.', brief: 'تبويبان: 📥 ملاحظات الزوار (بانتظار الحسم) و🗂️ الأرشيف (المحسومة). وشارة عددٍ حمراء تتسلسل من تبويب «المزيد» حتى البند لتقودك إليه، وتنبيهٌ برسائل الصندوق فور دخولك.', det: 'المدير يرى الكل؛ والمشرف ما يخصّ فروعه. من البطاقة: اعتماد المولود أو الترتيب، الرد باسم الإدارة من بنك الردود، حفظ جوال المرسل في ملفه، ثم تنتقل المحسومة للأرشيف.' },
     { t: 'المناقشات (الإدارة العليا)', fn: 'غرف نقاشٍ داخلية للمدير والمشرفين العامين فقط.', brief: 'المزيد ← «💬 المناقشات»: كل موضوعٍ محادثة مستقلة بأسلوب واتساب.', det: 'أنشئ موضوعاً بعنوانٍ واضح، وتحاور فيه بفقاعات رسائل (رسائلك بلونٍ مميّز والآخرون بأسمائهم)، مع فواصل الأيام ووقت كل رسالة، ومؤشرٍ أخضر للمواضيع التي فيها جديدٌ لم تقرأه، وتحديثٍ تلقائي أثناء فتح الغرفة. حذف الموضوع كاملاً للمدير وحده.' },
@@ -5629,7 +5640,7 @@ function openModal(title, body, onMount, opts) {
   const root = document.getElementById('modalRoot');
   const closeBtn = opts.noClose ? '' : `<button class="btn outline" id="modalClose" style="margin-top:10px">إلغاء</button>`;
   root.innerHTML = `<div class="modal-bg"><div class="modal"><h3>${esc(title)}</h3>${body}${closeBtn}</div></div>`;
-  root.querySelector('.modal-bg').addEventListener('click', e => { if (e.target.classList.contains('modal-bg')) closeModal(); });
+  if (!opts.noBgClose) root.querySelector('.modal-bg').addEventListener('click', e => { if (e.target.classList.contains('modal-bg')) closeModal(); });
   { const cb = document.getElementById('modalClose'); if (cb) cb.addEventListener('click', closeModal); }
   bindHints(root);
   if (onMount) onMount();
