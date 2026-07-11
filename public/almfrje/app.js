@@ -3142,27 +3142,42 @@ function guestOnboard() {
     pid = parseInt(sessionStorage.getItem('almfrje_guest_pid') || '0', 10);
     hasacct = sessionStorage.getItem('almfrje_guest_hasacct');
   } catch (e) { /* */ }
-  if (!pid || hasacct == null) return;
+  if (!pid && hasacct !== null) return;   // (البقية تُعالَج أدناه بكل الحالات)
   if (window._onbPoll) return;   // لا تكرار لمؤقّتات الانتظار
   const name = currentUserName();
-  // له حساب: دعوة للدخول — مرة واحدة لكل جلسة (غير قسرية)
+  // له حساب: الدخول به إلزامي — لا تصفّح كزائر ولا إغلاق للنافذة
   if (hasacct === '1') {
-    try { if (sessionStorage.getItem('almfrje_onboard') === '1') return; sessionStorage.setItem('almfrje_onboard', '1'); } catch (e) { /* */ }
     window._onbPoll = true;
     let tries = 0;
     const show = () => {
       const root = document.getElementById('modalRoot');
-      if (root && root.innerHTML.trim()) { if (tries++ < 60) { setTimeout(show, 800); return; } window._onbPoll = false; return; }
+      if (root && root.innerHTML.trim()) { if (tries++ < 90) { setTimeout(show, 700); return; } window._onbPoll = false; return; }
       window._onbPoll = false;
-      openModal('🔐 أنت مسجّلٌ لدينا', `
-        <div style="font-size:.95rem;line-height:1.9;text-align:center">حيّاك الله <b>${esc(name)}</b> 🌿<br>لديك حسابٌ مسجّل — ادخل به لتطّلع على <b>رسائلك وردود الإدارة</b> وكل جديدٍ يخصّك.</div>
-        <button class="btn" id="go_login" style="width:100%;margin-top:10px">🔐 دخول بحسابي (الجوال وكلمة المرور)</button>
-        <button class="btn outline" id="go_skip" style="width:100%;margin-top:8px">متابعة كزائر</button>`, () => {
+      openModal('🔐 الدخول بحسابك مطلوب', `
+        <div style="font-size:.95rem;line-height:1.9;text-align:center;background:#fff5f5;border:1px solid #e03131;border-radius:10px;padding:8px 10px;color:#c92a2a;font-weight:700;margin-bottom:8px">الدخول على الموقع بالحساب فقط</div>
+        <div style="font-size:.95rem;line-height:1.9;text-align:center">حيّاك الله <b>${esc(name)}</b> 🌿<br>لديك حسابٌ مسجّل — ادخل به وسيوجّهك الموقع حسب صلاحيتك، وتطّلع على <b>رسائلك وردود الإدارة</b>.</div>
+        <button class="btn" id="go_login" style="width:100%;margin-top:10px">🔐 دخول بحسابي (الجوال وكلمة المرور)</button>`, () => {
         document.getElementById('go_login').addEventListener('click', () => { closeModal(); setHash('#adminlogin'); });
-        document.getElementById('go_skip').addEventListener('click', closeModal);
-      });
+      }, { noClose: true, noBgClose: true });
     };
     setTimeout(show, 900);
+    return;
+  }
+  // زائر بلا تحقّق اسم (جلسة قديمة أو دخول مباشر): لا تصفّح — يخرج ليدخل باسمه فيسجَّل
+  if (hasacct == null) {
+    window._onbPoll = true;
+    let tries0 = 0;
+    const show0 = () => {
+      const root = document.getElementById('modalRoot');
+      if (root && root.innerHTML.trim()) { if (tries0++ < 90) { setTimeout(show0, 700); return; } window._onbPoll = false; return; }
+      window._onbPoll = false;
+      openModal('🔐 الدخول بالحساب فقط', `
+        <div style="font-size:.95rem;line-height:1.9;text-align:center">لم يعد التصفّح كزائرٍ متاحاً — الدخول بحسابٍ مسجّل فقط.<br>اخرج ثم ادخل <b>باسمك ونسبك</b> ليكتمل تسجيلك، أو ادخل بحسابك إن كان لديك.</div>
+        <button class="btn" id="go_exit0" style="width:100%;margin-top:10px">🚪 خروج للدخول بالاسم أو بالحساب</button>`, () => {
+        document.getElementById('go_exit0').addEventListener('click', async () => { try { await sb.auth.signOut(); } catch (e) { /* */ } location.hash = ''; location.reload(); });
+      }, { noClose: true, noBgClose: true });
+    };
+    setTimeout(show0, 900);
     return;
   }
   // لا حساب له: التسجيل إجباري — لا يُتجاوز (لا زر تخطٍّ ولا إغلاق) حتى يسجّل
@@ -3202,7 +3217,10 @@ function guestOnboard() {
           if (!res.ok || !j.ok) throw new Error(j.error || 'تعذّر التسجيل');
           try { sessionStorage.setItem('almfrje_signed', '1'); } catch (e) { /* */ }
           closeModal();
-          openModal('✅ شكراً لك', `<div style="text-align:center;font-size:1rem;line-height:2;padding:6px 0">استُلمت بياناتك وسوف <b>يُفعَّل حسابك لاحقاً</b> بعد مراجعة الإدارة.<br>يمكنك بعدها الدخول على حسابك من «المزيد ← دخول المسؤول»<br>📱 برقم جوالك وكلمة المرور التي اخترتها.</div>`);
+          openModal('✅ شكراً لك', `<div style="text-align:center;font-size:1rem;line-height:2;padding:6px 0">استُلمت بياناتك وسوف <b>يُفعَّل حسابك لاحقاً</b> بعد مراجعة الإدارة.<br>بعد التفعيل ادخل بحسابك 📱 برقم جوالك وكلمة المرور التي اخترتها.</div>
+            <button class="btn" id="go_done" style="width:100%">حسناً</button>`, () => {
+            document.getElementById('go_done').addEventListener('click', async () => { try { await sb.auth.signOut(); } catch (e2) { /* */ } location.hash = ''; location.reload(); });
+          }, { noClose: true, noBgClose: true });
         });
         if (!ok) { /* بقيت النافذة ليصحح */ }
       });
