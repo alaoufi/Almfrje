@@ -1124,3 +1124,11 @@ ul.hier ul.hier > .hier-li::before {
 .req-in::placeholder { color: #e03131; opacity: .95; font-weight: 700; }
 :root[data-theme="dark"] .req-in { background: #2a1215 !important; }
 @media (prefers-color-scheme: dark) { .req-in { background: #2a1215 !important; } }
+
+/* نافذة التسجيل: ضغطٌ عمودي لتظهر كل الحقول دفعةً واحدة على الجوال */
+.signup-compact .field { margin-bottom: 6px; }
+.signup-compact .field input { padding: 8px 10px; font-size: .88rem; min-height: 0; }
+.signup-compact .grid2 { gap: 6px; }
+.signup-compact .perm-chk { padding: 3px 0; font-size: .82rem; }
+.signup-compact .btn { padding: 10px 12px; }
+.modal { max-height: 94vh; overflow-y: auto; }
