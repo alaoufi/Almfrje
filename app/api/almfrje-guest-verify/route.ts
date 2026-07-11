@@ -50,7 +50,8 @@ export async function POST(request: NextRequest) {
   (settings || []).forEach((r: { key: string; value: unknown }) => { map[r.key] = r.value; });
   if (map.guest_open !== true) return NextResponse.json({ ok: false, error: 'الموقع مغلق للزوّار' }, { status: 403 });
   const gens = Math.max(0, parseInt(String(map.guest_verify_gens ?? 0), 10) || 0);
-  if (gens <= 0) return NextResponse.json({ ok: true });   // التحقّق غير مفعّل → دخول مباشر
+    // سياسة «الحساب فقط»: التحقق بالاسم يعمل دائماً (تجاوز إيقافه القديم)
+  const gensEff = gens <= 0 ? 2 : gens;
 
   const names = input.split(/\s+/).map((w) => w.trim()).filter((w) => w && w !== 'بن' && w !== 'ابن');
   // الحد الأدنى = ثلاثة أسماء (أنت + أبوك + جدّك) لتقليل الالتباس واحتمال الانتحال.

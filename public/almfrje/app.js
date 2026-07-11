@@ -3142,7 +3142,7 @@ function guestOnboard() {
     pid = parseInt(sessionStorage.getItem('almfrje_guest_pid') || '0', 10);
     hasacct = sessionStorage.getItem('almfrje_guest_hasacct');
   } catch (e) { /* */ }
-  if (!pid && hasacct !== null) return;   // (البقية تُعالَج أدناه بكل الحالات)
+  if (!pid) hasacct = null;   // بلا شخصٍ متحقَّق لا مسار تسجيل — يُعامل كجلسةٍ بلا تحقق (بوابة الخروج)
   if (window._onbPoll) return;   // لا تكرار لمؤقّتات الانتظار
   const name = currentUserName();
   // له حساب: الدخول به إلزامي — لا تصفّح كزائر ولا إغلاق للنافذة
@@ -3192,8 +3192,22 @@ function guestOnboard() {
     setTimeout(showP, 150);
     return;
   }
-  // لا حساب له وجواله غير مسجّل: التسجيل إجباري — لا يُتجاوز (لا زر تخطٍّ ولا إغلاق) حتى يسجّل
-  try { if (sessionStorage.getItem('almfrje_signed') === '1') return; } catch (e) { /* */ }
+  // سجّل سابقاً في هذه الجلسة وحسابه بانتظار التفعيل: لا تصفّح — بوابة انتظار
+  let signed = null; try { signed = sessionStorage.getItem('almfrje_signed'); } catch (e) { /* */ }
+  if (signed === '1') {
+    window._onbPoll = true;
+    const showW = () => {
+      window._onbPoll = false; closeModal();
+      openModal('⏳ حسابك بانتظار التفعيل', `
+        <div style="font-size:.95rem;line-height:1.9;text-align:center">استُلم تسجيلك ✓ وسيُفعَّل حسابك بعد مراجعة الإدارة.<br>بعد التفعيل ادخل بجوالك وكلمة المرور من صفحة الدخول.</div>
+        <button class="btn" id="go_wait_exit" style="width:100%;margin-top:10px">→ رجوع لصفحة الدخول</button>`, () => {
+        document.getElementById('go_wait_exit').addEventListener('click', async () => { try { await sb.auth.signOut(); } catch (e2) { /* */ } location.hash = '#login'; location.reload(); });
+      }, { noClose: true, noBgClose: true });
+    };
+    setTimeout(showW, 150);
+    return;
+  }
+  // لا حساب له وجواله غير مسجّل: التسجيل إجباري — لا يُتجاوز حتى يسجّل
   window._onbPoll = true;
   const show = () => {
     window._onbPoll = false;
@@ -5920,11 +5934,10 @@ function renderAuth() {
   document.querySelectorAll('.fab').forEach(f => f.remove());   // أزل الأزرار العائمة عند الخروج
   document.getElementById('app').classList.add('hidden');
   const box = document.getElementById('auth'); box.classList.remove('hidden');
-  const gated = guestOpen && guestGens > 0;
   // البوابة الافتراضية: الدخول بالحساب (جوال + كلمة مرور). الدخول بالاسم = مسار التسجيل فقط (بزرّه).
   const nameMode = window._authNameMode === true;
   const adminMode = !nameMode;
-  if (!adminMode && gated) {
+  if (!adminMode) {
     // ===== واجهة الزائر: حقل واحد فقط (الاسم بالتسلسل) =====
     box.innerHTML = `<div class="auth-box">
       <div class="logo" style="font-size:3.2rem">🌳</div>
@@ -6254,7 +6267,7 @@ async function init() {
     } else {
       _authUid = null; me = null;
       // بعد الخروج: إن كان الموقع مفتوحاً للزوّار ولسنا على رابط الإدارة، اعرض التصفّح مباشرةً.
-      if (guestOpen && guestGens <= 0 && !isAdminLoginUrl()) browseAsGuest(); else renderAuth();
+      renderAuth();   // سياسة «الحساب فقط»: لا تصفّح ضيفاً تلقائياً بأي إعداد
     }
   });
   // رابط مُشارَك يحمل ‎#login‎/‎#admin‎؟ يُمسح عند كل فتحٍ جديد للصفحة، فلا تظهر شاشة
@@ -6281,10 +6294,6 @@ async function init() {
       if (guestSess) bumpGuestTs();
       _authUid = session.user.id; await enterApp(session);
     }
-  } else if (!wantAdmin && guestOpen && guestGens <= 0) {
-    // لا جلسة + الموقع مفتوح بلا بوابة تحقّق → دخول الزائر مباشرةً للتصفّح
-    const ok = await browseAsGuest();
-    if (!ok) { showLoading(false); renderAuth(); }
   } else {
     showLoading(false); renderAuth();
   }
