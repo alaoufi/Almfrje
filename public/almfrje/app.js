@@ -3154,8 +3154,9 @@ function guestOnboard() {
     const root = document.getElementById('modalRoot');
     if (root && root.innerHTML.trim()) { if (tries++ < 90) { setTimeout(show, 700); return; } window._onbPoll = false; return; }
     window._onbPoll = false;
-    openModal('🌿 حيّاك الله — أكمل تسجيلك', `
-      <div style="font-size:.9rem;line-height:1.9;margin-bottom:8px">أهلاً <b>${esc(name)}</b>! لإتمام دخولك يلزم استكمال بياناتك وإنشاء حسابك — <b>خطوة واحدة لا تتكرر</b>:</div>
+    openModal('🌿 التسجيل مطلوب للدخول على الموقع', `
+      <div style="font-size:.95rem;line-height:1.9;margin-bottom:8px;text-align:center;background:#fff5f5;border:1px solid #e03131;border-radius:10px;padding:8px 10px;color:#c92a2a;font-weight:700">التسجيل مطلوبٌ للدخول على الموقع</div>
+      <div style="font-size:.9rem;line-height:1.9;margin-bottom:8px">أهلاً <b>${esc(name)}</b>! أكمل بياناتك لإنشاء حسابك — <b>خطوة واحدة لا تتكرر</b>:</div>
       <div class="field"><input id="go_phone" class="req-in" type="tel" inputmode="tel" placeholder="📱 رقم الجوال — إجباري *"></div>
       <div class="field"><input id="go_pw" class="req-in" type="password" placeholder="🔒 كلمة المرور — إجباري *"></div>
       <div class="field"><input id="go_nick" type="text" placeholder="اللقب (اختياري)"></div>
