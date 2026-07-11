@@ -25,6 +25,24 @@ export async function POST(request: NextRequest) {
 
   const admin0 = createClient(url, service, { auth: { persistSession: false, autoRefreshToken: false } });
 
+  // العضو يحدّث بيانات ملفه الشخصي (شخصه المرتبط في الشجرة) — حقول محدّدة ولنفسه حصراً
+  if (String(b.action || '') === 'myinfo') {
+    const { data: memRow } = await admin0.from('almfrje_members').select('user_id,person_id,is_active').eq('user_id', who.user.id).maybeSingle();
+    if (!memRow || !memRow.is_active) return NextResponse.json({ ok: false, error: 'الحساب غير مفعّل' }, { status: 403 });
+    if (!memRow.person_id) return NextResponse.json({ ok: false, error: 'حسابك غير مرتبطٍ بشخصٍ في الشجرة — تواصل مع الإدارة' }, { status: 400 });
+    const patch: Record<string, string> = {};
+    const nick = String(b.nickname ?? '').trim().slice(0, 60);
+    const cty = String(b.city ?? '').trim().slice(0, 60);
+    const brt = String(b.birth ?? '').trim().slice(0, 30);
+    if (b.nickname !== undefined) patch.nickname = nick;
+    if (b.city !== undefined) patch.city = cty;
+    if (b.birth !== undefined) patch.birth = brt;
+    if (!Object.keys(patch).length) return NextResponse.json({ ok: true });
+    const { error: pe } = await admin0.from('almfrje_persons').update(patch).eq('id', memRow.person_id);
+    if (pe) return NextResponse.json({ ok: false, error: pe.message }, { status: 400 });
+    return NextResponse.json({ ok: true });
+  }
+
   // تغيير خصوصية الجوال من «ملفي الشخصي» — لصاحب الحساب حصراً، مع تطبيق الأثر على ملفه بالشجرة
   if (String(b.action || '') === 'privacy') {
     const publish = b.publish === true;
