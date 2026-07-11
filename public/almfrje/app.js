@@ -3148,64 +3148,56 @@ function guestOnboard() {
   // له حساب: الدخول به إلزامي — لا تصفّح كزائر ولا إغلاق للنافذة
   if (hasacct === '1') {
     window._onbPoll = true;
-    let tries = 0;
     const show = () => {
-      const root = document.getElementById('modalRoot');
-      if (root && root.innerHTML.trim()) { if (tries++ < 90) { setTimeout(show, 700); return; } window._onbPoll = false; return; }
       window._onbPoll = false;
+      closeModal();   // بوابة إلزامية — تُزيح الترحيب/التهنئة وتظهر فوراً
       openModal('🔐 الدخول بحسابك مطلوب', `
         <div style="font-size:.95rem;line-height:1.9;text-align:center;background:#fff5f5;border:1px solid #e03131;border-radius:10px;padding:8px 10px;color:#c92a2a;font-weight:700;margin-bottom:8px">الدخول على الموقع بالحساب فقط</div>
         <div style="font-size:.95rem;line-height:1.9;text-align:center">حيّاك الله <b>${esc(name)}</b> 🌿<br>لديك حسابٌ مسجّل … ادخل بجوالك وكلمة المرور … وستمتع بجولةٍ بين ربعك وأبناء عمومتك … وتطّلع على <b>مراسلاتك</b>.</div>
         <button class="btn" id="go_login" style="width:100%;margin-top:10px">🔐 دخول بحسابي (الجوال وكلمة المرور)</button>`, () => {
-        document.getElementById('go_login').addEventListener('click', () => { closeModal(); setHash('#adminlogin'); });
+        document.getElementById('go_login').addEventListener('click', async () => { closeModal(); try { await sb.auth.signOut(); } catch (e2) { /* */ } location.hash = '#login'; location.reload(); });
       }, { noClose: true, noBgClose: true });
     };
-    setTimeout(show, 900);
+    setTimeout(show, 150);
     return;
   }
   // زائر بلا تحقّق اسم (جلسة قديمة أو دخول مباشر): لا تصفّح — يخرج ليدخل باسمه فيسجَّل
   if (hasacct == null) {
     window._onbPoll = true;
-    let tries0 = 0;
     const show0 = () => {
-      const root = document.getElementById('modalRoot');
-      if (root && root.innerHTML.trim()) { if (tries0++ < 90) { setTimeout(show0, 700); return; } window._onbPoll = false; return; }
       window._onbPoll = false;
+      closeModal();
       openModal('🔐 الدخول بالحساب فقط', `
         <div style="font-size:.95rem;line-height:1.9;text-align:center">لم يعد التصفّح كزائرٍ متاحاً — الدخول بحسابٍ مسجّل فقط.<br>اخرج ثم ادخل <b>باسمك ونسبك</b> ليكتمل تسجيلك، أو ادخل بحسابك إن كان لديك.</div>
         <button class="btn" id="go_exit0" style="width:100%;margin-top:10px">🚪 خروج للدخول بالاسم أو بالحساب</button>`, () => {
         document.getElementById('go_exit0').addEventListener('click', async () => { try { await sb.auth.signOut(); } catch (e) { /* */ } location.hash = ''; location.reload(); });
       }, { noClose: true, noBgClose: true });
     };
-    setTimeout(show0, 900);
+    setTimeout(show0, 150);
     return;
   }
   // جواله مسجّل في ملفه أساساً (وإن لم نجد حساباً): لا تسجيل — يعود لصفحة الدخول
   let hasph = null; try { hasph = sessionStorage.getItem('almfrje_guest_hasphone'); } catch (e) { /* */ }
   if (hasph === '1') {
     window._onbPoll = true;
-    let triesP = 0;
     const showP = () => {
-      const root = document.getElementById('modalRoot');
-      if (root && root.innerHTML.trim()) { if (triesP++ < 90) { setTimeout(showP, 700); return; } window._onbPoll = false; return; }
       window._onbPoll = false;
+      closeModal();
       openModal('📱 جوالك مسجّلٌ لدينا', `
         <div style="font-size:.95rem;line-height:1.9;text-align:center">حيّاك الله <b>${esc(name)}</b> 🌿<br>بياناتك مكتملة وجوالك مسجّل أساساً — <b>لا حاجة للتسجيل</b>.<br>ادخل من صفحة الدخول بجوالك وكلمة المرور، وإن تعذّرت فاستخدم زر <b>«مراسلة الإدارة»</b> هناك.</div>
         <button class="btn" id="go_back_login" style="width:100%;margin-top:10px">🚪 الرجوع لصفحة الدخول</button>`, () => {
         document.getElementById('go_back_login').addEventListener('click', async () => { try { await sb.auth.signOut(); } catch (e2) { /* */ } location.hash = ''; location.reload(); });
       }, { noClose: true, noBgClose: true });
     };
-    setTimeout(showP, 900);
+    setTimeout(showP, 150);
     return;
   }
   // لا حساب له وجواله غير مسجّل: التسجيل إجباري — لا يُتجاوز (لا زر تخطٍّ ولا إغلاق) حتى يسجّل
   try { if (sessionStorage.getItem('almfrje_signed') === '1') return; } catch (e) { /* */ }
   window._onbPoll = true;
-  let tries = 0;
   const show = () => {
-    const root = document.getElementById('modalRoot');
-    if (root && root.innerHTML.trim()) { if (tries++ < 90) { setTimeout(show, 700); return; } window._onbPoll = false; return; }
     window._onbPoll = false;
+    closeModal();
     openModal('🌿 التسجيل مطلوب للدخول على الموقع', `
       <div class="signup-compact">
       <div style="font-size:.85rem;line-height:1.6;margin-bottom:6px;text-align:center;background:#fff5f5;border:1px solid #e03131;border-radius:8px;padding:5px 8px;color:#c92a2a;font-weight:700">التسجيل مطلوبٌ للدخول على الموقع</div>
@@ -3248,7 +3240,7 @@ function guestOnboard() {
       });
     }, { noClose: true, noBgClose: true });
   };
-  setTimeout(show, 900);
+  setTimeout(show, 150);
 }
 // نداء خادم إدارة الملاحظات (يعمل بمفتاح خدمي بعد التحقق — لا يعتمد على RLS).
 async function fbApi(action, id, extra) {
