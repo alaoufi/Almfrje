@@ -5907,7 +5907,9 @@ function renderAuth() {
   document.getElementById('app').classList.add('hidden');
   const box = document.getElementById('auth'); box.classList.remove('hidden');
   const gated = guestOpen && guestGens > 0;
-  const adminMode = isAdminLoginUrl() || !guestOpen;   // واجهة المسؤول على #login أو عند إغلاق الزوّار
+  // البوابة الافتراضية: الدخول بالحساب (جوال + كلمة مرور). الدخول بالاسم = مسار التسجيل فقط (بزرّه).
+  const nameMode = window._authNameMode === true;
+  const adminMode = !nameMode;
   if (!adminMode && gated) {
     // ===== واجهة الزائر: حقل واحد فقط (الاسم بالتسلسل) =====
     box.innerHTML = `<div class="auth-box">
@@ -5918,8 +5920,10 @@ function renderAuth() {
       ${fInput('اكتب اسمك بالتسلسل هنا', 'g_lineage', '')}
       <div style="font-size:.92rem;font-weight:700;margin:6px 0 4px;text-align:center">تدخل تلقائياً بمجرد أن يتميّز اسمك — مثال: <span style="color:var(--brand)">${esc(gensExample(3))}</span></div>
       <div class="auth-msg" id="a_msg"></div>
+      <button class="auth-guest-link" id="back_acct">→ رجوع لدخول الحساب (الجوال وكلمة المرور)</button>
       ${sitePowered ? `<div style="font-size:.68rem;opacity:.7;margin-top:18px;text-align:center;width:100%">${esc(sitePowered)}</div>` : ''}
     </div>`;
+    { const ba = document.getElementById('back_acct'); if (ba) ba.addEventListener('click', () => { window._authNameMode = false; renderAuth(); }); }
     const gi = document.getElementById('g_lineage');
     if (gi) {
       try { gi.focus(); } catch (e) {}
@@ -5933,36 +5937,66 @@ function renderAuth() {
   box.innerHTML = `<div class="auth-box">
     <div class="logo">🌳</div>${siteTitle ? `<h2 style="margin-bottom:0">${esc(siteTitle)}</h2>` : ''}
     ${occasionText ? `<div style="font-weight:800;font-size:1.05rem;margin:4px 0 2px;text-align:center;color:${okColor(occasionColor)}">${esc(occasionText)}</div>` : ''}
-    ${sitePowered ? `<div style="font-size:.72rem;opacity:.8;margin-bottom:.4rem">${esc(sitePowered)}</div>` : ''}<div class="sub">دخول المسؤول / مشرف الفرع</div>
-    ${fInput('الجوال أو اسم المستخدم', 'a_id', '')}
-    ${pinField('الرقم السري', 'a_pin')}
+    ${sitePowered ? `<div style="font-size:.72rem;opacity:.8;margin-bottom:.4rem">${esc(sitePowered)}</div>` : ''}<div class="sub">🔐 الدخول بالحساب</div>
+    ${fInput('📱 رقم الجوال (أو اسم المستخدم)', 'a_id', '')}
+    ${pinField('🔒 كلمة المرور', 'a_pin')}
     <button class="btn" id="a_submit">تسجيل الدخول</button>
     <div class="auth-msg" id="a_msg"></div>
-    ${guestOpen && guestGens <= 0 ? `<button class="auth-guest-link" id="a_guest">تصفّح الموقع كزائر ←</button>` : ''}
-    ${gated ? `<button class="auth-guest-link" id="to_guest">→ دخول الزوّار</button>` : ''}
+    <div id="a_extra"></div>
+    <button class="auth-guest-link" id="to_name">🌿 ليس لديك حساب؟ ادخل باسمك وسجّل ←</button>
     </div>`;
+  { const tn = document.getElementById('to_name'); if (tn) tn.addEventListener('click', () => { window._authNameMode = true; renderAuth(); }); }
   document.getElementById('a_submit').addEventListener('click', submit);
-  { const gb = document.getElementById('a_guest'); if (gb) gb.addEventListener('click', () => { const m = document.getElementById('a_msg'); m.className = 'auth-msg'; m.textContent = '… جارٍ فتح التصفّح'; location.hash = '#/home'; try { sessionStorage.removeItem('almfrje_greeted'); } catch (e) {} browseAsGuest(m); }); }
-  { const tg = document.getElementById('to_guest'); if (tg) tg.addEventListener('click', () => { location.hash = '#/home'; renderAuth(); }); }
   box.querySelectorAll('.eye').forEach(b => b.addEventListener('click', () => { const inp = document.getElementById(b.dataset.eye); const show = inp.type === 'password'; inp.type = show ? 'text' : 'password'; b.textContent = show ? '🙈' : '👁'; }));
   box.querySelectorAll('input').forEach(inp => inp.addEventListener('keydown', e => { if (e.key === 'Enter') submit(); }));
 
   async function submit() {
     const msg = document.getElementById('a_msg'); msg.className = 'auth-msg';
+    const extra = document.getElementById('a_extra'); if (extra) extra.innerHTML = '';
     const pin = val('a_pin').trim();
-    if (!PIN_RE.test(pin)) { msg.classList.add('err'); msg.textContent = 'الرقم السري ٤ أرقام على الأقل'; return; }
+    if (!PIN_RE.test(pin)) { msg.classList.add('err'); msg.textContent = 'كلمة المرور ٤ أحرف/أرقام على الأقل'; return; }
     const ident = val('a_id').trim();
-    if (!ident) { msg.classList.add('err'); msg.textContent = 'أدخل الجوال أو اسم المستخدم'; return; }
+    if (!ident) { msg.classList.add('err'); msg.textContent = 'أدخل رقم الجوال'; return; }
     msg.textContent = '… لحظة';
+    const digits = normPhone(ident);
     try {
-      const digits = normPhone(ident);
       const { data: email } = await sb.rpc('almfrje_resolve_login', { ident: digits || ident });
-      const loginEmail = email || (digits ? phoneToEmail(digits) : null);
-      if (!loginEmail) { msg.classList.add('err'); msg.textContent = 'بيانات الدخول غير صحيحة'; return; }
-      const { error } = await sb.auth.signInWithPassword({ email: loginEmail, password: pinToPass(pin) });
+      // ① الجوال غير مسجّل → وجّهه للدخول بالاسم والتسجيل
+      if (!email) {
+        msg.classList.add('err'); msg.textContent = 'هذا الجوال غير مسجّل لدينا';
+        if (extra) {
+          extra.innerHTML = `<button class="btn" id="a_goName" style="width:100%;margin-top:8px">🌿 الدخول بالاسم ثم تسجيل البيانات</button>`;
+          document.getElementById('a_goName').addEventListener('click', () => { window._authNameMode = true; renderAuth(); });
+        }
+        return;
+      }
+      const { error } = await sb.auth.signInWithPassword({ email, password: pinToPass(pin) });
       if (error) throw error;
+      // ✓ دخول صحيح → يتوجه تلقائياً حسب صلاحيته (مدير/مشرف/عضو)
       try { sessionStorage.removeItem('almfrje_greeted'); } catch (e2) { /* دخول فعلي → أظهر التهنئة مرّة */ }
-    } catch (e) { msg.classList.add('err'); msg.textContent = translateAuthError(e.message); }
+    } catch (e) {
+      // ② مسجّل لكن كلمة المرور خطأ → رسالة صريحة + مراسلة الإدارة
+      if (/Invalid login/i.test(e.message || '')) {
+        msg.classList.add('err'); msg.textContent = '❌ كلمة المرور خطأ';
+        if (extra) {
+          extra.innerHTML = `<button class="btn outline" id="a_help" style="width:100%;margin-top:8px">✉️ مراسلة الإدارة (نسيت كلمة المرور)</button>`;
+          document.getElementById('a_help').addEventListener('click', async () => {
+            const b = document.getElementById('a_help'); b.disabled = true; b.textContent = '… جارٍ الإرسال';
+            try {
+              const { error: fe } = await sb.from('almfrje_feedback').insert({
+                subject: 'ملاحظة', branch_id: null, error_desc: '',
+                details: '🔑 طلب مساعدة دخول: صاحب الجوال ' + (digits || ident) + ' يتعذّر عليه الدخول (كلمة المرور لا تعمل) — يرجو التواصل/إعادة التعيين.',
+                created_by_name: 'طلب مساعدة دخول', sender_phone: digits || '',
+              });
+              if (fe) throw fe;
+              b.textContent = '✅ وصلت رسالتك للإدارة — سيتواصلون معك';
+            } catch (e3) { b.disabled = false; b.textContent = '✉️ مراسلة الإدارة (نسيت كلمة المرور)'; msg.textContent = 'تعذّر الإرسال — حاول مجدداً'; }
+          });
+        }
+        return;
+      }
+      msg.classList.add('err'); msg.textContent = translateAuthError(e.message);
+    }
   }
 }
 function translateAuthError(m) {
