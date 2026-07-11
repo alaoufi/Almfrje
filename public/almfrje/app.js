@@ -2654,6 +2654,15 @@ async function savePerson(id, existing) {
     status: val('p_status'), work: val('p_work'), birth: val('p_birth').trim(), birthplace: val('p_birthplace').trim(), death: val('p_status') === 'dead' ? val('p_death').trim() : '',
     city: val('p_city').trim(), phone: val('p_phone').trim(), email: val('p_email').trim(), notes: val('p_notes').trim(),
   };
+  // حماية اختيار العضو: إن كان لهذا الشخص عضوٌ مرتبط اختار «استخدام الموقع فقط»،
+  // فلا يُكتب رقمُه الخاص في ملفه بالشجرة — حتى من الإدارة (القرار له وحده).
+  if (existing && obj.phone) {
+    const lmP = C.members.find(mm => Number(mm.person_id) === existing.id && mm.phone_public === false);
+    if (lmP && lmP.phone && normPhone(lmP.phone) === normPhone(obj.phone)) {
+      toast('🔒 صاحب هذا الملف اختار عدم نشر جواله — لا يُحفظ في ملفه. تغيير الخيار له وحده من ملفه الشخصي.');
+      return;
+    }
+  }
   if (existing && nameChanged && existing.name) {
     // تغيير اسم قائم حسّاسٌ في شجرة الأنساب: رسالتان تأكيديتان + كتابة عبارة تأكيد
     const chain = ancestryShort(existing.id, 4);
@@ -3254,9 +3263,12 @@ async function addSenderPhone(f) {
   if (!p) { toast('تعذّر تحديد شخص المرسل في الشجرة'); return; }
   if (!f.sender_phone) { toast('لا جوال مرفق مع الملاحظة'); return; }
   if (p.phone && normPhone(p.phone) === normPhone(f.sender_phone)) { toast('هذا الجوال مسجّل له مسبقاً'); return; }
-  // احترام اختيار الخصوصية: عضو اختار «استخدام الموقع فقط» لا يُنشر جواله في ملفه إلا بوعيٍ كامل
+  // قرار الخصوصية لصاحبه وحده — الإدارة لا تتجاوزه: منعٌ قاطع لا تحذير
   const lm = C.members.find(mm => Number(mm.person_id) === p.id);
-  if (lm && lm.phone_public === false && !(await confirm2('⚠️ هذا العضو اختار «استخدام الموقع فقط» لجواله (عدم النشر).\nنشره في ملفه بالشجرة يخالف اختياره.\nهل تتابع رغم ذلك؟', { title: 'تنبيه خصوصية', okText: 'متابعة على مسؤوليتي', danger: true }))) return;
+  if (lm && lm.phone_public === false) {
+    toast('🔒 هذا العضو اختار «استخدام الموقع فقط» — لا يمكن نشر جواله. تغيير الخيار له وحده من ملفه الشخصي.');
+    return;
+  }
   const msg = p.phone
     ? 'لهذا الشخص جوالٌ مسجّل (' + p.phone + ') — استبداله بجوال المرسل ' + f.sender_phone + '؟\n' + lineageShort(p.id, 6)
     : 'إضافة الجوال ' + f.sender_phone + ' إلى ملف:\n' + lineageShort(p.id, 6) + '؟';
@@ -5296,7 +5308,7 @@ function screenProfile() {
     </div>
 
     <div class="card"><h3>🔒 خصوصية رقم جوالك</h3>
-      <p class="muted" style="font-size:.85rem;margin-top:-2px">اختيارك يُطبَّق فوراً على ملفك في الشجرة وكل الكشوف.</p>
+      <p class="muted" style="font-size:.85rem;margin-top:-2px">اختيارك يُطبَّق فوراً على ملفك في الشجرة وكل الكشوف. <b>هذا القرار لك وحدك — حتى الإدارة لا تستطيع تعديله.</b></p>
       <label class="perm-chk"><input type="radio" name="pf_priv" value="publish" ${me.phone_public ? 'checked' : ''}><span>أسمح بنشره في دليل الموقع (يظهر في ملفك بالشجرة)</span></label>
       <label class="perm-chk"><input type="radio" name="pf_priv" value="private" ${me.phone_public ? '' : 'checked'}><span>استخدام الموقع فقط — حماية مطلقة (لا يراه إلا أنت والإدارة)</span></label>
       <button class="btn sm" id="pf_savePriv" style="margin-top:8px">حفظ الخصوصية</button>
