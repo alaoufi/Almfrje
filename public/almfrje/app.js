@@ -5555,11 +5555,17 @@ function screenMembers() {
         if (hit) n++;
       });
       const cn = document.getElementById('mem_qn');
-      if (cn) cn.textContent = (mq.value.trim()) ? ('النتائج: ' + n) : '';
+      if (cn) {
+        const qv = mq.value.trim();
+        if (!qv) { cn.innerHTML = ''; }
+        else if (n > 0) { cn.innerHTML = 'النتائج: ' + n + ' — <a href="#" id="mem_mk" style="font-weight:700">أو أنشئ حساباً جديداً لشخصٍ من الشجرة بهذا الاسم ➕</a>'; }
+        else { cn.innerHTML = '<span style="color:var(--danger)">لا عضو بهذا الاسم.</span> <a href="#" id="mem_mk" style="font-weight:800">➕ أنشئ له حساباً من الشجرة (بياناته وكلمة مروره)</a>'; }
+        const mk = document.getElementById('mem_mk');
+        if (mk) mk.addEventListener('click', (ev) => { ev.preventDefault(); addUserModal(qv); });
+      }
     }); }
   view().querySelectorAll('[data-regok]').forEach(b => b.addEventListener('click', async () => {
     const uid = b.dataset.regok;
-    if (!(await confirm2('تحقّقت من صحة البيانات وتريد تفعيل الحساب؟ سيتمكن صاحبه من الدخول والاطلاع على رسائله.', { title: 'تفعيل بعد التحقق', okText: 'تفعيل' }))) return;
     const ok = await guard(async () => { await updMember(uid, { is_active: true }); });
     if (ok) { toast('فُعِّل الحساب ✓'); await loadAll(); screenMembers(); }
   }));
@@ -5692,7 +5698,6 @@ function editUserDataModal(m) {
       if (!full_name) { toast('أدخل الاسم'); return; }
       if (phone && phone.length < 7) { toast('رقم جوال غير صحيح'); return; }
       if (pin && !PIN_RE.test(pin)) { toast('الرقم السري ٤ أرقام على الأقل'); return; }
-      if (!(await confirm2('حفظ تعديل بيانات هذا العضو؟'))) return;
       const ok = await guard(async () => {
         const { data: { session } } = await sb.auth.getSession();
         const tok = session && session.access_token;
@@ -5710,7 +5715,7 @@ function editUserDataModal(m) {
 }
 
 // نافذة «إضافة مستخدم» — ينشئ الحساب ويحدّد الفروع والصلاحيات
-function addUserModal() {
+function addUserModal(initialQuery) {
   if (!isAdmin()) return;
   const roleOpts = ROLES.map(r => `<option value="${r.k}">${r.ar}</option>`).join('');
   const branchChks = C.branches.length
@@ -5747,6 +5752,7 @@ function addUserModal() {
     // الاسم يُنتقى من الشجرة (حيّ فقط) — كطريقة دخول الزائر/إضافة المواليد
     let nuPerson = null;
     const nuSearch = document.getElementById('nu_search');
+    if (initialQuery && nuSearch) { nuSearch.value = initialQuery; setTimeout(() => nuSearch.dispatchEvent(new Event('input')), 60); }
     nuSearch.addEventListener('input', () => fbPickerSearch(nuSearch.value, document.getElementById('nu_results'), true, (p) => {
       nuPerson = p;
       document.getElementById('nu_selected').innerHTML = p ? '<div style="padding:8px 10px;border:1px solid var(--brand);border-radius:8px;font-size:.9rem">✅ الاسم: <b>' + esc(lineageShort(p.id, 12)) + '</b></div>' : '';
