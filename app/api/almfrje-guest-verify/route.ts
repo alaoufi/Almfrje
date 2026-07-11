@@ -115,6 +115,17 @@ export async function POST(request: NextRequest) {
       const cond = ph ? `person_id.eq.${liveMatches[0].id},phone.eq.${ph}` : `person_id.eq.${liveMatches[0].id}`;
       const { data: mem } = await admin.from('almfrje_members').select('user_id').or(cond).limit(1);
       hasAccount = !!(mem && mem.length);
+      // الحسابات القديمة بلا ربطٍ وجوال ملفها فارغ: طابق اسم العضو المطبَّع بالاسم الرباعي المبني
+      if (!hasAccount) {
+        const normName = (x: string) => String(x || '').replace(/\bبن\b|\bابن\b/g, ' ')
+          .replace(/[أإآ]/g, 'ا').replace(/ى/g, 'ي').replace(/ة/g, 'ه').replace(/[ً-ْٰـ…]/g, '')
+          .replace(/\s+/g, '').trim();
+      const target = normName(fullName);
+        if (target) {
+          const { data: allm } = await admin.from('almfrje_members').select('user_id,full_name').limit(500);
+          hasAccount = !!(allm || []).some((r) => normName(String((r as { full_name?: string }).full_name || '')) === target);
+        }
+      }
     } catch { /* أفضل جهد */ }
     return NextResponse.json({ ok: true, branch: liveMatches[0].branch_id, name: fullName, pid: liveMatches[0].id, has_phone: !!(liveMatches[0].phone && String(liveMatches[0].phone).trim()), has_account: hasAccount });
   }

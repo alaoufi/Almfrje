@@ -79,6 +79,18 @@ export async function POST(request: NextRequest) {
   }
   const full_name = names.join(' بن ');
 
+  // صدّ الثغرة: اسمٌ له حسابٌ قائم (حتى القديمة غير المربوطة) — لا تسجيل مزدوج
+  {
+    const normName = (x: string) => String(x || '').replace(/\bبن\b|\bابن\b/g, ' ')
+      .replace(/[أإآ]/g, 'ا').replace(/ى/g, 'ي').replace(/ة/g, 'ه').replace(/[ً-ْٰـ…]/g, '')
+      .replace(/\s+/g, '').trim();
+    const target = normName(full_name);
+    const { data: allm } = await admin.from('almfrje_members').select('full_name').limit(500);
+    if ((allm || []).some((r) => normName(String((r as { full_name?: string }).full_name || '')) === target)) {
+      return NextResponse.json({ ok: false, error: 'لهذا الاسم حسابٌ مسجّل مسبقاً — ارجع لصفحة الدخول وادخل بجوالك وكلمة المرور، أو استخدم «مراسلة الإدارة» هناك.' }, { status: 409 });
+    }
+  }
+
   const { data: created, error: ce } = await admin.auth.admin.createUser({
     email: `${phone}@almfrje.app`, password: `${password}@Almfrje`, email_confirm: true,
     user_metadata: { full_name, phone },

@@ -3221,7 +3221,9 @@ function guestOnboard() {
         <label class="perm-chk"><input type="radio" name="go_priv" value="publish"><span>أسمح بنشره في دليل الموقع</span></label>
         <label class="perm-chk"><input type="radio" name="go_priv" value="private" checked><span>استخدام الموقع فقط (لا يُنشر)</span></label>
       </div>
-      <button class="btn" id="go_send" style="width:100%">✅ تسجيل بياناتي</button>`, () => {
+      <button class="btn" id="go_send" style="width:100%">✅ تسجيل بياناتي</button>
+      <button class="btn outline" id="go_backlogin" style="width:100%;margin-top:8px">→ رجوع لصفحة الدخول</button>`, () => {
+      document.getElementById('go_backlogin').addEventListener('click', async () => { try { await sb.auth.signOut(); } catch (e0) { /* */ } location.hash = ''; location.reload(); });
       document.getElementById('go_send').addEventListener('click', async () => {
         const phone = normPhone(val('go_phone'));
         if (phone.length < 9) { toast('رقم الجوال إجباري — اكتبه صحيحاً'); return; }
