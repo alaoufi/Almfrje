@@ -248,11 +248,25 @@ export const ALMFRJE_SCHEMA_SQL = `
         FOR EACH ROW EXECUTE FUNCTION public.almfrje_handle_new_user();
 
       -- استرجاع بريد الدخول من الجوال أو اسم المستخدم
+      -- تطبيع الجوال داخل القاعدة (يطابق منطق الواجهة): أرقام عربية/فارسية → لاتينية،
+      -- إزالة غير الأرقام، ثم 00966/966 → صفر البداية، و5XXXXXXXX ← 05XXXXXXXX.
+      CREATE OR REPLACE FUNCTION public.almfrje_norm_phone(p text) RETURNS text
+        LANGUAGE sql IMMUTABLE AS $func$
+        select case
+          when d = '' then ''
+          when d like '00966%' then case when length(substr(d,6)) = 9 and substr(d,6,1)='5' then '0'||substr(d,6) else substr(d,6) end
+          when d like '966%'   then case when length(substr(d,4)) = 9 and substr(d,4,1)='5' then '0'||substr(d,4) else substr(d,4) end
+          when length(d) = 9 and d like '5%' then '0'||d
+          else d end
+        from (select regexp_replace(translate(coalesce(p,''),
+          '٠١٢٣٤٥٦٧٨٩۰۱۲۳۴۵۶۷۸۹','01234567890123456789'), '\\D', '', 'g') as d) t; $func$;
+      -- الدخول يطبّع الطرفين: يقبل أي صيغةٍ مُدخلة ويطابق حتى الأرقام المخزّنة قديماً بصيغٍ مختلفة
       CREATE OR REPLACE FUNCTION public.almfrje_resolve_login(ident text) RETURNS text
         LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, auth AS $func$
         select u.email from public.almfrje_members m join auth.users u on u.id = m.user_id
-         where m.phone = ident or lower(m.username) = lower(ident)
-         order by (m.phone = ident) desc limit 1; $func$;
+         where public.almfrje_norm_phone(m.phone) = public.almfrje_norm_phone(ident)
+            or lower(m.username) = lower(ident)
+         order by (public.almfrje_norm_phone(m.phone) = public.almfrje_norm_phone(ident)) desc limit 1; $func$;
       REVOKE ALL ON FUNCTION public.almfrje_resolve_login(text) FROM public;
       GRANT EXECUTE ON FUNCTION public.almfrje_resolve_login(text) TO anon, authenticated;
 
@@ -356,8 +370,8 @@ export const ALMFRJE_SCHEMA_SQL = `
       -- ختم إصدار المخطط: يرتفع مع كل تعديلٍ للمخطط، ووجوده بالقيمة الأحدث في القاعدة
       -- دليلٌ قاطع أن قناة الترقية التلقائية (/api/almfrje-setup) تعمل.
       INSERT INTO public.almfrje_settings (key, value)
-        VALUES ('schema_rev', '"2026-07-06-8"'::jsonb)
-        ON CONFLICT (key) DO UPDATE SET value = '"2026-07-06-8"'::jsonb, updated_at = now();
+        VALUES ('schema_rev', '"2026-07-11-9"'::jsonb)
+        ON CONFLICT (key) DO UPDATE SET value = '"2026-07-11-9"'::jsonb, updated_at = now();
 
       -- ملاحظات الزوار: يرسلها أي زائر/عضو، ويراجعها المدير ويضع علامة «تم».
       CREATE TABLE IF NOT EXISTS public.almfrje_feedback (
