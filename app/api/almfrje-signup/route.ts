@@ -25,6 +25,18 @@ export async function POST(request: NextRequest) {
 
   const admin0 = createClient(url, service, { auth: { persistSession: false, autoRefreshToken: false } });
 
+  // كشف الأعضاء المطهَّر للمشرفين: أسماء وأدوار وحالات وربط الشخص فقط — بلا جوالات
+  // (جوالات الأعضاء محمية حمايةً مطلقة: المدير وصاحب الرقم فقط)
+  if (String(b.action || '') === 'roster') {
+    const { data: memRow } = await admin0.from('almfrje_members').select('role,is_active').eq('user_id', who.user.id).maybeSingle();
+    const okRole = memRow && memRow.is_active && ['admin', 'general_manager', 'branch_manager'].includes(String(memRow.role));
+    if (!okRole) return NextResponse.json({ ok: false, error: 'غير مصرّح' }, { status: 403 });
+    const { data: rows, error: re } = await admin0.from('almfrje_members')
+      .select('full_name,role,is_active,person_id,created_at').limit(2000);
+    if (re) return NextResponse.json({ ok: false, error: re.message }, { status: 400 });
+    return NextResponse.json({ ok: true, rows: rows || [] });
+  }
+
   // العضو يحدّث بيانات ملفه الشخصي (شخصه المرتبط في الشجرة) — حقول محدّدة ولنفسه حصراً
   if (String(b.action || '') === 'myinfo') {
     const { data: memRow } = await admin0.from('almfrje_members').select('user_id,person_id,is_active').eq('user_id', who.user.id).maybeSingle();
