@@ -415,13 +415,16 @@ function mgrPerm(k) {
 // جلب كل صفوف جدول عبر صفحات — Supabase يحدّ كل طلب بـ 1000 صف افتراضياً،
 // وشجرتنا تتجاوز ذلك، فنكرّر بـ range حتى تنتهي الصفوف.
 async function fetchAll(table, pageSize = 1000) {
-  const out = [];
-  for (let from = 0; ; from += pageSize) {
-    const { data, error } = await sb.from(table).select('*').range(from, from + pageSize - 1);
-    if (error) throw error;
-    if (!data || !data.length) break;
-    out.push(...data);
-    if (data.length < pageSize) break;
+  // الصفحة الأولى تكشف العدد الكلي، وبقية الصفحات تُجلب دفعةً واحدة بالتوازي (لا تتابع بطيء)
+  const first = await sb.from(table).select('*', { count: 'exact' }).range(0, pageSize - 1);
+  if (first.error) throw first.error;
+  const out = (first.data || []).slice();
+  const total = (typeof first.count === 'number' && first.count >= out.length) ? first.count : out.length;
+  if (total > out.length) {
+    const jobs = [];
+    for (let from = pageSize; from < total; from += pageSize) jobs.push(sb.from(table).select('*').range(from, from + pageSize - 1));
+    const rest = await Promise.all(jobs);
+    for (const r of rest) { if (r.error) throw r.error; out.push(...(r.data || [])); }
   }
   return out;
 }
@@ -432,29 +435,6 @@ async function fetchPersons() {
   if (full) return fetchAll('almfrje_persons');
   try { return await fetchAll('almfrje_persons_pub'); }
   catch (e) { return fetchAll('almfrje_persons'); }   // المنظور غير موجود بعد → رجوع
-}
-/* ===== عرضٌ فوري من ذاكرة الجهاز (SWR): افتح من النسخة المحفوظة ثم حدّث بالخلفية ===== */
-const DATA_CACHE_KEY = 'almfrje_data_v1';
-function dataTier() { return (isAdmin() || isManager()) ? 'f' : 'p'; }   // f = بيانات كاملة (إدارة)، p = منقّاة (زائر)
-function dataSig() {
-  let mx = '';
-  for (const p of C.persons) { const u = p.updated_at || p.created_at || ''; if (u > mx) mx = u; }
-  return C.persons.length + ':' + C.branches.length + ':' + C.members.length + ':' + mx;
-}
-function saveDataCache() {
-  try {
-    if (!C.persons.length) return;
-    localStorage.setItem(DATA_CACHE_KEY, JSON.stringify({ tier: dataTier(), sig: dataSig(), persons: C.persons, branches: C.branches, members: C.members }));
-  } catch (e) { /* امتلاء التخزين → تجاهل بأمان */ }
-}
-function loadDataCache() {
-  try {
-    const raw = localStorage.getItem(DATA_CACHE_KEY); if (!raw) return false;
-    const c = JSON.parse(raw);
-    if (!c || c.tier !== dataTier() || !Array.isArray(c.persons) || !c.persons.length) return false;
-    C.persons = c.persons; C.branches = c.branches || []; C.members = c.members || [];
-    return true;
-  } catch (e) { return false; }
 }
 async function loadAll() {
   // الإعدادات تتوازى مع البيانات (كانت تتسلسل بعدها فتبطئ الدخول)
@@ -468,7 +448,6 @@ async function loadAll() {
   C.branches = br.error ? [] : (br.data || []);
   C.members = mr.error ? [] : (mr.data || []);
   buildIndex();
-  saveDataCache();   // تحديث نسخة الجهاز — يفتح فورياً في الزيارة القادمة
   // عدّاد صندوق الوارد لا يعطّل الدخول — يُجلب بالخلفية ويُحدّث شاراته وتنبيهه حال وصوله
   refreshInboxCount();
 }
@@ -6013,29 +5992,6 @@ async function enterApp(session) {
   if (!me.is_active) { showLoading(false); renderPending(); return; }
   // الزائر حساب مشترك تلقائي — لا يحتاج زرّ خروج (يبقى للمسؤول/المشرف).
   document.getElementById('signoutBtn').classList.toggle('hidden', isGuestUser() && guestGens <= 0);
-  // ⚡ عرضٌ فوري: إن وُجدت نسخة محفوظة على الجهاز افتح منها حالاً وحدّث بالخلفية
-  const cached = loadDataCache();
-  if (cached) {
-    buildIndex();
-    showLoading(false);
-    if (!location.hash || isAdminLoginUrl()) location.hash = '#/home';
-    render();
-    startPresence();
-    const oldSig = dataSig();
-    loadSettings().then(() => {
-      try { let fn = ''; try { fn = (sessionStorage.getItem('almfrje_guest_name') || '').trim().split(/\s+/)[0] || ''; } catch (e) { /* */ } showGreeting(fn); } catch (e) { /* */ }
-      try { render(); } catch (e) { /* البانر/النصوص وصلت */ }
-    }).catch(() => { /* */ });
-    loadAll().then(() => {
-      // أعد رسم الشاشات العامة فقط إن تغيّرت البيانات فعلاً (بلا مقاطعة كتابة/نوافذ)
-      if (dataSig() !== oldSig && !document.getElementById('modalRoot').innerHTML.trim()) {
-        const h = location.hash || '';
-        if (h === '' || h.startsWith('#/home') || h.startsWith('#/tree') || h.startsWith('#/branches') || h.startsWith('#/stats') || h.startsWith('#/search')) render();
-      }
-    }).catch(() => { /* تبقى نسخة الجهاز */ });
-    return;
-  }
-  // لا نسخة محفوظة (أول زيارة) — المسار الكامل
   try { await loadSettings(); } catch (e) { /* تجاهل — تبقى الافتراضية */ }
   try {
     let fn = '';
