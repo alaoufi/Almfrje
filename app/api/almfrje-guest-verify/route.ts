@@ -107,7 +107,15 @@ export async function POST(request: NextRequest) {
       while (cur != null && out.length < 4 && guard++ < 20) { const p = byId.get(String(cur)); if (!p) break; out.push(p.name); cur = p.father_id; }
       return out.join(' بن ');
     })();
-    return NextResponse.json({ ok: true, branch: liveMatches[0].branch_id, name: fullName, pid: liveMatches[0].id, has_phone: !!(liveMatches[0].phone && String(liveMatches[0].phone).trim()) });
+    // هل له حسابُ عضوٍ مسبقاً؟ (بربط شخصه أو بجواله) — ليُدعى للدخول بدل التسجيل
+    let hasAccount = false;
+    try {
+      const ph = String(liveMatches[0].phone || '').replace(/\D/g, '');
+      const cond = ph ? `person_id.eq.${liveMatches[0].id},phone.eq.${ph}` : `person_id.eq.${liveMatches[0].id}`;
+      const { data: mem } = await admin.from('almfrje_members').select('user_id').or(cond).limit(1);
+      hasAccount = !!(mem && mem.length);
+    } catch { /* أفضل جهد */ }
+    return NextResponse.json({ ok: true, branch: liveMatches[0].branch_id, name: fullName, pid: liveMatches[0].id, has_phone: !!(liveMatches[0].phone && String(liveMatches[0].phone).trim()), has_account: hasAccount });
   }
   if (liveMatches.length > 1) {
     return NextResponse.json({ ok: false, error: 'اسمك يطابق أكثر من شخص حيّ — أضِف اسم جدٍّ آخر للتمييز.' });
