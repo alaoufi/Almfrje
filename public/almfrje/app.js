@@ -5400,6 +5400,18 @@ function screenProfile() {
       <button class="btn" id="pf_saveInfo">حفظ البيانات</button>
     </div>
 
+    ${(() => {
+      const myp = myPersonId() ? byId.get(myPersonId()) : null;
+      if (!myp) return '';
+      return `<div class="card"><h3>🌳 بياناتي في الشجرة</h3>
+      <p class="muted" style="font-size:.85rem;margin-top:-2px">تُحدّث ملفك الظاهر في الشجرة — بياناتك أنت فقط.</p>
+      ${fInput('اللقب', 'pi_nick', myp.nickname || '')}
+      <div class="grid2">
+        ${fInput('المدينة', 'pi_city', myp.city || '')}
+        ${fInput('سنة الميلاد', 'pi_birth', myp.birth || '')}
+      </div>
+      <button class="btn sm" id="pi_save" style="margin-top:6px">حفظ بياناتي</button></div>`;
+    })()}
     <div class="card"><h3>🔒 خصوصية رقم جوالك</h3>
       <p class="muted" style="font-size:.85rem;margin-top:-2px">اختيارك يُطبَّق فوراً على ملفك في الشجرة وكل الكشوف. <b>هذا القرار لك وحدك — حتى الإدارة لا تستطيع تعديله.</b></p>
       <label class="perm-chk"><input type="radio" name="pf_priv" value="publish" ${me.phone_public ? 'checked' : ''}><span>أسمح بنشره في دليل الموقع (يظهر في ملفك بالشجرة)</span></label>
@@ -5417,6 +5429,16 @@ function screenProfile() {
   // إظهار/إخفاء حقول الـ PIN
   view().querySelectorAll('.eye').forEach(b => b.addEventListener('click', () => { const inp = document.getElementById(b.dataset.eye); const show = inp.type === 'password'; inp.type = show ? 'text' : 'password'; b.textContent = show ? '🙈' : '👁'; }));
 
+  { const ps = document.getElementById('pi_save'); if (ps) ps.addEventListener('click', async () => {
+    const body = { action: 'myinfo', nickname: val('pi_nick').trim(), city: val('pi_city').trim(), birth: val('pi_birth').trim() };
+    const ok = await guard(async () => {
+      const { data: { session } } = await sb.auth.getSession();
+      const res = await fetch('/api/almfrje-signup', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + (session && session.access_token) }, body: JSON.stringify(body) });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok || !j.ok) throw new Error(j.error || 'تعذّر الحفظ');
+    });
+    if (ok) { toast('حُفظت بياناتك في الشجرة ✓'); await loadAll(); render(); }
+  }); }
   document.getElementById('pf_savePriv').addEventListener('click', async () => {
     const sel = document.querySelector('input[name="pf_priv"]:checked');
     const publish = !!(sel && sel.value === 'publish');
@@ -5508,7 +5530,8 @@ function screenProfile() {
 }
 
 /* ===== الأعضاء والصلاحيات ===== */
-let expandedMember = null;   // user_id للعضو المفتوح حالياً
+let expandedMember = null;
+let memTab = 'all';   // كشوف الأعضاء: all | staff | reg | unreg   // user_id للعضو المفتوح حالياً
 function screenMembers() {
   if (!isAdmin()) { view().innerHTML = noPerm(); return; }
   const list = C.members.slice().sort((a, b) => (a.full_name || '').localeCompare(b.full_name || ''));
@@ -5535,15 +5558,49 @@ function screenMembers() {
           </div>
         </div>`; }).join('')}</div>`;
     })()}
-    <div class="card"><h3>الأعضاء (${list.length}) ${hintBtn('member_role')}</h3>
-      <p class="muted" style="font-size:.85rem;margin-top:-4px">اضغط على اسم لعرض تفاصيله والتحكّم به.</p>
-      <div class="field"><input id="mem_q" type="text" placeholder="🔍 ابحث بالاسم أو الجوال أو الدور…"></div>
+    ${(() => {
+      const staff = list.filter(m => m.role !== 'viewer');
+      const regd = list.filter(m => m.role === 'viewer' && m.username !== 'guest');
+      const linkedPids = new Set(list.filter(m => m.person_id).map(m => Number(m.person_id)));
+      const memPhones = new Set(list.map(m => normPhone(m.phone || '')).filter(x => x.length >= 9));
+      const unreg = C.persons.filter(pp => pp.status !== 'dead' && !linkedPids.has(pp.id) && !(pp.phone && memPhones.has(normPhone(pp.phone))));
+      const shown = memTab === 'staff' ? staff : memTab === 'reg' ? regd : list;
+      const tabBtn = (k, t) => `<button class="btn sm ${memTab === k ? '' : 'outline'}" data-memtab="${k}" style="margin:0 0 8px 6px">${t}</button>`;
+      return `<div class="card"><h3>كشوف الأعضاء ${hintBtn('member_role')}</h3>
+      <div>${tabBtn('all', 'الكل (' + list.length + ')')}${tabBtn('staff', 'المسؤولون (' + staff.length + ')')}${tabBtn('reg', 'المسجلون (' + regd.length + ')')}${tabBtn('unreg', 'غير المسجلين (' + unreg.length + ')')}</div>
+      <div class="field"><input id="mem_q" type="text" placeholder="🔍 ابحث بالاسم أو الجوال…"></div>
       <div class="muted" id="mem_qn" style="font-size:.78rem;margin:-4px 0 6px"></div>
-      <div class="mlist">${list.map(memberRow).join('')}</div>
-    </div>`;
+      ${memTab === 'unreg'
+        ? `<p class="muted" style="font-size:.8rem">أفراد الشجرة الأحياء بلا حسابات — تابعهم وأنشئ حساباتهم وزوّدهم بمعلوماتهم.</p><div id="unregList"></div>`
+        : `<div class="mlist">${shown.map(memberRow).join('') || '<div class="muted" style="padding:8px">لا أحد في هذا الكشف.</div>'}</div>`}
+    </div>`; })()}`;
   const au = document.getElementById('addUserBtn'); if (au) au.addEventListener('click', addUserModal);
 
-  { const mq = document.getElementById('mem_q');
+  view().querySelectorAll('[data-memtab]').forEach(b => b.addEventListener('click', () => { memTab = b.dataset.memtab; screenMembers(); }));
+  if (memTab === 'unreg') {
+    const linkedPids = new Set(C.members.filter(m => m.person_id).map(m => Number(m.person_id)));
+    const memPhones = new Set(C.members.map(m => normPhone(m.phone || '')).filter(x => x.length >= 9));
+    const unregAll = C.persons.filter(pp => pp.status !== 'dead' && !linkedPids.has(pp.id) && !(pp.phone && memPhones.has(normPhone(pp.phone))));
+    const CAP = 80;
+    const renderUnreg = () => {
+      const q = normalizeAr((document.getElementById('mem_q') || { value: '' }).value.trim());
+      const hits = q ? unregAll.filter(pp => (pp._n || normalizeAr(pp.name)).includes(q) || normalizeAr(lineageShort(pp.id, 4)).includes(q)) : unregAll;
+      const cn = document.getElementById('mem_qn');
+      if (cn) cn.textContent = 'المعروض: ' + Math.min(CAP, hits.length) + ' من ' + hits.length + (hits.length > CAP ? ' — ضيّق بالبحث' : '');
+      const box = document.getElementById('unregList'); if (!box) return;
+      box.innerHTML = hits.slice(0, CAP).map(pp => `
+        <div class="row" style="align-items:center">
+          <span class="k" style="flex:1">${esc(pp.name)} <span class="muted" style="font-size:.72rem">${esc(lineageShort(pp.id, 4))}${pp.branch_id ? ' • ' + esc(branchName(pp.branch_id)) : ''}</span></span>
+          <button class="btn sm" data-mkacc="${pp.id}">➕ حساب</button>
+        </div>`).join('') || '<div class="muted" style="padding:8px">لا نتائج.</div>';
+      box.querySelectorAll('[data-mkacc]').forEach(bb => bb.addEventListener('click', () => {
+        const pp = byId.get(parseInt(bb.dataset.mkacc, 10));
+        addUserModal(pp ? lineage(pp.id).slice(0, 2).map(x => x.name).join(' ') : '');
+      }));
+    };
+    renderUnreg();
+    { const mq2 = document.getElementById('mem_q'); if (mq2) mq2.addEventListener('input', debounce(renderUnreg, 220)); }
+  } else { const mq = document.getElementById('mem_q');
     if (mq) mq.addEventListener('input', () => {
       const q = normalizeAr(mq.value.trim());
       const qd = normPhone(mq.value.trim());
