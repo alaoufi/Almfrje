@@ -20,8 +20,28 @@ export async function POST(request: NextRequest) {
   const { data: who } = await caller.auth.getUser();
   if (!who || !who.user) return NextResponse.json({ ok: false, error: 'جلسة غير صالحة' }, { status: 401 });
 
-  let b: { pid?: unknown; phone?: unknown; password?: unknown; nickname?: unknown; city?: unknown; birth?: unknown; publish?: unknown };
+  let b: { action?: unknown; pid?: unknown; phone?: unknown; password?: unknown; nickname?: unknown; city?: unknown; birth?: unknown; publish?: unknown };
   try { b = await request.json(); } catch { return NextResponse.json({ ok: false, error: 'طلب غير صالح' }, { status: 400 }); }
+
+  const admin0 = createClient(url, service, { auth: { persistSession: false, autoRefreshToken: false } });
+
+  // تغيير خصوصية الجوال من «ملفي الشخصي» — لصاحب الحساب حصراً، مع تطبيق الأثر على ملفه بالشجرة
+  if (String(b.action || '') === 'privacy') {
+    const publish = b.publish === true;
+    const { data: memRow } = await admin0.from('almfrje_members').select('user_id,phone,person_id').eq('user_id', who.user.id).maybeSingle();
+    if (!memRow) return NextResponse.json({ ok: false, error: 'لا حساب عضوية' }, { status: 404 });
+    const { error: e1 } = await admin0.from('almfrje_members').update({ phone_public: publish }).eq('user_id', who.user.id);
+    if (e1) return NextResponse.json({ ok: false, error: e1.message }, { status: 400 });
+    const myPh = normalizePhone(memRow.phone);
+    if (memRow.person_id && myPh) {
+      const { data: pr } = await admin0.from('almfrje_persons').select('id,phone').eq('id', memRow.person_id).maybeSingle();
+      if (pr) {
+        if (publish && !String(pr.phone || '').trim()) await admin0.from('almfrje_persons').update({ phone: myPh }).eq('id', pr.id);
+        if (!publish && String(pr.phone || '').trim() && normalizePhone(pr.phone) === myPh) await admin0.from('almfrje_persons').update({ phone: '' }).eq('id', pr.id);
+      }
+    }
+    return NextResponse.json({ ok: true });
+  }
   const pid = Number(b.pid);
   const phone = normalizePhone(b.phone);
   const password = String(b.password || '').trim();
@@ -33,7 +53,7 @@ export async function POST(request: NextRequest) {
   if (phone.length < 9) return NextResponse.json({ ok: false, error: 'أدخل رقم جوال صحيح (إجباري)' }, { status: 400 });
   if (password.length < 4) return NextResponse.json({ ok: false, error: 'كلمة المرور إجبارية — ٤ أحرف/أرقام على الأقل' }, { status: 400 });
 
-  const admin = createClient(url, service, { auth: { persistSession: false, autoRefreshToken: false } });
+  const admin = admin0;
 
   const { data: person } = await admin.from('almfrje_persons')
     .select('id,name,father_id,status,phone,nickname,city,birth').eq('id', pid).maybeSingle();
