@@ -5645,7 +5645,7 @@ function screenMembers() {
         </div>`).join('') || '<div class="muted" style="padding:8px">لا نتائج.</div>';
       box.querySelectorAll('[data-mkacc]').forEach(bb => bb.addEventListener('click', () => {
         const pp = byId.get(parseInt(bb.dataset.mkacc, 10));
-        addUserModal(pp ? lineage(pp.id).slice(0, 2).map(x => x.name).join(' ') : '');
+        addUserModal(pp ? lineage(pp.id).slice(0, 2).map(x => x.name).join(' ') : '', true);
       }));
     };
     renderUnreg();
@@ -5668,7 +5668,7 @@ function screenMembers() {
         else if (n > 0) { cn.innerHTML = 'النتائج: ' + n + ' — <a href="#" id="mem_mk" style="font-weight:700">أو أنشئ حساباً جديداً لشخصٍ من الشجرة بهذا الاسم ➕</a>'; }
         else { cn.innerHTML = '<span style="color:var(--danger)">لا عضو بهذا الاسم.</span> <a href="#" id="mem_mk" style="font-weight:800">➕ أنشئ له حساباً من الشجرة (بياناته وكلمة مروره)</a>'; }
         const mk = document.getElementById('mem_mk');
-        if (mk) mk.addEventListener('click', (ev) => { ev.preventDefault(); addUserModal(qv); });
+        if (mk) mk.addEventListener('click', (ev) => { ev.preventDefault(); addUserModal(qv, true); });
       }
     }); }
   view().querySelectorAll('[data-regok]').forEach(b => b.addEventListener('click', async () => {
@@ -5822,14 +5822,14 @@ function editUserDataModal(m) {
 }
 
 // نافذة «إضافة مستخدم» — ينشئ الحساب ويحدّد الفروع والصلاحيات
-function addUserModal(initialQuery) {
+function addUserModal(initialQuery, memberOnly) {
   if (!isAdmin()) return;
   const roleOpts = ROLES.map(r => `<option value="${r.k}">${r.ar}</option>`).join('');
   const branchChks = C.branches.length
     ? C.branches.map(b => `<label class="perm-chk"><input type="checkbox" data-nubranch="${b.id}"><span>${esc(b.name)}</span></label>`).join('')
     : '<div class="muted">لا فروع بعد.</div>';
   const permChksNew = MGR_PERMS.map(([k, l]) => `<label class="perm-chk"><input type="checkbox" data-nuperm="${k}" checked><span>${l}</span></label>`).join('');
-  openModal('إضافة مستخدم جديد', `
+  openModal(memberOnly ? '➕ تسجيل عضو' : '➕ إضافة عضو جديد', `
     <div class="field">
       <label>الاسم (يُختار من الشجرة — لا بدّ أن يكون حيّاً)</label>
       <input id="nu_search" type="text" placeholder="اكتب الاسم ثم اسم أبيه (مثال: سالم خالد) *" autocomplete="off">
@@ -5837,24 +5837,26 @@ function addUserModal(initialQuery) {
       <div id="nu_selected" class="muted" style="margin-top:6px"></div>
     </div>
     ${fInput('رقم الجوال', 'nu_phone', '', 'tel', 'inputmode="tel"')}
-    ${fInput('اسم المستخدم (اختياري)', 'nu_user', '', 'text', 'autocomplete="off"')}
-    ${pinField('الرقم السري (٤ أرقام فأكثر)', 'nu_pin')}
-    <div class="field"><label>الدور</label><select id="nu_role">${roleOpts}</select></div>
+    ${memberOnly ? '' : `${fInput('اسم المستخدم (اختياري)', 'nu_user', '', 'text', 'autocomplete="off"')}`}
+    ${pinField('كلمة المرور (٤ أرقام فأكثر)', 'nu_pin')}
+    ${memberOnly ? '' : `<div class="field"><label>الدور</label><select id="nu_role">${roleOpts}</select></div>
     <div id="nu_mgrbox">
       <div class="perm-box"><div class="perm-title">الفروع التي يشرف عليها <span class="muted" style="font-weight:normal">(للمشرف العام: اتركها فارغة = كل الفروع)</span>:</div>${branchChks}</div>
       <div class="perm-box"><div class="perm-title">صلاحياته:</div>${permChksNew}</div>
     </div>
-    <div id="nu_rolenote" class="muted" style="font-size:.85rem;margin:6px 0"></div>
-    <button class="btn" id="nu_save">إنشاء الحساب وتفعيله</button>`, () => {
+    <div id="nu_rolenote" class="muted" style="font-size:.85rem;margin:6px 0"></div>`}
+    <button class="btn" id="nu_save">${memberOnly ? 'تسجيل العضو وتفعيله' : 'إنشاء الحساب وتفعيله'}</button>`, () => {
     const roleSel = document.getElementById('nu_role');
-    const mgrBox = document.getElementById('nu_mgrbox');
-    const roleNote = document.getElementById('nu_rolenote');
-    const syncRole = () => {
-      const r = roleSel.value;
-      mgrBox.style.display = (r === 'branch_manager' || r === 'general_manager') ? '' : 'none';
-      roleNote.textContent = ROLE_HINT[r] || '';
-    };
-    roleSel.addEventListener('change', syncRole); syncRole();
+    if (roleSel) {
+      const mgrBox = document.getElementById('nu_mgrbox');
+      const roleNote = document.getElementById('nu_rolenote');
+      const syncRole = () => {
+        const r = roleSel.value;
+        mgrBox.style.display = (r === 'branch_manager' || r === 'general_manager') ? '' : 'none';
+        roleNote.textContent = ROLE_HINT[r] || '';
+      };
+      roleSel.addEventListener('change', syncRole); syncRole();
+    }
 
     // الاسم يُنتقى من الشجرة (حيّ فقط) — كطريقة دخول الزائر/إضافة المواليد
     let nuPerson = null;
@@ -5871,9 +5873,9 @@ function addUserModal(initialQuery) {
       // اسمٌ نظيف بلا علامة الاختصار «…» (كانت تفسد مطابقة نسبه لاحقاً)
       const full_name = lineage(nuPerson.id).slice(0, 4).map(x => x.name).join(' بن ');
       const phone = normPhone(val('nu_phone'));
-      const username = val('nu_user').trim();
+      const username = document.getElementById('nu_user') ? val('nu_user').trim() : '';
       const pin = val('nu_pin').trim();
-      const role = roleSel.value;
+      const role = memberOnly || !roleSel ? 'viewer' : roleSel.value;
       if (!full_name) { toast('تعذّر تحديد الاسم'); return; }
       if (phone.length < 7) { toast('أدخل رقم جوال صحيح'); return; }
       if (!PIN_RE.test(pin)) { toast('الرقم السري ٤ أرقام على الأقل'); return; }
