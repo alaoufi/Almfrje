@@ -454,6 +454,16 @@ async function loadAll() {
 // جلب عدّاد الصندوق بالخلفية: يحدّث شارة «المزيد» ويطلق تنبيه الدخول (مرة لكل جلسة)
 function refreshInboxCount() {
   if (!me || !me.is_active || !(isAdmin() || isManager())) { C.feedbackPending = 0; return; }
+  // تنبيه بطلبات التسجيل الجديدة (بيانات الأعضاء محمّلة أصلاً — بلا نداء إضافي)
+  try {
+    if (isAdmin()) {
+      const nr = C.members.filter(m => !m.is_active && m.role === 'viewer' && m.person_id).length;
+      if (nr > 0 && sessionStorage.getItem('almfrje_reg_alerted') !== '1') {
+        sessionStorage.setItem('almfrje_reg_alerted', '1');
+        setTimeout(() => toast('👤 ' + nr + (nr === 1 ? ' طلب تسجيل' : ' طلبات تسجيل') + ' بانتظار تحققك وتفعيلك — لوحة التحكم ← المستخدمون'), 3200);
+      }
+    }
+  } catch (e) { /* */ }
   fbApi('count').then(j => {
     C.feedbackPending = j.pending || 0;
     try { buildNav(); } catch (e) { /* */ }
@@ -4688,7 +4698,7 @@ function screenControl() {
   const featured = [
     ['📨', 'صندوق الوارد', 'ملاحظات الزوّار: الاعتماد والرد والأرشيف', '#/feedbacks', C.feedbackPending || 0],
     ['⚙️', 'الإعدادات', 'فتح الزوّار • آخر الإضافات • الزيارات', '#/settings', 0],
-    ['👥', 'المستخدمون', 'الحسابات والأدوار والصلاحيات الدقيقة', '#/members', 0],
+    ['👥', 'المستخدمون', 'الحسابات والأدوار والصلاحيات الدقيقة', '#/members', C.members.filter(m => !m.is_active && m.role === 'viewer' && m.person_id).length],
   ];
   const tiles = [
     ['🗂️', 'الفروع والمشرفون', 'تعريف الفروع وتعيين مشرفيها', '#/branchadmin'],
@@ -5370,12 +5380,43 @@ function screenMembers() {
       <div class="li-sub">أنشئ حساباً وحدّد الفروع التي يُشرف عليها وصلاحياته.</div>
       <button class="btn sm" id="addUserBtn" style="margin-top:6px">➕ إضافة مستخدم</button></div>
 
+    ${(() => {
+      const pend = list.filter(m => !m.is_active && m.role === 'viewer' && m.person_id);
+      if (!pend.length) return '';
+      return `<div class="card" style="border-inline-start:4px solid #e8590c"><h3>🆕 طلبات تسجيل بانتظار التحقق (${pend.length})</h3>
+        <p class="muted" style="font-size:.82rem;margin-top:-4px">سجّلوا بأنفسهم بعد دخولهم بأسمائهم — تحقّق من صحة البيانات ثم فعّل.</p>
+        ${pend.map(m => { const p = m.person_id ? byId.get(Number(m.person_id)) : null; return `
+        <div style="border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-bottom:8px">
+          <div style="font-weight:800">${esc(m.full_name || '—')}</div>
+          <div class="li-sub" style="margin-top:2px">📱 ${esc(m.phone || '—')}${p && p.phone && normPhone(p.phone) !== normPhone(m.phone || '') ? ' <span style="color:var(--danger);font-weight:700">≠ جوال ملفه (' + esc(p.phone) + ')</span>' : ''}</div>
+          ${p ? `<div class="li-sub">🌳 ${esc(lineageShort(p.id, 6))}</div>
+          <div class="li-sub">${p.nickname ? 'اللقب: ' + esc(p.nickname) + ' • ' : ''}${p.city ? 'المدينة: ' + esc(p.city) + ' • ' : ''}${p.birth ? 'الميلاد: ' + esc(p.birth) : ''}</div>` : '<div class="li-sub" style="color:var(--danger)">⚠️ لا ربط بشخصٍ في الشجرة</div>'}
+          <div class="btn-row" style="margin-top:8px">
+            ${p ? `<button class="btn sm outline" data-go="#/person/${p.id}">👁 ملفه بالشجرة</button>` : ''}
+            <button class="btn sm" data-regok="${m.user_id}">✅ تحقّقت — تفعيل</button>
+            <button class="btn sm danger" data-regno="${m.user_id}">❌ رفض وحذف</button>
+          </div>
+        </div>`; }).join('')}</div>`;
+    })()}
     <div class="card"><h3>المستخدمون (${list.length}) ${hintBtn('member_role')}</h3>
       <p class="muted" style="font-size:.85rem;margin-top:-4px">اضغط على اسم لعرض تفاصيله والتحكّم به.</p>
       <div class="mlist">${list.map(memberRow).join('')}</div>
     </div>`;
   const au = document.getElementById('addUserBtn'); if (au) au.addEventListener('click', addUserModal);
 
+  view().querySelectorAll('[data-regok]').forEach(b => b.addEventListener('click', async () => {
+    const uid = b.dataset.regok;
+    if (!(await confirm2('تحقّقت من صحة البيانات وتريد تفعيل الحساب؟ سيتمكن صاحبه من الدخول والاطلاع على رسائله.', { title: 'تفعيل بعد التحقق', okText: 'تفعيل' }))) return;
+    const ok = await guard(async () => { await updMember(uid, { is_active: true }); });
+    if (ok) { toast('فُعِّل الحساب ✓'); await loadAll(); screenMembers(); }
+  }));
+  view().querySelectorAll('[data-regno]').forEach(b => b.addEventListener('click', async () => {
+    const uid = b.dataset.regno;
+    if (!(await confirm2('رفض طلب التسجيل وحذف الحساب؟ (لا يمسّ بياناته في الشجرة)', { danger: true, okText: 'رفض وحذف' }))) return;
+    const ok = await guard(async () => { const { error } = await sb.from('almfrje_members').delete().eq('user_id', uid); if (error) throw error; });
+    if (ok) { toast('رُفض الطلب وحُذف الحساب'); await loadAll(); screenMembers(); }
+  }));
+  bindGo();
   bindMemberRows();
 }
 // صف عضو: اسم فقط (مطويّ)، أو اسم + بطاقة كاملة (مفتوح)
