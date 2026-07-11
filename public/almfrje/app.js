@@ -3180,7 +3180,25 @@ function guestOnboard() {
     setTimeout(show0, 900);
     return;
   }
-  // لا حساب له: التسجيل إجباري — لا يُتجاوز (لا زر تخطٍّ ولا إغلاق) حتى يسجّل
+  // جواله مسجّل في ملفه أساساً (وإن لم نجد حساباً): لا تسجيل — يعود لصفحة الدخول
+  let hasph = null; try { hasph = sessionStorage.getItem('almfrje_guest_hasphone'); } catch (e) { /* */ }
+  if (hasph === '1') {
+    window._onbPoll = true;
+    let triesP = 0;
+    const showP = () => {
+      const root = document.getElementById('modalRoot');
+      if (root && root.innerHTML.trim()) { if (triesP++ < 90) { setTimeout(showP, 700); return; } window._onbPoll = false; return; }
+      window._onbPoll = false;
+      openModal('📱 جوالك مسجّلٌ لدينا', `
+        <div style="font-size:.95rem;line-height:1.9;text-align:center">حيّاك الله <b>${esc(name)}</b> 🌿<br>بياناتك مكتملة وجوالك مسجّل أساساً — <b>لا حاجة للتسجيل</b>.<br>ادخل من صفحة الدخول بجوالك وكلمة المرور، وإن تعذّرت فاستخدم زر <b>«مراسلة الإدارة»</b> هناك.</div>
+        <button class="btn" id="go_back_login" style="width:100%;margin-top:10px">🚪 الرجوع لصفحة الدخول</button>`, () => {
+        document.getElementById('go_back_login').addEventListener('click', async () => { try { await sb.auth.signOut(); } catch (e2) { /* */ } location.hash = ''; location.reload(); });
+      }, { noClose: true, noBgClose: true });
+    };
+    setTimeout(showP, 900);
+    return;
+  }
+  // لا حساب له وجواله غير مسجّل: التسجيل إجباري — لا يُتجاوز (لا زر تخطٍّ ولا إغلاق) حتى يسجّل
   try { if (sessionStorage.getItem('almfrje_signed') === '1') return; } catch (e) { /* */ }
   window._onbPoll = true;
   let tries = 0;
