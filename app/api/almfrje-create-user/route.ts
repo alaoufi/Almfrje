@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { almfrjeEnv } from '@/lib/almfrje-env';
+import { normalizePhone } from '@/lib/almfrje-phone';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -28,7 +29,7 @@ export async function POST(request: NextRequest) {
   try { b = await request.json(); } catch { return NextResponse.json({ ok: false, error: 'طلب غير صالح' }, { status: 400 }); }
 
   const full_name = String(b.full_name || '').trim();
-  const phone = String(b.phone || '').replace(/\D/g, '');
+  const phone = normalizePhone(b.phone);
   const username = b.username ? String(b.username).trim() : '';
   const pin = String(b.pin || '').trim();
   const role = ['admin', 'general_manager', 'branch_manager', 'viewer'].includes(String(b.role)) ? String(b.role) : 'viewer';
