@@ -3528,6 +3528,7 @@ function screenMore() {
   const admin = [];
   if (isAdmin()) admin.push(['⚙️ لوحة التحكم', '#/control', 'control_panel']);
   if (isAdmin() || isGeneralManager()) admin.push(['💬 المناقشات (الإدارة العليا)', '#/discussions']);
+  if (isAdmin()) admin.push(['👥 الأعضاء — بحث وإدارة وكلمات المرور', '#/members']);
   { const n = (isAdmin() || isManager()) ? (C.feedbackPending || 0) : 0;
     if (isAdmin() || isManager()) admin.push(['📨 صندوق الوارد' + (n > 0 ? ' <span class="inb-badge">' + (n > 99 ? '99+' : n) + '</span>' : ''), '#/feedbacks', 'feedbacks']); }
   if (canAdd()) admin.push(['👶 إضافة مولود (مباشرة)', '#/person-edit/0', 'add_person']);
