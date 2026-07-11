@@ -5555,7 +5555,7 @@ async function screenMembersForManager() {
   view().innerHTML = `
     <div class="card"><h3>كشوف أعضاء ${allMine ? 'كل الفروع' : 'فروعك'}</h3>
       <p class="muted" style="font-size:.82rem;margin-top:-2px">عرضٌ للمتابعة ضمن نطاق إشرافك — بلا أرقام (خصوصية الأعضاء محفوظة) وبلا أدوات إدارة.</p>
-      <div>${tabBtn('all', 'الكل (' + scoped.length + ')')}${tabBtn('staff', 'المشرفون (' + staff.length + ')')}${tabBtn('reg', 'المسجلون (' + regd.length + ')')}${tabBtn('unreg', 'غير المسجلين (' + unreg.length + ')')}</div>
+      <div>${tabBtn('all', 'الكل (' + scoped.length + ')')}${tabBtn('staff', 'المشرفون (' + staff.length + ')')}${tabBtn('reg', 'المسجلون (' + regd.length + ')')}${tabBtn('unreg', 'غير المسجلين — الأحياء (' + unreg.length + ')')}</div>
       <div class="field"><input id="mem_q" type="text" placeholder="🔍 ابحث بالاسم…"></div>
       <div class="muted" id="mem_qn" style="font-size:.78rem;margin:-4px 0 6px"></div>
       <div id="mgrRosterList"></div>
@@ -5617,11 +5617,11 @@ function screenMembers() {
       const shown = memTab === 'staff' ? staff : memTab === 'reg' ? regd : list;
       const tabBtn = (k, t) => `<button class="btn sm ${memTab === k ? '' : 'outline'}" data-memtab="${k}" style="margin:0 0 8px 6px">${t}</button>`;
       return `<div class="card"><h3>كشوف الأعضاء ${hintBtn('member_role')}</h3>
-      <div>${tabBtn('all', 'الكل (' + list.length + ')')}${tabBtn('staff', 'المسؤولون (' + staff.length + ')')}${tabBtn('reg', 'المسجلون (' + regd.length + ')')}${tabBtn('unreg', 'غير المسجلين (' + unreg.length + ')')}</div>
+      <div>${tabBtn('all', 'الكل (' + list.length + ')')}${tabBtn('staff', 'المسؤولون (' + staff.length + ')')}${tabBtn('reg', 'المسجلون (' + regd.length + ')')}${tabBtn('unreg', 'غير المسجلين — الأحياء (' + unreg.length + ')')}</div>
       <div class="field"><input id="mem_q" type="text" placeholder="🔍 ابحث بالاسم أو الجوال…"></div>
       <div class="muted" id="mem_qn" style="font-size:.78rem;margin:-4px 0 6px"></div>
       ${memTab === 'unreg'
-        ? `<p class="muted" style="font-size:.8rem">أفراد الشجرة الأحياء بلا حسابات — تابعهم وأنشئ حساباتهم وزوّدهم بمعلوماتهم.</p><div id="unregList"></div>`
+        ? `<p class="muted" style="font-size:.8rem">أفراد الشجرة الأحياء فقط (بلا حسابات) — تابعهم وأنشئ حساباتهم وزوّدهم بمعلوماتهم.</p><div id="unregList"></div>`
         : `<div class="mlist">${shown.map(memberRow).join('') || '<div class="muted" style="padding:8px">لا أحد في هذا الكشف.</div>'}</div>`}
     </div>`; })()}`;
   const au = document.getElementById('addUserBtn'); if (au) au.addEventListener('click', addUserModal);
