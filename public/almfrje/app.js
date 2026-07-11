@@ -433,6 +433,29 @@ async function fetchPersons() {
   try { return await fetchAll('almfrje_persons_pub'); }
   catch (e) { return fetchAll('almfrje_persons'); }   // المنظور غير موجود بعد → رجوع
 }
+/* ===== عرضٌ فوري من ذاكرة الجهاز (SWR): افتح من النسخة المحفوظة ثم حدّث بالخلفية ===== */
+const DATA_CACHE_KEY = 'almfrje_data_v1';
+function dataTier() { return (isAdmin() || isManager()) ? 'f' : 'p'; }   // f = بيانات كاملة (إدارة)، p = منقّاة (زائر)
+function dataSig() {
+  let mx = '';
+  for (const p of C.persons) { const u = p.updated_at || p.created_at || ''; if (u > mx) mx = u; }
+  return C.persons.length + ':' + C.branches.length + ':' + C.members.length + ':' + mx;
+}
+function saveDataCache() {
+  try {
+    if (!C.persons.length) return;
+    localStorage.setItem(DATA_CACHE_KEY, JSON.stringify({ tier: dataTier(), sig: dataSig(), persons: C.persons, branches: C.branches, members: C.members }));
+  } catch (e) { /* امتلاء التخزين → تجاهل بأمان */ }
+}
+function loadDataCache() {
+  try {
+    const raw = localStorage.getItem(DATA_CACHE_KEY); if (!raw) return false;
+    const c = JSON.parse(raw);
+    if (!c || c.tier !== dataTier() || !Array.isArray(c.persons) || !c.persons.length) return false;
+    C.persons = c.persons; C.branches = c.branches || []; C.members = c.members || [];
+    return true;
+  } catch (e) { return false; }
+}
 async function loadAll() {
   // الإعدادات تتوازى مع البيانات (كانت تتسلسل بعدها فتبطئ الدخول)
   const [pr, br, mr] = await Promise.all([
@@ -445,6 +468,7 @@ async function loadAll() {
   C.branches = br.error ? [] : (br.data || []);
   C.members = mr.error ? [] : (mr.data || []);
   buildIndex();
+  saveDataCache();   // تحديث نسخة الجهاز — يفتح فورياً في الزيارة القادمة
   // عدّاد صندوق الوارد لا يعطّل الدخول — يُجلب بالخلفية ويُحدّث شاراته وتنبيهه حال وصوله
   refreshInboxCount();
 }
@@ -3141,19 +3165,20 @@ function guestOnboard() {
     }
     openModal('🌿 حيّاك الله — أكمل بياناتك', `
       <div style="font-size:.9rem;line-height:1.9;margin-bottom:8px">أهلاً <b>${esc(name)}</b>! بياناتك في الشجرة غير مكتملة — أكملها ليُنشأ لك <b>حسابٌ خاص</b> تطّلع به على رسائلك:</div>
-      <div class="field"><input id="go_phone" type="tel" inputmode="tel" placeholder="📱 رقم الجوال (إجباري) *"></div>
+      <div class="field"><input id="go_phone" class="req-in" type="tel" inputmode="tel" placeholder="📱 رقم الجوال — إجباري *"></div>
       <div class="field"><input id="go_nick" type="text" placeholder="اللقب (اختياري)"></div>
       <div class="grid2">
         <div class="field"><input id="go_city" type="text" placeholder="المدينة (اختياري)"></div>
         <div class="field"><input id="go_birth" type="text" placeholder="سنة الميلاد مثل 1410هـ (اختياري)"></div>
       </div>
-      <div class="field"><input id="go_pw" type="password" placeholder="كلمة مرور (اختياري — الافتراضية رقم جوالك)"></div>
+      <div class="field"><input id="go_pw" class="req-in" type="password" placeholder="🔒 كلمة المرور — إجباري *"></div>
       <button class="btn" id="go_send" style="width:100%">✅ تسجيل بياناتي</button>
       <button class="btn outline" id="go_later" style="width:100%;margin-top:8px">لاحقاً — متابعة كزائر</button>`, () => {
       document.getElementById('go_later').addEventListener('click', closeModal);
       document.getElementById('go_send').addEventListener('click', async () => {
         const phone = normPhone(val('go_phone'));
         if (phone.length < 9) { toast('رقم الجوال إجباري — اكتبه صحيحاً'); return; }
+        if (val('go_pw').trim().length < 4) { toast('كلمة المرور إجبارية — ٤ أحرف/أرقام على الأقل'); return; }
         const body = { pid, phone, password: val('go_pw').trim(), nickname: val('go_nick').trim(), city: val('go_city').trim(), birth: val('go_birth').trim() };
         const ok = await guard(async () => {
           const { data: { session } } = await sb.auth.getSession();
@@ -3161,7 +3186,7 @@ function guestOnboard() {
           const j = await res.json().catch(() => ({}));
           if (!res.ok || !j.ok) throw new Error(j.error || 'تعذّر التسجيل');
           closeModal();
-          openModal('✅ شكراً لك', `<div style="text-align:center;font-size:1rem;line-height:2;padding:6px 0">استُلمت بياناتك وسوف <b>يُفعَّل حسابك لاحقاً</b> بعد مراجعة الإدارة.<br>يمكنك بعدها الدخول على حسابك من «المزيد ← دخول المسؤول»<br>📱 برقم جوالك ${j.defaulted_pw ? 'وكلمة المرور: <b>رقم جوالك نفسه</b> (يمكن تغييرها لاحقاً)' : 'وكلمة المرور التي اخترتها'}.</div>`);
+          openModal('✅ شكراً لك', `<div style="text-align:center;font-size:1rem;line-height:2;padding:6px 0">استُلمت بياناتك وسوف <b>يُفعَّل حسابك لاحقاً</b> بعد مراجعة الإدارة.<br>يمكنك بعدها الدخول على حسابك من «المزيد ← دخول المسؤول»<br>📱 برقم جوالك وكلمة المرور التي اخترتها.</div>`);
         });
         if (!ok) { /* بقيت النافذة ليصحح */ }
       });
@@ -5988,7 +6013,29 @@ async function enterApp(session) {
   if (!me.is_active) { showLoading(false); renderPending(); return; }
   // الزائر حساب مشترك تلقائي — لا يحتاج زرّ خروج (يبقى للمسؤول/المشرف).
   document.getElementById('signoutBtn').classList.toggle('hidden', isGuestUser() && guestGens <= 0);
-  // حمّل الإعدادات أولاً (خفيفة) لإظهار رسالة الترحيب/المبارَكة فوراً قبل تحميل بقية البيانات
+  // ⚡ عرضٌ فوري: إن وُجدت نسخة محفوظة على الجهاز افتح منها حالاً وحدّث بالخلفية
+  const cached = loadDataCache();
+  if (cached) {
+    buildIndex();
+    showLoading(false);
+    if (!location.hash || isAdminLoginUrl()) location.hash = '#/home';
+    render();
+    startPresence();
+    const oldSig = dataSig();
+    loadSettings().then(() => {
+      try { let fn = ''; try { fn = (sessionStorage.getItem('almfrje_guest_name') || '').trim().split(/\s+/)[0] || ''; } catch (e) { /* */ } showGreeting(fn); } catch (e) { /* */ }
+      try { render(); } catch (e) { /* البانر/النصوص وصلت */ }
+    }).catch(() => { /* */ });
+    loadAll().then(() => {
+      // أعد رسم الشاشات العامة فقط إن تغيّرت البيانات فعلاً (بلا مقاطعة كتابة/نوافذ)
+      if (dataSig() !== oldSig && !document.getElementById('modalRoot').innerHTML.trim()) {
+        const h = location.hash || '';
+        if (h === '' || h.startsWith('#/home') || h.startsWith('#/tree') || h.startsWith('#/branches') || h.startsWith('#/stats') || h.startsWith('#/search')) render();
+      }
+    }).catch(() => { /* تبقى نسخة الجهاز */ });
+    return;
+  }
+  // لا نسخة محفوظة (أول زيارة) — المسار الكامل
   try { await loadSettings(); } catch (e) { /* تجاهل — تبقى الافتراضية */ }
   try {
     let fn = '';
