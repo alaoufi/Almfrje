@@ -5586,7 +5586,7 @@ function screenMembers() {
   const list = C.members.slice().sort((a, b) => (a.full_name || '').localeCompare(b.full_name || ''));
   view().innerHTML = adminTabBar('members') + `
     <div class="card"><div class="li-title">🛡️ إضافة مسؤول ${hintBtn('add_user')}</div>
-      <div class="li-sub">لتعيين مشرفٍ (عام أو فرع) بفروعه وصلاحياته. أما تسجيل الأعضاء فمن كشف «غير المسجلين».</div>
+      <div class="li-sub">لتعيين مشرفٍ (عام أو فرع) بفروعه وصلاحياته. أما تسجيل عضوٍ أو إكمال بياناته فمن كشوف الأعضاء أدناه.</div>
       <button class="btn sm" id="addUserBtn" style="margin-top:6px">🛡️ إضافة مسؤول</button></div>
 
     ${(() => {
@@ -5828,7 +5828,7 @@ function addUserModal(initialQuery, memberOnly) {
     ? C.branches.map(b => `<label class="perm-chk"><input type="checkbox" data-nubranch="${b.id}"><span>${esc(b.name)}</span></label>`).join('')
     : '<div class="muted">لا فروع بعد.</div>';
   const permChksNew = MGR_PERMS.map(([k, l]) => `<label class="perm-chk"><input type="checkbox" data-nuperm="${k}" checked><span>${l}</span></label>`).join('');
-  openModal(memberOnly ? '➕ تسجيل عضو' : '🛡️ إضافة مسؤول', `
+  openModal(memberOnly ? '➕ تسجيل عضو / إكمال بياناته' : '🛡️ إضافة مسؤول', `
     <div class="field">
       <label>الاسم (يُختار من الشجرة — لا بدّ أن يكون حيّاً)</label>
       <input id="nu_search" type="text" placeholder="اكتب الاسم ثم اسم أبيه (مثال: سالم خالد) *" autocomplete="off">
