@@ -76,6 +76,9 @@ export async function POST(request: NextRequest) {
   // استكمال بيانات شخصه — تعبئة الفارغ فقط
   const patch: Record<string, string> = {};
   if (publish && !String(person.phone || '').trim()) patch.phone = phone;   // يُنشر في ملفه فقط بموافقته
+  // طلب الخصوصية = حماية مطلقة: إن كان جوالُه منشوراً في ملفه بالشجرة يُسحب منه
+  // (يبقى محفوظاً في حسابه — يراه هو والمدير فقط بحماية القاعدة)
+  if (!publish && String(person.phone || '').trim() && normalizePhone(person.phone) === phone) patch.phone = '';
   if (nickname && !String(person.nickname || '').trim()) patch.nickname = nickname;
   if (city && !String(person.city || '').trim()) patch.city = city;
   if (birth && !String(person.birth || '').trim()) patch.birth = birth;
