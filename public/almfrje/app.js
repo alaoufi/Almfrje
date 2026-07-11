@@ -3155,7 +3155,7 @@ function guestOnboard() {
       window._onbPoll = false;
       openModal('🔐 الدخول بحسابك مطلوب', `
         <div style="font-size:.95rem;line-height:1.9;text-align:center;background:#fff5f5;border:1px solid #e03131;border-radius:10px;padding:8px 10px;color:#c92a2a;font-weight:700;margin-bottom:8px">الدخول على الموقع بالحساب فقط</div>
-        <div style="font-size:.95rem;line-height:1.9;text-align:center">حيّاك الله <b>${esc(name)}</b> 🌿<br>لديك حسابٌ مسجّل — ادخل به وسيوجّهك الموقع حسب صلاحيتك، وتطّلع على <b>رسائلك وردود الإدارة</b>.</div>
+        <div style="font-size:.95rem;line-height:1.9;text-align:center">حيّاك الله <b>${esc(name)}</b> 🌿<br>لديك حسابٌ مسجّل … ادخل بجوالك وكلمة المرور … وستمتع بجولةٍ بين ربعك وأبناء عمومتك … وتطّلع على <b>مراسلاتك</b>.</div>
         <button class="btn" id="go_login" style="width:100%;margin-top:10px">🔐 دخول بحسابي (الجوال وكلمة المرور)</button>`, () => {
         document.getElementById('go_login').addEventListener('click', () => { closeModal(); setHash('#adminlogin'); });
       }, { noClose: true, noBgClose: true });
