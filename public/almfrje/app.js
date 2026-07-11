@@ -5490,10 +5490,26 @@ function screenMembers() {
     })()}
     <div class="card"><h3>الأعضاء (${list.length}) ${hintBtn('member_role')}</h3>
       <p class="muted" style="font-size:.85rem;margin-top:-4px">اضغط على اسم لعرض تفاصيله والتحكّم به.</p>
+      <div class="field"><input id="mem_q" type="text" placeholder="🔍 ابحث بالاسم أو الجوال أو الدور…"></div>
+      <div class="muted" id="mem_qn" style="font-size:.78rem;margin:-4px 0 6px"></div>
       <div class="mlist">${list.map(memberRow).join('')}</div>
     </div>`;
   const au = document.getElementById('addUserBtn'); if (au) au.addEventListener('click', addUserModal);
 
+  { const mq = document.getElementById('mem_q');
+    if (mq) mq.addEventListener('input', () => {
+      const q = normalizeAr(mq.value.trim());
+      const qd = normPhone(mq.value.trim());
+      let n = 0;
+      view().querySelectorAll('.mitem').forEach(el => {
+        const hay = el.dataset.msearch || '';
+        const hit = !q && !qd ? true : ((q && hay.includes(q)) || (qd.length >= 3 && hay.includes(qd)));
+        el.style.display = hit ? '' : 'none';
+        if (hit) n++;
+      });
+      const cn = document.getElementById('mem_qn');
+      if (cn) cn.textContent = (mq.value.trim()) ? ('النتائج: ' + n) : '';
+    }); }
   view().querySelectorAll('[data-regok]').forEach(b => b.addEventListener('click', async () => {
     const uid = b.dataset.regok;
     if (!(await confirm2('تحقّقت من صحة البيانات وتريد تفعيل الحساب؟ سيتمكن صاحبه من الدخول والاطلاع على رسائله.', { title: 'تفعيل بعد التحقق', okText: 'تفعيل' }))) return;
@@ -5513,7 +5529,8 @@ function screenMembers() {
 function memberRow(m) {
   const open = expandedMember === m.user_id;
   const sub = `${arOf(ROLES, m.role)}${m.is_active ? '' : ' • موقوف'}`;
-  return `<div class="mitem ${open ? 'open' : ''}">
+  const hay = normalizeAr([m.full_name, m.username, m.phone, arOf(ROLES, m.role)].filter(Boolean).join(' ')) + ' ' + normPhone(m.phone || '');
+  return `<div class="mitem ${open ? 'open' : ''}" data-msearch="${esc(hay)}">
     <div class="mitem-head" data-mhead="${m.user_id}">
       <span class="mitem-name">${esc(m.full_name || '—')} ${m.user_id === me.user_id ? '<span class="badge">أنت</span>' : ''}</span>
       <span class="mitem-sub">${esc(sub)}</span>
