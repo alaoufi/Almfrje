@@ -434,18 +434,34 @@ async function fetchPersons() {
   catch (e) { return fetchAll('almfrje_persons'); }   // المنظور غير موجود بعد → رجوع
 }
 async function loadAll() {
+  // الإعدادات تتوازى مع البيانات (كانت تتسلسل بعدها فتبطئ الدخول)
   const [pr, br, mr] = await Promise.all([
     fetchPersons().then(d => ({ data: d }), e => ({ error: e })),
     fetchAll('almfrje_branches').then(d => ({ data: d }), e => ({ error: e })),
     fetchAll('almfrje_members').then(d => ({ data: d }), e => ({ error: e })),
+    loadSettings().catch(() => { /* */ }),
   ]);
   C.persons = pr.error ? [] : (pr.data || []);
   C.branches = br.error ? [] : (br.data || []);
   C.members = mr.error ? [] : (mr.data || []);
-  // عدد الطلبات/الملاحظات قيد المراجعة التي يخصّ هذا المستخدم (عبر الخادم — يشمل ملاحظات فرعه).
-  try { const j = await fbApi('count'); C.feedbackPending = j.pending || 0; } catch (e) { C.feedbackPending = 0; }
-  await loadSettings();
   buildIndex();
+  // عدّاد صندوق الوارد لا يعطّل الدخول — يُجلب بالخلفية ويُحدّث شاراته وتنبيهه حال وصوله
+  refreshInboxCount();
+}
+// جلب عدّاد الصندوق بالخلفية: يحدّث شارة «المزيد» ويطلق تنبيه الدخول (مرة لكل جلسة)
+function refreshInboxCount() {
+  if (!me || !me.is_active || !(isAdmin() || isManager())) { C.feedbackPending = 0; return; }
+  fbApi('count').then(j => {
+    C.feedbackPending = j.pending || 0;
+    try { buildNav(); } catch (e) { /* */ }
+    try {
+      if (C.feedbackPending > 0 && sessionStorage.getItem('almfrje_inbox_alerted') !== '1') {
+        sessionStorage.setItem('almfrje_inbox_alerted', '1');
+        const n = C.feedbackPending;
+        toast('📨 لديك ' + n + (n === 1 ? ' رسالة' : ' رسائل') + ' في صندوق الوارد بانتظار الحسم — المزيد ← صندوق الوارد');
+      }
+    } catch (e) { /* */ }
+  }).catch(() => { C.feedbackPending = 0; });
 }
 // تحويل الاتصال إلى وسيط الموقع ‎/sbdb‎ — لشبكاتٍ تحجب نطاق القاعدة مباشرة (تحدث على أجهزة الكمبيوتر خاصة)
 function switchDbToProxy() {
@@ -5979,15 +5995,7 @@ async function enterApp(session) {
     try { fn = (sessionStorage.getItem('almfrje_guest_name') || '').trim().split(/\s+/)[0] || ''; } catch (e) { /* */ }
     showGreeting(fn);
   } catch (e) { /* تجاهل */ }
-  try { await loadAll();
-  // 📨 تنبيه صاحب الصلاحية فور دخوله بعدد رسائل الصندوق غير المحسومة (مرة لكل جلسة)
-  try {
-    if ((isAdmin() || isManager()) && (C.feedbackPending || 0) > 0 && sessionStorage.getItem('almfrje_inbox_alerted') !== '1') {
-      sessionStorage.setItem('almfrje_inbox_alerted', '1');
-      const n = C.feedbackPending;
-      setTimeout(() => toast('📨 لديك ' + n + (n === 1 ? ' رسالة' : ' رسائل') + ' في صندوق الوارد بانتظار الحسم — المزيد ← صندوق الوارد'), 1400);
-    }
-  } catch (e) { /* */ } } catch (e) { toast('خطأ تحميل: ' + e.message); }
+  try { await loadAll(); } catch (e) { toast('خطأ تحميل: ' + e.message); }
   showLoading(false);
   // الزائر دخل عبر رابط الإدارة سهواً؟ حوّله للرئيسية بدل بقائه على #login
   if (!location.hash || isAdminLoginUrl()) location.hash = '#/home';
