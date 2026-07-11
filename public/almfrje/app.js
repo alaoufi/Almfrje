@@ -3293,6 +3293,42 @@ function parseNewborn(f) {
   try { const o = JSON.parse(f.details); if (o && o.kind === 'newborn') return o; } catch (e) {}
   return null;
 }
+// طلب مساعدة الدخول: توليد كلمة مرور جديدة لصاحب الجوال وعرضها للمدير ليرسلها له.
+// (كلمات المرور مشفّرة لا تُسترجع — التوليد الجديد هو الأسلوب الآمن الوحيد.)
+async function resetLoginHelp(f) {
+  if (!isAdmin()) { toast('للمدير فقط'); return; }
+  const hm = f && f.sender_phone ? C.members.find(mm => normPhone(mm.phone || '') === normPhone(f.sender_phone)) : null;
+  if (!hm) { toast('لا حساب بهذا الجوال'); return; }
+  if (!(await confirm2('توليد كلمة مرور جديدة لحساب «' + (hm.full_name || '—') + '»؟\nستُعرض لك لإرسالها له، وتُلغى كلمته القديمة فوراً.', { title: 'إعادة تعيين كلمة المرور', okText: 'توليد وعرض' }))) return;
+  const newPin = String(Math.floor(100000 + Math.random() * 900000));
+  const ok = await guard(async () => {
+    const { data: { session } } = await sb.auth.getSession();
+    const r = await fetch('/api/almfrje-admin', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + ((session && session.access_token) || '') },
+      body: JSON.stringify({ user_id: hm.user_id, pin: newPin }),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || !j.ok) throw new Error(j.error || ('فشل (' + r.status + ')'));
+  });
+  if (!ok) return;
+  const msg = 'حيّاك الله ' + ((hm.full_name || '').split(' ')[0] || '') + '، كلمة مرورك الجديدة في موقع المفارجة هي: ' + newPin + '\nتدخل بجوالك ' + (hm.phone || '') + ' وهذه الكلمة، ويمكنك تغييرها لاحقاً من «ملفي الشخصي».';
+  openModal('🔑 كلمة المرور الجديدة — أرسلها له', `
+    <div style="text-align:center;line-height:2">
+      <div>👤 <b>${esc(hm.full_name || '—')}</b></div>
+      <div>📱 ${esc(hm.phone || '')}</div>
+      <div style="font-size:1.8rem;font-weight:900;letter-spacing:4px;margin:10px 0;padding:10px;border:2px dashed var(--brand);border-radius:12px">${newPin}</div>
+    </div>
+    <button class="btn" id="pw_copy" style="width:100%">📋 نسخ رسالة جاهزة للإرسال</button>
+    <p class="muted" style="font-size:.78rem;margin-top:8px;text-align:center">أرسلها له واتساباً أو اتصالاً، ثم علّم الطلب «تم». الكلمة القديمة أُلغيت.</p>`, () => {
+    const btn = document.getElementById('pw_copy');
+    btn.dataset.msg = msg;
+    btn.addEventListener('click', async () => {
+      try { await navigator.clipboard.writeText(btn.dataset.msg); toast('نُسخت الرسالة ✓ — ألصقها في واتساب'); }
+      catch (e) { uiPrompt('انسخ الرسالة يدوياً:', { title: 'الرسالة', placeholder: '', okText: 'تم' }); }
+    });
+  });
+}
 // شخص مُرسِل الملاحظة في الشجرة: من الربط المحفوظ، وإلا بمطابقة اسمه عند التفرّد.
 function feedbackSenderPerson(f) {
   if (f && f.sender_person_id) { const p = byId.get(Number(f.sender_person_id)); if (p) return p; }
@@ -3377,6 +3413,15 @@ async function screenFeedbacks() {
         ${f.branch_id ? `<div class="li-sub" style="margin-top:4px">🗂️ الفرع: <b>${esc(branchName(f.branch_id))}</b></div>` : ''}
         ${body}
         ${f.error_desc ? `<div class="li-sub" style="margin-top:4px;white-space:pre-wrap">⚠️ ${esc(f.error_desc)}</div>` : ''}
+        ${(() => {
+          const isPwHelp = f.created_by_name === 'طلب مساعدة دخول' || /🔑 طلب مساعدة دخول/.test(f.details || '');
+          if (!isPwHelp) return '';
+          const hm = f.sender_phone ? C.members.find(mm => normPhone(mm.phone || '') === normPhone(f.sender_phone)) : null;
+          return `<div style="margin-top:8px;padding:8px 10px;border:1px solid #e8590c;border-radius:8px;background:color-mix(in srgb, #e8590c 6%, var(--card));font-size:.85rem;line-height:1.8">
+            ${hm ? `👤 صاحب الحساب: <b>${esc(hm.full_name || '—')}</b> • ${arOf(ROLES, hm.role)}${hm.is_active ? '' : ' • <span style=\"color:var(--danger)\">موقوف</span>'}` : '⚠️ لا حساب بهذا الجوال — تحقّق من الرقم'}
+            ${hm && isAdmin() ? `<div style=\"margin-top:6px\"><button class=\"btn sm\" data-pwhelp=\"${f.id}\">🔑 توليد كلمة مرور جديدة لإرسالها له</button></div>` : ''}
+          </div>`;
+        })()}
         ${f.reply ? `<div style="margin-top:8px;padding:8px 10px;background:color-mix(in srgb, var(--brand) 7%, var(--card));border:1px solid var(--line);border-inline-start:3px solid var(--brand);border-radius:8px;font-size:.86rem;line-height:1.8">↩️ <b>ردّ الإدارة:</b> ${esc(f.reply)}<div class="muted" style="font-size:.72rem;margin-top:2px">${esc(f.replied_by_name || '')}${f.replied_at ? ' • ' + fmtDateTime(f.replied_at) : ''}</div></div>` : ''}
         <div class="muted" style="margin-top:6px;font-size:.74rem">👤 ${esc(f.created_by_name || 'زائر')}${(() => { const ph = f.sender_phone || (() => { const sp = feedbackSenderPerson(f); return (sp && sp.phone) ? sp.phone : ''; })(); return ph ? ' • 📱 <b>' + esc(ph) + '</b>' + (f.sender_phone ? '' : ' <span style="opacity:.7">(من ملفه المسجّل)</span>') : ''; })()} • ${fmtDateTime(f.created_at)}${f.status === 'done' && f.done_by_name ? ' • ' + esc(f.done_by_name) : ''}</div>
         <div class="btn-row" style="margin-top:8px">${(() => { const sp = f.sender_phone && feedbackSenderPerson(f); return (sp && (!sp.phone || normPhone(sp.phone) !== normPhone(f.sender_phone)) && canEditPerson(sp)) ? `<button class="btn sm outline" data-fbphone="${f.id}">📱 حفظ الجوال في ملفه</button>` : ''; })()}<button class="btn sm outline" data-fbreply="${f.id}">↩️ ${f.reply ? 'تعديل الرد' : 'رد باسم الإدارة'}</button>${actions}</div>
@@ -3386,6 +3431,7 @@ async function screenFeedbacks() {
   view().querySelectorAll('[data-fbreopen]').forEach(b => b.addEventListener('click', () => markFeedback(b.dataset.fbreopen, 'new')));
   view().querySelectorAll('[data-fbdel]').forEach(b => b.addEventListener('click', () => delFeedback(b.dataset.fbdel)));
   view().querySelectorAll('[data-fbreply]').forEach(b => b.addEventListener('click', () => replyModal(list.find(x => String(x.id) === b.dataset.fbreply))));
+  view().querySelectorAll('[data-pwhelp]').forEach(b => b.addEventListener('click', () => resetLoginHelp(list.find(x => String(x.id) === b.dataset.pwhelp))));
   view().querySelectorAll('[data-fbphone]').forEach(b => b.addEventListener('click', () => addSenderPhone(list.find(x => String(x.id) === b.dataset.fbphone))));
   view().querySelectorAll('[data-rook]').forEach(b => b.addEventListener('click', () => approveReorder(list.find(x => String(x.id) === b.dataset.rook))));
   view().querySelectorAll('[data-rono]').forEach(b => b.addEventListener('click', () => rejectReorder(list.find(x => String(x.id) === b.dataset.rono))));
