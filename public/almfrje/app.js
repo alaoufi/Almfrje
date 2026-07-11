@@ -5295,6 +5295,13 @@ function screenProfile() {
       <button class="btn" id="pf_saveInfo">حفظ البيانات</button>
     </div>
 
+    <div class="card"><h3>🔒 خصوصية رقم جوالك</h3>
+      <p class="muted" style="font-size:.85rem;margin-top:-2px">اختيارك يُطبَّق فوراً على ملفك في الشجرة وكل الكشوف.</p>
+      <label class="perm-chk"><input type="radio" name="pf_priv" value="publish" ${me.phone_public ? 'checked' : ''}><span>أسمح بنشره في دليل الموقع (يظهر في ملفك بالشجرة)</span></label>
+      <label class="perm-chk"><input type="radio" name="pf_priv" value="private" ${me.phone_public ? '' : 'checked'}><span>استخدام الموقع فقط — حماية مطلقة (لا يراه إلا أنت والإدارة)</span></label>
+      <button class="btn sm" id="pf_savePriv" style="margin-top:8px">حفظ الخصوصية</button>
+    </div>
+
     <div class="card"><h3>تغيير كلمة المرور (الرقم السري)</h3>
       <p class="muted" style="font-size:.85rem">رقم سري جديد من ٤ أرقام فأكثر. ستحتاجه في الدخول القادم.</p>
       ${pinField('الرقم السري الجديد', 'pf_pin')}
@@ -5305,6 +5312,21 @@ function screenProfile() {
   // إظهار/إخفاء حقول الـ PIN
   view().querySelectorAll('.eye').forEach(b => b.addEventListener('click', () => { const inp = document.getElementById(b.dataset.eye); const show = inp.type === 'password'; inp.type = show ? 'text' : 'password'; b.textContent = show ? '🙈' : '👁'; }));
 
+  document.getElementById('pf_savePriv').addEventListener('click', async () => {
+    const sel = document.querySelector('input[name="pf_priv"]:checked');
+    const publish = !!(sel && sel.value === 'publish');
+    const ok = await guard(async () => {
+      const { data: { session } } = await sb.auth.getSession();
+      const res = await fetch('/api/almfrje-signup', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + (session && session.access_token) }, body: JSON.stringify({ action: 'privacy', publish }) });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok || !j.ok) throw new Error(j.error || 'تعذّر الحفظ');
+    });
+    if (ok) {
+      me.phone_public = publish;
+      toast(publish ? 'سيُنشر جوالك في دليل الموقع ✓' : '🔒 جوالك محميٌّ — للموقع فقط');
+      await loadAll(); render();
+    }
+  });
   document.getElementById('pf_saveInfo').addEventListener('click', async () => {
     const full_name = val('pf_name').trim();
     const phone = normPhone(val('pf_phone'));
