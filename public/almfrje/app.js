@@ -3529,6 +3529,7 @@ function screenMore() {
   if (isAdmin()) admin.push(['⚙️ لوحة التحكم', '#/control', 'control_panel']);
   if (isAdmin() || isGeneralManager()) admin.push(['💬 المناقشات (الإدارة العليا)', '#/discussions']);
   if (isAdmin()) admin.push(['👥 الأعضاء — بحث وإدارة وكلمات المرور', '#/members']);
+  else if (isManager()) admin.push(['👥 كشوف أعضاء فروعي', '#/members']);
   { const n = (isAdmin() || isManager()) ? (C.feedbackPending || 0) : 0;
     if (isAdmin() || isManager()) admin.push(['📨 صندوق الوارد' + (n > 0 ? ' <span class="inb-badge">' + (n > 99 ? '99+' : n) + '</span>' : ''), '#/feedbacks', 'feedbacks']); }
   if (canAdd()) admin.push(['👶 إضافة مولود (مباشرة)', '#/person-edit/0', 'add_person']);
@@ -5529,10 +5530,59 @@ function screenProfile() {
   renderMyPerson();
 }
 
+/* ===== كشوف الأعضاء للمشرفين: نسخة مطهّرة (بلا جوالات/أزرار) ضمن نطاق فروعهم فقط ===== */
+async function screenMembersForManager() {
+  showLoading(true);
+  let roster = [];
+  try {
+    const { data: { session } } = await sb.auth.getSession();
+    const res = await fetch('/api/almfrje-signup', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + (session && session.access_token) }, body: JSON.stringify({ action: 'roster' }) });
+    const j = await res.json().catch(() => ({}));
+    if (res.ok && j.ok) roster = j.rows || [];
+  } catch (e) { /* */ }
+  showLoading(false);
+  const mineB = new Set(myBranches().map(Number));
+  const allMine = isGeneralManager() && myBranches().length === C.branches.length;
+  const inScopeP = (pid) => { const pp = pid && byId.get(Number(pid)); return !!(pp && pp.branch_id != null && mineB.has(Number(pp.branch_id))); };
+  const scoped = roster.filter(r => r.role === 'admin' ? false : inScopeP(r.person_id));
+  const staff = scoped.filter(r => r.role !== 'viewer');
+  const regd = scoped.filter(r => r.role === 'viewer');
+  const linkedPids = new Set(roster.filter(r => r.person_id).map(r => Number(r.person_id)));
+  const unreg = C.persons.filter(pp => pp.status !== 'dead' && pp.branch_id != null && mineB.has(Number(pp.branch_id)) && !linkedPids.has(pp.id));
+  const shown = memTab === 'staff' ? staff : memTab === 'reg' ? regd : scoped;
+  const tabBtn = (k, t) => `<button class="btn sm ${memTab === k ? '' : 'outline'}" data-memtab="${k}" style="margin:0 0 8px 6px">${t}</button>`;
+  const row = (r) => { const pp = r.person_id && byId.get(Number(r.person_id)); return `<div class="row"><span class="k">${esc(r.full_name || '—')} <span class="muted" style="font-size:.72rem">${arOf(ROLES, r.role)}${r.is_active ? '' : ' • موقوف'}${pp && pp.branch_id ? ' • ' + esc(branchName(pp.branch_id)) : ''}</span></span></div>`; };
+  view().innerHTML = `
+    <div class="card"><h3>كشوف أعضاء ${allMine ? 'كل الفروع' : 'فروعك'}</h3>
+      <p class="muted" style="font-size:.82rem;margin-top:-2px">عرضٌ للمتابعة ضمن نطاق إشرافك — بلا أرقام (خصوصية الأعضاء محفوظة) وبلا أدوات إدارة.</p>
+      <div>${tabBtn('all', 'الكل (' + scoped.length + ')')}${tabBtn('staff', 'المشرفون (' + staff.length + ')')}${tabBtn('reg', 'المسجلون (' + regd.length + ')')}${tabBtn('unreg', 'غير المسجلين (' + unreg.length + ')')}</div>
+      <div class="field"><input id="mem_q" type="text" placeholder="🔍 ابحث بالاسم…"></div>
+      <div class="muted" id="mem_qn" style="font-size:.78rem;margin:-4px 0 6px"></div>
+      <div id="mgrRosterList"></div>
+    </div>`;
+  const CAP = 80;
+  const renderList = () => {
+    const q = normalizeAr((document.getElementById('mem_q') || { value: '' }).value.trim());
+    const box = document.getElementById('mgrRosterList'); if (!box) return;
+    if (memTab === 'unreg') {
+      const hits = q ? unreg.filter(pp => (pp._n || normalizeAr(pp.name)).includes(q) || normalizeAr(lineageShort(pp.id, 4)).includes(q)) : unreg;
+      const cn = document.getElementById('mem_qn'); if (cn) cn.textContent = 'المعروض: ' + Math.min(CAP, hits.length) + ' من ' + hits.length;
+      box.innerHTML = hits.slice(0, CAP).map(pp => `<div class="row"><span class="k">${esc(pp.name)} <span class="muted" style="font-size:.72rem">${esc(lineageShort(pp.id, 4))}</span></span></div>`).join('') || '<div class="muted" style="padding:8px">لا أحد.</div>';
+    } else {
+      const hits = q ? shown.filter(r => normalizeAr(r.full_name || '').includes(q)) : shown;
+      const cn = document.getElementById('mem_qn'); if (cn) cn.textContent = q ? ('النتائج: ' + hits.length) : '';
+      box.innerHTML = hits.map(row).join('') || '<div class="muted" style="padding:8px">لا أحد في هذا الكشف.</div>';
+    }
+  };
+  renderList();
+  { const mq = document.getElementById('mem_q'); if (mq) mq.addEventListener('input', debounce(renderList, 200)); }
+  view().querySelectorAll('[data-memtab]').forEach(b => b.addEventListener('click', () => { memTab = b.dataset.memtab; screenMembersForManager(); }));
+}
 /* ===== الأعضاء والصلاحيات ===== */
 let expandedMember = null;
 let memTab = 'all';   // كشوف الأعضاء: all | staff | reg | unreg   // user_id للعضو المفتوح حالياً
 function screenMembers() {
+  if (!isAdmin() && isManager()) { screenMembersForManager(); return; }
   if (!isAdmin()) { view().innerHTML = noPerm(); return; }
   const list = C.members.slice().sort((a, b) => (a.full_name || '').localeCompare(b.full_name || ''));
   view().innerHTML = adminTabBar('members') + `
