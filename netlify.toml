@@ -1,0 +1,12 @@
+# إعداد نشر منصّة alaoufi على Netlify (تشغّل Next.js وخدماته الخادمية عبر الـ Runtime الرسمي).
+# لا يؤثّر على النشر الحالي على فيرسل — ملفٌ يقرؤه Netlify وحده.
+[build]
+  command = "next build"
+  publish = ".next"
+
+# Runtime الرسمي لـ Next.js على Netlify — يحوّل مسارات app/api والـ SSR والـ rewrites تلقائياً.
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
+
+[build.environment]
+  NODE_VERSION = "20"
