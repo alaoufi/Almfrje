@@ -10,3 +10,11 @@
 
 [build.environment]
   NODE_VERSION = "20"
+
+# تحويل جذر الدومين إلى واجهة المفرجي (Netlify لا يطبّق rewrite الجذر من next.config)
+# from='/' يطابق الجذر فقط، فلا يؤثر على /con أو /notes أو بقية المسارات.
+[[redirects]]
+  from = "/"
+  to = "/almfrje/"
+  status = 301
+  force = true
