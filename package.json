@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "test": "node --no-warnings --experimental-strip-types --test test/*.test.mjs",
     "check:boundaries": "node scripts/check-boundaries.mjs",
     "prebuild": "node scripts/check-boundaries.mjs",
     "build": "next build",
@@ -12,7 +13,7 @@
   "dependencies": {
     "@supabase/supabase-js": "^2.45.6",
     "bcryptjs": "^2.4.3",
-    "next": "^15.0.3",
+    "next": "^16.3.0",
     "pg": "^8.13.1",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
