@@ -30,3 +30,6 @@ uploads/
 # Misc
 *.tsbuildinfo
 next-env.d.ts
+
+# Local Git worktrees
+.worktrees/
