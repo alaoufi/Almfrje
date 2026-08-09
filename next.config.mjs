@@ -34,6 +34,16 @@ const nextConfig = {
     ];
   },
   async headers() {
+    const securityHeaders = [
+      {
+        key: 'Content-Security-Policy',
+        value: "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' https://*.supabase.co; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'",
+      },
+      { key: 'X-Frame-Options', value: 'SAMEORIGIN' },
+      { key: 'X-Content-Type-Options', value: 'nosniff' },
+      { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+      { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=(self), payment=()' },
+    ];
     const noCache = [
       { key: 'Cache-Control', value: 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0, s-maxage=0, private' },
       { key: 'CDN-Cache-Control', value: 'no-store' },
@@ -50,6 +60,7 @@ const nextConfig = {
       { key: 'Vercel-CDN-Cache-Control', value: 'no-cache' },
     ];
     return [
+      { source: '/:path*', headers: securityHeaders },
       // منصّة الاستشارات على /con (وملفاتها داخل /legacy/)
       { source: '/con', headers: noCache },
       { source: '/legacy/:path*', headers: noCache },
