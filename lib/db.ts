@@ -20,11 +20,11 @@ export function db(): SupabaseClient {
 }
 
 function jwtSecret(): string {
-  const s = process.env.JWT_SECRET;
-  // If a strong secret is configured, use it. Otherwise fall back to the
-  // original Hostinger value so existing tokens keep working — set
-  // JWT_SECRET in Vercel to override this with a stronger value.
-  return s && s.length >= 16 ? s : 'alaoufi_secret_2026_x9k2p';
+  const secret = process.env.JWT_SECRET?.trim();
+  if (!secret || secret.length < 32) {
+    throw new Error('JWT_SECRET must be configured with at least 32 characters');
+  }
+  return secret;
 }
 
 export interface AuthPayload {
