@@ -5,7 +5,13 @@ const ALMFRJE_DB = process.env.ALMFRJE_SUPABASE_URL || process.env.NEXT_PUBLIC_S
 const nextConfig = {
   reactStrictMode: true,
   outputFileTracingIncludes: {
-    '/api/setup': ['./database/setup.sql'],
+    // `pg` selects pg-cloudflare at runtime in Workers. Next.js tracing sees
+    // the default empty export, so include the Worker implementation explicitly.
+    '/api/almfrje-setup': ['./node_modules/pg-cloudflare/dist/**/*'],
+    '/api/setup': [
+      './database/setup.sql',
+      './node_modules/pg-cloudflare/dist/**/*',
+    ],
   },
   async rewrites() {
     return [
