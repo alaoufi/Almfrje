@@ -19,9 +19,9 @@ const nextConfig = {
       // Supabase مباشرةً فتظهر شاشة الدخول الخاطئة ويفشل كل شيء. هذا المسار يمرّر
       // REST/Auth عبر نطاق الموقع نفسه، ويتحوّل إليه المتصفّح تلقائياً عند الحجب.
       { source: '/sbdb/:path*', destination: `${ALMFRJE_DB}/:path*` },
-      // المفرجي يُخدَم من جذر الدومين / مباشرةً (ليعمل على almfrje.alaoufi.me دون مسار).
       // المساران /almfrje و/almfrji يبقيان عاملَين كـ alias لنفس التطبيق (توافق قديم).
-      { source: '/', destination: '/almfrje/index.html' },
+      // الجذر يُعالَج في app/page.tsx بدلاً من rewrite: ذلك يعمل على Cloudflare Workers
+      // أيضاً، حيث لا يُطبَّق rewrite إلى ملف ثابت على الجذر بصورة موثوقة.
       { source: '/almfrji', destination: '/almfrje/index.html' },
       { source: '/almfrji/', destination: '/almfrje/index.html' },
       { source: '/almfrje', destination: '/almfrje/index.html' },
