@@ -1,0 +1,17 @@
+/ /almfrje/index.html 200
+/almfrji /almfrje/index.html 301
+/almfrji/ /almfrje/index.html 301
+/almfrje /almfrje/index.html 200
+/almfrje/ /almfrje/index.html 200
+/almfrje/* /almfrje/index.html 200
+/con /legacy/index.html 200
+/con/ /legacy/index.html 200
+/con/* /legacy/index.html 200
+/mrah /mrahi/index.html 301
+/mrah/ /mrahi/index.html 301
+/mrahi /mrahi/index.html 200
+/mrahi/ /mrahi/index.html 200
+/mrahi/* /mrahi/index.html 200
+/notes /notes/index.html 200
+/notes/ /notes/index.html 200
+/notes/* /notes/index.html 200
