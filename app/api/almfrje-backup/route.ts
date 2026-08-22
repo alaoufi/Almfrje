@@ -16,7 +16,7 @@ export const runtime = 'nodejs';
 
 const BUCKET = 'almfrje-backups';
 const PREFIX = 'auto';
-const KEEP = 30;
+const KEEP = 7;   // ٧ شرائح دوّارة بأيام الأسبوع (سبت فوق سبت) — النسخة الأحدث تحلّ محلّ نسخة نفس اليوم
 
 // جلب كل صفوف جدول مع ترقيم صفحات (تجاوز حدّ 1000 صف الافتراضي).
 async function fetchAllRows(db: SupabaseClient, table: string): Promise<any[]> {
@@ -78,20 +78,23 @@ async function runBackup(admin: SupabaseClient) {
     data: { persons, branches, members, documents, settings },
   };
   await ensureBucket(admin);
-  const d = new Date(), p = (n: number) => String(n).padStart(2, '0');
-  const stamp = `${d.getUTCFullYear()}-${p(d.getUTCMonth() + 1)}-${p(d.getUTCDate())}_${p(d.getUTCHours())}-${p(d.getUTCMinutes())}`;
-  const path = `${PREFIX}/almfrje_${stamp}.json`;
+  // ٧ شرائح دوّارة بأيام الأسبوع: نسخة كل يوم تحلّ محلّ نسخة نفس اليوم من الأسبوع الماضي (upsert)
+  // — «السبت على السبت وهكذا». اليوم يُحسب بتوقيت الرياض (UTC+3) ليطابق ما يراه المستخدم محلياً.
+  const WDAYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];   // getUTCDay: 0=الأحد .. 6=السبت
+  const riyadh = new Date(Date.now() + 3 * 3600 * 1000);
+  const dow = riyadh.getUTCDay();
+  const path = `${PREFIX}/almfrje_wday-${dow}-${WDAYS[dow]}.json`;   // تاريخ الأخذ محفوظٌ داخل الملف (created_at)
   const { error: upErr } = await admin.storage.from(BUCKET).upload(path, JSON.stringify(backup, null, 2), { contentType: 'application/json', upsert: true });
   if (upErr) return { ok: false, status: 500, error: 'تعذّر الرفع للتخزين: ' + upErr.message };
 
+  // احتفظ فقط بشرائح الأيام السبع (almfrje_wday-*) واحذف ما عداها — تنظيفٌ للنسخ القديمة المؤرَّخة
   let deleted = 0;
   try {
-    const { data } = await admin.storage.from(BUCKET).list(PREFIX, { limit: 1000, sortBy: { column: 'name', order: 'desc' } });
-    const files = (data || []).filter((f) => f.name.endsWith('.json'));
-    if (files.length > KEEP) {
-      const old = files.slice(KEEP).map((f) => `${PREFIX}/${f.name}`);
-      await admin.storage.from(BUCKET).remove(old); deleted = old.length;
-    }
+    const { data } = await admin.storage.from(BUCKET).list(PREFIX, { limit: 1000 });
+    const stale = (data || [])
+      .filter((f) => f.name.endsWith('.json') && !f.name.startsWith('almfrje_wday-'))
+      .map((f) => `${PREFIX}/${f.name}`);
+    if (stale.length) { await admin.storage.from(BUCKET).remove(stale); deleted = stale.length; }
   } catch { /* تجاهل أخطاء الاحتفاظ */ }
 
   return { ok: true, status: 200, path, counts: backup.counts, kept: KEEP, deleted };
