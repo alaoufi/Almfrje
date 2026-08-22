@@ -1132,3 +1132,13 @@ ul.hier ul.hier > .hier-li::before {
 .signup-compact .perm-chk { padding: 3px 0; font-size: .82rem; }
 .signup-compact .btn { padding: 10px 12px; }
 .modal { max-height: 94vh; overflow-y: auto; }
+
+/* ===== جدول «غير المسجّلين» القابل للتعبئة (حفظ تلقائي في ملف الشخص) ===== */
+.ureg-head { display: none; }
+.ureg-row { display: grid; grid-template-columns: 1fr 1fr 1fr auto; gap: 5px; align-items: center; padding: 7px 2px; border-bottom: 1px solid var(--line); }
+.ureg-name { grid-column: 1 / -1; font-size: .84rem; font-weight: 700; margin-bottom: 2px; }
+.ureg-name .muted { font-size: .68rem; font-weight: 400; }
+.ureg-in { width: 100%; padding: 6px 7px; border: 1px solid var(--line); border-radius: 7px; font-size: .82rem; background: var(--card); color: var(--text); box-sizing: border-box; transition: border-color .15s, background .15s; }
+.ureg-in:focus { border-color: var(--brand); outline: none; }
+.ureg-in.saving { opacity: .55; }
+.ureg-in.saved { border-color: var(--ok); background: color-mix(in srgb, var(--ok) 12%, var(--card)); }

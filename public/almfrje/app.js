@@ -5649,7 +5649,7 @@ function screenMembers() {
       <div class="field"><input id="mem_q" type="text" placeholder="🔍 ابحث بالاسم أو الجوال…"></div>
       <div class="muted" id="mem_qn" style="font-size:.78rem;margin:-4px 0 6px"></div>
       ${memTab === 'unreg'
-        ? `<p class="muted" style="font-size:.8rem">أفراد الشجرة الأحياء فقط (بلا حسابات) — تابعهم وأنشئ حساباتهم وزوّدهم بمعلوماتهم.</p><div id="unregList"></div>`
+        ? `<p class="muted" style="font-size:.8rem">أفراد الشجرة الأحياء (بلا حسابات). عبّئ <b>الجوال والمدينة وسنة الميلاد</b> مباشرةً في الجدول — <b>يُحفظ تلقائياً</b> في ملف الشخص. وزرّ «➕ حساب» يُنشئ له حساب دخول.</p><div id="unregList" class="ureg-tbl"></div>`
         : `<div class="mlist">${shown.map(memberRow).join('') || '<div class="muted" style="padding:8px">لا أحد في هذا الكشف.</div>'}</div>`}
     </div>`; })()}`;
   const au = document.getElementById('addUserBtn'); if (au) au.addEventListener('click', () => addUserModal());
@@ -5660,17 +5660,41 @@ function screenMembers() {
     const memPhones = new Set(C.members.map(m => normPhone(m.phone || '')).filter(x => x.length >= 9));
     const unregAll = C.persons.filter(pp => pp.status !== 'dead' && !linkedPids.has(pp.id) && !(pp.phone && memPhones.has(normPhone(pp.phone))));
     const CAP = 80;
+    // حفظٌ تلقائي لحقلٍ واحد (جوال/مدينة/ميلاد) في ملف الشخص بالشجرة — مع سجلّ التعديلات
+    const saveUnregField = async (inp) => {
+      const id = parseInt(inp.dataset.id, 10); const f = inp.dataset.f;
+      const pp = byId.get(id); if (!pp || !canEditPerson(pp)) return;
+      const nv = inp.value.trim();
+      if ((pp[f] || '') === nv) return;   // لا تغيير — لا تحفظ
+      const who = (me.full_name || me.username || '');
+      const patch = { [f]: nv, updated_by_name: who, updated_at: new Date().toISOString() };
+      const prev = { [f]: pp[f] ?? null, updated_by_name: pp.updated_by_name ?? null, updated_at: pp.updated_at ?? null };
+      inp.classList.add('saving');
+      const ok = await guard(async () => {
+        const { error } = await sb.from('almfrje_persons').update(patch).eq('id', id); if (error) throw error;
+        await auditLog('edit', id, pp.name, { kind: 'persons', items: [{ id, prev }], label: pp.name });
+      });
+      inp.classList.remove('saving');
+      if (ok) { pp[f] = nv; pp.updated_by_name = who; pp.updated_at = patch.updated_at; inp.classList.add('saved'); setTimeout(() => inp.classList.remove('saved'), 1200); }
+      else { inp.value = pp[f] || ''; }   // رجوعٌ آمن عند فشل الحفظ
+    };
     const renderUnreg = () => {
       const q = normalizeAr((document.getElementById('mem_q') || { value: '' }).value.trim());
       const hits = q ? unregAll.filter(pp => (pp._n || normalizeAr(pp.name)).includes(q) || normalizeAr(lineageShort(pp.id, 4)).includes(q)) : unregAll;
       const cn = document.getElementById('mem_qn');
       if (cn) cn.textContent = 'المعروض: ' + Math.min(CAP, hits.length) + ' من ' + hits.length + (hits.length > CAP ? ' — ضيّق بالبحث' : '');
       const box = document.getElementById('unregList'); if (!box) return;
-      box.innerHTML = hits.slice(0, CAP).map(pp => `
-        <div class="row" style="align-items:center">
-          <span class="k" style="flex:1">${esc(pp.name)} <span class="muted" style="font-size:.72rem">${esc(lineageShort(pp.id, 4))}${pp.branch_id ? ' • ' + esc(branchName(pp.branch_id)) : ''}</span></span>
-          <button class="btn sm" data-mkacc="${pp.id}">➕ حساب</button>
-        </div>`).join('') || '<div class="muted" style="padding:8px">لا نتائج.</div>';
+      // جدولٌ قابل للتعبئة: الاسم ثابت، والجوال/المدينة/الميلاد تُحفظ تلقائياً عند الخروج من الحقل
+      box.innerHTML = `<div class="ureg-head"><span>الاسم</span><span>الجوال</span><span>المدينة</span><span>الميلاد</span><span></span></div>` +
+        (hits.slice(0, CAP).map(pp => `
+        <div class="ureg-row">
+          <div class="ureg-name">${esc(pp.name)}<span class="muted"> ${esc(lineageShort(pp.id, 3))}</span></div>
+          <input class="ureg-in" data-f="phone" data-id="${pp.id}" type="tel" inputmode="tel" value="${esc(pp.phone || '')}" placeholder="جوال">
+          <input class="ureg-in" data-f="city" data-id="${pp.id}" type="text" value="${esc(pp.city || '')}" placeholder="مدينة">
+          <input class="ureg-in" data-f="birth" data-id="${pp.id}" type="text" value="${esc(pp.birth || '')}" placeholder="ميلاد">
+          <button class="btn sm" data-mkacc="${pp.id}" title="إنشاء حساب دخول لهذا الشخص">➕ حساب</button>
+        </div>`).join('') || '<div class="muted" style="padding:8px">لا نتائج.</div>');
+      box.querySelectorAll('.ureg-in').forEach(inp => inp.addEventListener('change', () => saveUnregField(inp)));
       box.querySelectorAll('[data-mkacc]').forEach(bb => bb.addEventListener('click', () => {
         const pp = byId.get(parseInt(bb.dataset.mkacc, 10));
         addUserModal(pp ? lineage(pp.id).slice(0, 2).map(x => x.name).join(' ') : '', true);
