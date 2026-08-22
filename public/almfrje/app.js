@@ -482,6 +482,38 @@ function switchDbToProxy() {
   try { localStorage.setItem('almfrje_dbproxy', '1'); } catch (e) { /* */ }
   sb = window.supabase.createClient(location.origin + '/sbdb', window.ALMFRJE_CONFIG.SUPABASE_ANON_KEY);
 }
+/* ===== ذاكرة محلية للشجرة: عرضٌ فوري بآخر نسخة ثم تحديثٌ صامت (stale-while-revalidate) =====
+   يجعل الموقع يظهر لحظياً في الفتحات المتكرّرة بلا انتظار جلب البيانات، والتعديلات
+   تظهر بعد لحظةٍ حين تصل النسخة الحديثة من القاعدة. الذاكرة على جهاز المستخدم فقط. */
+const TREE_CACHE_KEY = 'almfrje_tree_v1';
+function treeCacheRole() { return (isAdmin() || isManager()) ? 'full' : 'pub'; }
+function saveTreeCache() {
+  try {
+    localStorage.setItem(TREE_CACHE_KEY, JSON.stringify({
+      role: treeCacheRole(), ts: Date.now(),
+      persons: C.persons, branches: C.branches, members: C.members
+    }));
+  } catch (e) { /* الحجم أو الوضع الخاص — تجاهل */ }
+}
+// يُرجِع true إن نجح ملء البيانات من الذاكرة (بنفس الدور) — فنعرض فوراً
+function hydrateFromCache() {
+  try {
+    const rawS = localStorage.getItem('almfrje_settings_v1');
+    if (rawS) { const m = JSON.parse(rawS); if (m && typeof m === 'object') applySettings(m); }
+  } catch (e) { /* */ }
+  try {
+    const raw = localStorage.getItem(TREE_CACHE_KEY);
+    if (!raw) return false;
+    const p = JSON.parse(raw);
+    if (!p || p.role !== treeCacheRole() || !Array.isArray(p.persons) || !p.persons.length) return false;
+    C.persons = p.persons; C.branches = Array.isArray(p.branches) ? p.branches : []; C.members = Array.isArray(p.members) ? p.members : [];
+    buildIndex();
+    return true;
+  } catch (e) { return false; }
+}
+function clearTreeCache() {
+  try { localStorage.removeItem(TREE_CACHE_KEY); localStorage.removeItem('almfrje_settings_v1'); } catch (e) { /* */ }
+}
 async function loadSettings() {
   for (let att = 0; att < 3; att++) {
     try {
@@ -503,10 +535,16 @@ async function loadSettings() {
   }
 }
 async function loadSettingsOnce() {
+  const { data, error } = await sb.from('almfrje_settings').select('key,value');
+  if (error) throw error;
+  const map = {}; (data || []).forEach(r => map[r.key] = r.value);
+  applySettings(map);
+  // خزّن الإعدادات محلياً كي تُطبَّق فوراً في الفتحة القادمة قبل وصول القاعدة (عرضٌ فوري)
+  try { localStorage.setItem('almfrje_settings_v1', JSON.stringify(map)); } catch (e) { /* */ }
+}
+// تطبيق خريطة الإعدادات على المتغيّرات العامة (تُستدعى من القاعدة ومن الذاكرة المحلية)
+function applySettings(map) {
   {
-    const { data, error } = await sb.from('almfrje_settings').select('key,value');
-    if (error) throw error;
-    const map = {}; (data || []).forEach(r => map[r.key] = r.value);
     imported = map.imported === true;
     visitStats = (map.visit_stats && typeof map.visit_stats === 'object') ? map.visit_stats : { total: 0, byBranch: {}, byCity: {} };
     guestOpen = map.guest_open === true;
@@ -6341,13 +6379,33 @@ async function enterApp(session) {
   if (!me.is_active) { showLoading(false); renderPending(); return; }
   // الزائر حساب مشترك تلقائي — لا يحتاج زرّ خروج (يبقى للمسؤول/المشرف).
   document.getElementById('signoutBtn').classList.toggle('hidden', isGuestUser() && guestGens <= 0);
+  // تحيّةٌ تُعرض مرّة واحدة (تعتمد على الإعدادات) — تُستدعى بعد جهوز الإعدادات في المسارين
+  const greet = () => {
+    try {
+      let fn = '';
+      try { fn = (sessionStorage.getItem('almfrje_guest_name') || '').trim().split(/\s+/)[0] || ''; } catch (e) { /* */ }
+      showGreeting(fn);
+    } catch (e) { /* تجاهل */ }
+  };
+  // عرضٌ فوري من الذاكرة المحلية إن وُجدت (بنفس الدور)، ثم تحديثٌ صامت من القاعدة.
+  // النتيجة: يظهر الموقع لحظياً في الفتحات المتكرّرة، والتعديلات تظهر بعد لحظة حين تصل النسخة الحديثة.
+  if (hydrateFromCache()) {
+    greet();
+    showLoading(false);
+    if (!location.hash || isAdminLoginUrl()) location.hash = '#/home';
+    render();                       // يظهر الموقع فوراً بلا انتظار جلب البيانات
+    startPresence();
+    loadAll().then(() => {
+      saveTreeCache();
+      const mr = document.getElementById('modalRoot');
+      if (!(mr && mr.children && mr.children.length)) render();   // لا تُقاطع نافذةً مفتوحة للمستخدم
+    }).catch(() => { /* يبقى العرض من الذاكرة */ });
+    return;
+  }
+  // أول زيارة (لا ذاكرة محلية): حمّل الإعدادات والبيانات ثم اعرض
   try { await loadSettings(); } catch (e) { /* تجاهل — تبقى الافتراضية */ }
-  try {
-    let fn = '';
-    try { fn = (sessionStorage.getItem('almfrje_guest_name') || '').trim().split(/\s+/)[0] || ''; } catch (e) { /* */ }
-    showGreeting(fn);
-  } catch (e) { /* تجاهل */ }
-  try { await loadAll(); } catch (e) { toast('خطأ تحميل: ' + e.message); }
+  greet();
+  try { await loadAll(); saveTreeCache(); } catch (e) { toast('خطأ تحميل: ' + e.message); }
   showLoading(false);
   // الزائر دخل عبر رابط الإدارة سهواً؟ حوّله للرئيسية بدل بقائه على #login
   if (!location.hash || isAdminLoginUrl()) location.hash = '#/home';
@@ -6412,6 +6470,7 @@ async function init() {
   document.getElementById('signoutBtn').addEventListener('click', async () => {
     stopPresence();
     try { sessionStorage.removeItem('almfrje_guest_ts'); } catch (e) { /* */ }
+    clearTreeCache();   // لا تُبقِ بيانات المستخدم السابق على جهازٍ قد يكون مشتركاً
     location.hash = '#/home';
     await sb.auth.signOut();
   });
