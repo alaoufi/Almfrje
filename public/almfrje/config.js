@@ -7,4 +7,4 @@ window.ALMFRJE_CONFIG = {
   SUPABASE_URL: "https://noupszhgfyqhfotokabj.supabase.co",
   SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5vdXBzemhnZnlxaGZvdG9rYWJqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA3Njc5NDUsImV4cCI6MjA5NjM0Mzk0NX0.TmyNXiXOm1vhOfV07GWwKkvIdb23oIoeaYL20Wwcpv0",
 };
-/* rebuild-trigger */
+/* rebuild-trigger v2 — apply CF env vars */
