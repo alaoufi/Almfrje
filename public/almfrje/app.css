@@ -1142,3 +1142,9 @@ ul.hier ul.hier > .hier-li::before {
 .ureg-in:focus { border-color: var(--brand); outline: none; }
 .ureg-in.saving { opacity: .55; }
 .ureg-in.saved { border-color: var(--ok); background: color-mix(in srgb, var(--ok) 12%, var(--card)); }
+
+/* ===== نافذة موافقة طلبات التسجيل ===== */
+.apr-item { border: 1px solid var(--line); border-inline-start: 4px solid #e8590c; border-radius: 12px; padding: 10px 12px; margin-bottom: 10px; }
+.apr-name { font-weight: 800; font-size: 1rem; }
+.apr-ph { font-size: .85rem; color: var(--text); margin-top: 3px; }
+.apr-acts { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }

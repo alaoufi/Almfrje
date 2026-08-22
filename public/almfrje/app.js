@@ -475,16 +475,7 @@ async function loadAll() {
 // جلب عدّاد الصندوق بالخلفية: يحدّث شارة «المزيد» ويطلق تنبيه الدخول (مرة لكل جلسة)
 function refreshInboxCount() {
   if (!me || !me.is_active || !(isAdmin() || isManager())) { C.feedbackPending = 0; return; }
-  // تنبيه بطلبات التسجيل الجديدة (بيانات الأعضاء محمّلة أصلاً — بلا نداء إضافي)
-  try {
-    if (isAdmin()) {
-      const nr = C.members.filter(m => !m.is_active && m.role === 'viewer' && m.person_id).length;
-      if (nr > 0 && sessionStorage.getItem('almfrje_reg_alerted') !== '1') {
-        sessionStorage.setItem('almfrje_reg_alerted', '1');
-        setTimeout(() => toast('👤 ' + nr + (nr === 1 ? ' طلب تسجيل' : ' طلبات تسجيل') + ' بانتظار تحققك وتفعيلك — لوحة التحكم ← الأعضاء'), 3200);
-      }
-    }
-  } catch (e) { /* */ }
+  // طلبات التسجيل الجديدة تُعرض للمدير في نافذةٍ مباشرة عند الدخول (showPendingApprovals) — لا تنبيه نصّي
   fbApi('count').then(j => {
     C.feedbackPending = j.pending || 0;
     try { buildNav(); } catch (e) { /* */ }
@@ -5606,6 +5597,66 @@ async function screenMembersForManager() {
   { const mq = document.getElementById('mem_q'); if (mq) mq.addEventListener('input', debounce(renderList, 200)); }
   view().querySelectorAll('[data-memtab]').forEach(b => b.addEventListener('click', () => { memTab = b.dataset.memtab; screenMembersForManager(); }));
 }
+/* ===== نافذة موافقة طلبات التسجيل — تظهر للمدير فور دخوله (الاسم + الجوال → موافقة/رفض) ===== */
+function pendingRegs() { return (C.members || []).filter(m => !m.is_active && m.role === 'viewer' && m.person_id); }
+function pendRegItemHtml(m) {
+  const p = m.person_id ? byId.get(Number(m.person_id)) : null;
+  return `<div class="apr-item">
+    <div class="apr-name">${esc(m.full_name || (p && p.name) || '—')}</div>
+    <div class="apr-ph">📱 <b>${esc(m.phone || '—')}</b>${p ? ' • 🌳 ' + esc(lineageShort(p.id, 4)) : ' • <span style="color:var(--danger)">لا ربط بالشجرة</span>'}</div>
+    <div class="apr-acts">
+      <button class="btn sm" data-aprok="${m.user_id}">✅ موافق على تسجيله</button>
+      <button class="btn sm danger" data-aprno="${m.user_id}">❌ رفض</button>
+    </div>
+  </div>`;
+}
+function showPendingApprovals() {
+  if (!isAdmin()) return;                       // القبول/الرفض صلاحية المدير
+  if (!pendingRegs().length) return;
+  try { if (sessionStorage.getItem('almfrje_approvals_shown') === '1') return; } catch (e) { /* */ }
+  // لا تُزِح بطاقة التحية إن كانت معروضة — أعد المحاولة حتى تُغلق
+  const root0 = document.getElementById('modalRoot');
+  if (root0 && root0.querySelector('.greet-bg')) { setTimeout(showPendingApprovals, 1200); return; }
+  const pend = pendingRegs();
+  if (!pend.length) return;
+  try { sessionStorage.setItem('almfrje_approvals_shown', '1'); } catch (e) { /* */ }
+  openModal('🆕 طلبات تسجيل بانتظار موافقتك (' + pend.length + ')',
+    `<p class="muted" style="font-size:.82rem;margin:-2px 0 8px">راجع الاسم والجوال ثم وافق أو ارفض. (تجدها لاحقاً في لوحة التحكم ← الأعضاء)</p>
+     <div id="aprList">${pend.map(pendRegItemHtml).join('')}</div>
+     <button class="btn outline" id="apr_later" style="width:100%;margin-top:10px">لاحقاً</button>`,
+    () => bindApprovals());
+}
+function bindApprovals() {
+  const later = document.getElementById('apr_later'); if (later) later.addEventListener('click', closeModal);
+  const list = document.getElementById('aprList'); if (!list) return;
+  const refresh = () => {
+    const rem = pendingRegs();
+    if (!rem.length) { closeModal(); toast('تمّت مراجعة كل الطلبات ✓'); try { render(); } catch (e) { /* */ } return; }
+    list.innerHTML = rem.map(pendRegItemHtml).join('');
+  };
+  list.addEventListener('click', async (e) => {
+    const okB = e.target.closest('[data-aprok]');
+    const noB = e.target.closest('[data-aprno]');
+    const no2 = e.target.closest('[data-aprno2]');
+    const cx = e.target.closest('[data-aprcancel]');
+    if (okB) {
+      okB.disabled = true;
+      const ok = await guard(async () => { await updMember(okB.dataset.aprok, { is_active: true }); });
+      if (ok) { toast('فُعِّل الحساب ✓'); await loadAll(); refresh(); } else okB.disabled = false;
+    } else if (noB) {
+      // تأكيدٌ مضمّن داخل الصفّ (بلا نافذةٍ أخرى تُزيح هذه)
+      const acts = noB.closest('.apr-item').querySelector('.apr-acts'); const uid = noB.dataset.aprno;
+      acts.innerHTML = `<span style="font-size:.82rem;color:var(--danger);align-self:center;font-weight:700">تأكيد الرفض؟</span>
+        <button class="btn sm danger" data-aprno2="${uid}">نعم، ارفض</button>
+        <button class="btn sm outline" data-aprcancel="${uid}">تراجع</button>`;
+    } else if (no2) {
+      no2.disabled = true;
+      const ok = await guard(async () => { const { error } = await sb.from('almfrje_members').delete().eq('user_id', no2.dataset.aprno2); if (error) throw error; });
+      if (ok) { toast('رُفض الطلب'); await loadAll(); refresh(); } else no2.disabled = false;
+    } else if (cx) { refresh(); }
+  });
+}
+
 /* ===== الأعضاء والصلاحيات ===== */
 let expandedMember = null;
 let memTab = 'all';   // كشوف الأعضاء: all | staff | reg | unreg   // user_id للعضو المفتوح حالياً
@@ -6410,6 +6461,8 @@ async function enterApp(session) {
   if (!location.hash || isAdminLoginUrl()) location.hash = '#/home';
   render();
   startPresence();   // احتساب الزيارة + بدء تتبّع التواجد (لكل من يدخل)
+  // المدير: نافذة طلبات التسجيل المعلّقة فور الدخول (الاسم + الجوال → موافقة/رفض مباشرة)
+  setTimeout(() => { try { showPendingApprovals(); } catch (e) { /* */ } }, 900);
 }
 
 /* ===== التهيئة ===== */
