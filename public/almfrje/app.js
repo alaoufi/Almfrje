@@ -210,6 +210,7 @@ function normalizeAr(s) {
 /* ===== الحالة العامة ===== */
 let sb = null;
 let me = null;
+let meResolved = false;   // هل تحدّد دور المستخدم نهائياً؟ (يمنع وميض «يحتاج تفعيل» أثناء التحميل)
 let _authUid = null;   // هوية الجلسة الحالية — لتجاهل أحداث المصادقة المتكررة
 let imported = false;
 let guestOpen = false;    // إتاحة زر «تصفّح كزائر» بحساب زائر مدمج (قراءة فقط)
@@ -748,6 +749,8 @@ const ROUTES = {
 };
 function parseHash() { const raw = (location.hash || '#/home').replace(/^#\//, ''); const p = raw.split('/'); return { name: p[0] || 'home', arg: p[1] }; }
 function render() {
+  // ما زال الدور قيد التحميل؟ أبقِ شاشة التحميل بدل وميض «يحتاج تفعيل» مؤقتاً
+  if (!meResolved) { showLoading(true); return; }
   if (!me || !me.is_active) { renderPending(); return; }
   const { name, arg } = parseHash();
   const r = ROUTES[name] || ROUTES.home;
@@ -6075,7 +6078,7 @@ function bumpGuestTs() { try { sessionStorage.setItem('almfrje_guest_ts', String
 function guestSessionFresh() {
   try { const ts = parseInt(sessionStorage.getItem('almfrje_guest_ts') || '0', 10); return !!ts && (Date.now() - ts) < GUEST_IDLE_MS; } catch (e) { return false; }
 }
-async function endGuestSession() { stopPresence(); try { sessionStorage.removeItem('almfrje_guest_ts'); } catch (e) { /* */ } _authUid = null; me = null; try { await sb.auth.signOut(); } catch (e) { /* */ } }
+async function endGuestSession() { stopPresence(); try { sessionStorage.removeItem('almfrje_guest_ts'); } catch (e) { /* */ } _authUid = null; me = null; meResolved = false; try { await sb.auth.signOut(); } catch (e) { /* */ } }
 async function browseAsGuest(msgEl) {
   // لا نُصفّر علامة الترحيب هنا: قد تُستدعى تلقائياً عند تحديث الصفحة/تجديد الجلسة،
   // فالتصفير يقتصر على الدخول اليدوي الفعلي (كتابة الاسم / زر التصفّح / دخول المسؤول).
@@ -6328,6 +6331,7 @@ async function enterApp(session) {
   document.getElementById('app').classList.remove('hidden');
   buildNav();
   showLoading(true);
+  meResolved = false;   // الدور قيد التحديد — لا تعرض «يحتاج تفعيل» حتى ينتهي
   let { data: mem } = await sb.from('almfrje_members').select('*').eq('user_id', session.user.id).maybeSingle();
   me = mem || { user_id: session.user.id, full_name: '', role: 'viewer', is_active: false, perms: {} };
   // علاجٌ لمرة واحدة: التتبّع الذي ثُبّت تلقائياً بالخطأ للمشرف العام (كان يعلّقه على فرع مرزوق)
@@ -6361,16 +6365,17 @@ async function enterApp(session) {
       }
     } catch (e) { /* أفضل جهد — تجاهل */ }
   }
+  meResolved = true;   // تحدّد الدور نهائياً الآن — يجوز عرض الحالة الصحيحة
   if (!me.is_active) { showLoading(false); renderPending(); return; }
   // الزائر حساب مشترك تلقائي — لا يحتاج زرّ خروج (يبقى للمسؤول/المشرف).
   document.getElementById('signoutBtn').classList.toggle('hidden', isGuestUser() && guestGens <= 0);
-  try { await loadSettings(); } catch (e) { /* تجاهل — تبقى الافتراضية */ }
-  try {
+  // loadAll يحمّل الإعدادات والبيانات بالتوازي — فلا حاجة لجلب الإعدادات متسلسلاً قبله (رحلة زائدة أُزيلت)
+  try { await loadAll(); } catch (e) { toast('خطأ تحميل: ' + e.message); }
+  try {   // التحية تعتمد على الإعدادات (جهزت الآن مع loadAll)
     let fn = '';
     try { fn = (sessionStorage.getItem('almfrje_guest_name') || '').trim().split(/\s+/)[0] || ''; } catch (e) { /* */ }
     showGreeting(fn);
   } catch (e) { /* تجاهل */ }
-  try { await loadAll(); } catch (e) { toast('خطأ تحميل: ' + e.message); }
   showLoading(false);
   // الزائر دخل عبر رابط الإدارة سهواً؟ حوّله للرئيسية بدل بقائه على #login
   if (!location.hash || isAdminLoginUrl()) location.hash = '#/home';
@@ -6455,7 +6460,7 @@ async function init() {
       if (uid !== _authUid) { _authUid = uid; enterApp(session); }
       // نفس المستخدم (تحديث رمز/تركيز): لا تُعِد الرسم.
     } else {
-      _authUid = null; me = null;
+      _authUid = null; me = null; meResolved = false;
       // بعد الخروج: إن كان الموقع مفتوحاً للزوّار ولسنا على رابط الإدارة، اعرض التصفّح مباشرةً.
       renderAuth();   // سياسة «الحساب فقط»: لا تصفّح ضيفاً تلقائياً بأي إعداد
     }
@@ -6476,7 +6481,7 @@ async function init() {
     const guestSess = session.user.email === GUEST_EMAIL;
     // جلسة زائر مع طلب دخول الإدارة أو إغلاق الموقع → سجّل خروج الزائر واعرض شاشة الدخول
     if (guestSess && (wantAdmin || !guestOpen)) {
-      _authUid = null; me = null; await sb.auth.signOut(); showLoading(false); renderAuth();
+      _authUid = null; me = null; meResolved = false; await sb.auth.signOut(); showLoading(false); renderAuth();
     } else if (guestSess && guestGens > 0 && !guestSessionFresh()) {
       // جلسة زائر لكن أُغلق التبويب سابقاً (sessionStorage مُسح) أو مرّت ساعة خمول → أعد التحقق
       await endGuestSession(); showLoading(false); renderAuth();
