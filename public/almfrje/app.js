@@ -2449,8 +2449,9 @@ async function screenPersonEdit(arg) {
   // ——— التعديل: نموذج كامل (بلا حقل الجنس) ———
   editFather = p.father_id ? byId.get(p.father_id) : null;
   document.getElementById('screenTitle').textContent = 'تعديل: ' + p.name;
-  // للمدير: إن كان لهذا الشخص حساب دخول (عضو)، تُتاح إعادة تعيين كلمة مروره من هنا
+  // للمدير: حساب دخول الشخص إن وُجد (لتغيير كلمته)، وإلا يُتاح إنشاء حساب له إن كان حيّاً
   const peMem = isAdmin() ? (C.members || []).find(mm => Number(mm.person_id) === id) : null;
+  const peShowPw = isAdmin() && (peMem || p.status !== 'dead');   // حقل كلمة المرور: تغيير أو إنشاء حساب
   view().innerHTML = `
     <div class="card"><h3>البيانات الأساسية</h3>
       <div class="field"><label>الأب المباشر</label><div class="father-name" style="text-align:right">${editFather ? '👤 ' + esc(editFather.name) : '— (الأصل)'}</div></div>
@@ -2466,8 +2467,10 @@ async function screenPersonEdit(arg) {
         <div class="field"><label>المدينة</label><input id="p_city" type="text" value="${esc(p.city || '')}" placeholder="اختياري"></div>
         <div class="field"><label>الجوال</label><input id="p_phone" type="tel" inputmode="tel" value="${esc(p.phone || '')}" placeholder="اختياري"></div>
       </div>
-      ${peMem ? `${pinField('🔑 كلمة مرور حساب العضو — رقم سري جديد (اتركه فارغاً لإبقاء القديمة)', 'pe_pin')}
-      <div class="muted" style="font-size:.75rem;margin:-6px 0 8px">لهذا الشخص حساب دخول${peMem.phone ? ' (📱 ' + esc(peMem.phone) + ')' : ''}${peMem.is_active ? '' : ' • موقوف'} — يُحفظ الرقم الجديد مع «حفظ التعديل».</div>` : ''}
+      ${peShowPw ? `${pinField(peMem ? '🔑 كلمة مرور حساب العضو — رقم سري جديد (اتركه فارغاً لإبقاء القديمة)' : '🔑 كلمة مرور دخول العضو (اكتبها لإنشاء حساب دخول له)', 'pe_pin')}
+      <div class="muted" style="font-size:.75rem;margin:-6px 0 8px">${peMem
+        ? 'لهذا الشخص حساب دخول' + (peMem.phone ? ' (📱 ' + esc(peMem.phone) + ')' : '') + (peMem.is_active ? '' : ' • موقوف') + ' — يُحفظ الرقم الجديد مع «حفظ التعديل».'
+        : 'لا حساب دخول له بعد. اكتب كلمة مرور (٤ أرقام فأكثر) وتأكّد من رقم الجوال أعلاه — يُنشأ له حساب دخول عند «حفظ التعديل». اتركها فارغة إن لم ترد إنشاء حساب.'}</div>` : ''}
       <div class="field" id="p_death_wrap" style="${(p.status === 'dead') ? '' : 'display:none'}"><label>سنة الوفاة</label><input id="p_death" type="text" value="${esc(p.death || '')}" placeholder="إن وُجدت"></div>
       ${fInput('البريد الإلكتروني', 'p_email', p.email, 'email', 'placeholder="اختياري"')}
     </div>
@@ -2482,25 +2485,37 @@ async function screenPersonEdit(arg) {
     <p class="muted" style="text-align:center;font-size:.8rem;margin-top:6px">الحذف لمدير النظام فقط — تُحفظ نسخة في سلة المحذوفات ويمكن استرجاعها.</p>`
       : `<p class="muted" style="text-align:center;font-size:.82rem;margin-top:8px">🔒 حذف الأسماء غير متاح — التعديل فقط، والنسخة السابقة تُحفظ في سلة المحذوفات.</p>`}`;
   // زرّ العين لإظهار/إخفاء الرقم السري (حين يوجد حقل كلمة المرور)
-  if (peMem) view().querySelectorAll('.eye').forEach(b => b.addEventListener('click', () => { const inp = document.getElementById(b.dataset.eye); if (!inp) return; const show = inp.type === 'password'; inp.type = show ? 'text' : 'password'; b.textContent = show ? '🙈' : '👁'; }));
+  if (peShowPw) view().querySelectorAll('.eye').forEach(b => b.addEventListener('click', () => { const inp = document.getElementById(b.dataset.eye); if (!inp) return; const show = inp.type === 'password'; inp.type = show ? 'text' : 'password'; b.textContent = show ? '🙈' : '👁'; }));
   document.getElementById('saveBtn').addEventListener('click', async () => {
-    // إن كان للشخص حساب عضو وأُدخل رقمٌ سري جديد، غيّره أولاً (فارغ = إبقاء القديمة) ثم احفظ البيانات
-    if (peMem) {
+    // كلمة المرور (فارغ = تجاهُل): إن كان للشخص حساب غيّرها، وإلا أنشئ له حساب دخول — قبل حفظ البيانات
+    if (peShowPw) {
       const pin = (val('pe_pin') || '').trim();
       if (pin) {
         if (!PIN_RE.test(pin)) { toast('الرقم السري ٤ أرقام على الأقل'); return; }
-        const okPin = await guard(async () => {
-          const { data: { session } } = await sb.auth.getSession();
-          const r = await fetch('/api/almfrje-admin', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + ((session && session.access_token) || '') },
-            body: JSON.stringify({ user_id: peMem.user_id, pin }),
+        const { data: { session } } = await sb.auth.getSession();
+        const tok = (session && session.access_token) || '';
+        if (peMem) {
+          // تغيير كلمة مرور حساب موجود
+          const okPin = await guard(async () => {
+            const r = await fetch('/api/almfrje-admin', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + tok }, body: JSON.stringify({ user_id: peMem.user_id, pin }) });
+            const j = await r.json().catch(() => ({}));
+            if (!r.ok || !j.ok) throw new Error(j.error || ('فشل تغيير كلمة المرور (' + r.status + ')'));
           });
-          const j = await r.json().catch(() => ({}));
-          if (!r.ok || !j.ok) throw new Error(j.error || ('فشل تغيير كلمة المرور (' + r.status + ')'));
-        });
-        if (!okPin) return;   // لا تُكمل الحفظ إن فشل تغيير كلمة المرور
-        toast('تم تغيير كلمة المرور ✓');
+          if (!okPin) return;
+          toast('تم تغيير كلمة المرور ✓');
+        } else {
+          // لا حساب له: أنشئ حساب دخول (عضو) بالجوال وكلمة المرور
+          const phone = normPhone(val('p_phone'));
+          if (phone.length < 7) { toast('أدخل رقم الجوال أولاً لإنشاء الحساب'); return; }
+          const full_name = (val('p_name').trim() || p.name) + (editFather ? ' ' + editFather.name : '');
+          const okNew = await guard(async () => {
+            const r = await fetch('/api/almfrje-create-user', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + tok }, body: JSON.stringify({ full_name, username: '', phone, pin, role: 'viewer', branch_ids: [], perms: {}, person_id: id }) });
+            const j = await r.json().catch(() => ({}));
+            if (!r.ok || !j.ok) throw new Error(j.error || ('تعذّر إنشاء الحساب (' + r.status + ')'));
+          });
+          if (!okNew) return;
+          toast('تم إنشاء حساب دخول للعضو ✓');
+        }
       }
     }
     savePerson(id, p);
