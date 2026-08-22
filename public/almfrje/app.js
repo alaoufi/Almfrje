@@ -417,13 +417,13 @@ function mgrPerm(k) {
 /* ===== طبقة البيانات ===== */
 // جلب كل صفوف جدول عبر صفحات — Supabase يحدّ كل طلب بـ 1000 صف افتراضياً،
 // وشجرتنا تتجاوز ذلك، فنكرّر بـ range حتى تنتهي الصفوف.
-async function fetchAll(table, cols = '*', pageSize = 10000) {
-  // جلبةٌ واحدة تكفي حتى ~١٠٠٠٠ سجل: بلا count مكلف (يعدّ كل الصفوف تحت RLS) وبلا صفحةٍ ثانية.
-  // نتابع الجلب فقط إن امتلأت الصفحة تماماً (أي قد يكون هناك مزيد) — فيتوسّع تلقائياً لأي حجم.
+async function fetchAll(table, cols = '*', pageSize = 1000) {
+  // مهمّ: PostgREST يحدّ الاستجابة بـ ~١٠٠٠ صف مهما اتّسع range، فيجب أن يكون pageSize ≤ هذا الحدّ.
+  // نبدأ بصفحة، ونتابع طالما رجعت صفحةٌ ممتلئة (قد يكون بعدها مزيد) حتى تنقص صفحة — بلا count مكلف.
   const first = await sb.from(table).select(cols).range(0, pageSize - 1);
   if (first.error) throw first.error;
   const out = (first.data || []).slice();
-  if (out.length === pageSize) {
+  if (out.length >= pageSize) {
     for (let from = pageSize; ; from += pageSize) {
       const r = await sb.from(table).select(cols).range(from, from + pageSize - 1);
       if (r.error) throw r.error;
