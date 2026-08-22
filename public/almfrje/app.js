@@ -6316,20 +6316,9 @@ async function enterApp(session) {
   // المدير: شغّل ترقية المخطّط بتوكنه (idempotent) فتُطبَّق تحديثات البنية الجديدة تلقائياً (مثل دور «مشرف عام»).
   if (me.role === 'admin' && me.is_active) {
     try {
-      // ترقية القاعدة تلقائياً بتوكن المدير — ونُظهر له سبب الفشل بدل الصمت (كي لا تضيع الترقيات)
+      // ترقية القاعدة تلقائياً بتوكن المدير — تُنفَّذ بصمت. لا يُظهَر تحذيرٌ للمدير عند
+      // تعذّرها؛ فالموقع يعمل عبر الاحتياطي الثابت، والترقية تكميلية لا حرجة.
       fetch('/api/almfrje-setup', { method: 'POST', headers: { Authorization: 'Bearer ' + session.access_token } })
-        .then(r => r.json())
-        .then(j => {
-          if (j && j.ok === false && isAdmin()) {
-            // تذكيرٌ لا إزعاج: مرة كل ٢٢ ساعة كحدٍّ أقصى لكل متصفح
-            try {
-              const k = 'almfrje_upg_warn', last = +localStorage.getItem(k) || 0;
-              if (Date.now() - last < 22 * 3600 * 1000) return;
-              localStorage.setItem(k, String(Date.now()));
-            } catch (e) { /* */ }
-            toast('⚠️ تعذّرت ترقية القاعدة تلقائياً: ' + (j.reason || j.error || 'راجع الإعداد'));
-          }
-        })
         .catch(() => { /* */ });
     } catch (e) { /* تجاهل */ }
   }
