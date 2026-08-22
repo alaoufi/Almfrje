@@ -2470,7 +2470,7 @@ async function screenPersonEdit(arg) {
       ${peShowPw ? `${pinField(peMem ? '🔑 كلمة مرور حساب العضو — رقم سري جديد (اتركه فارغاً لإبقاء القديمة)' : '🔑 كلمة مرور دخول العضو (اكتبها لإنشاء حساب دخول له)', 'pe_pin')}
       <div class="muted" style="font-size:.75rem;margin:-6px 0 8px">${peMem
         ? 'لهذا الشخص حساب دخول' + (peMem.phone ? ' (📱 ' + esc(peMem.phone) + ')' : '') + (peMem.is_active ? '' : ' • موقوف') + ' — يُحفظ الرقم الجديد مع «حفظ التعديل».'
-        : 'لا حساب دخول له بعد. اكتب كلمة مرور (٤ أرقام فأكثر) وتأكّد من رقم الجوال أعلاه — يُنشأ له حساب دخول عند «حفظ التعديل». اتركها فارغة إن لم ترد إنشاء حساب.'}</div>` : ''}
+        : 'لا حساب دخول له بعد. اكتب كلمة مرور (٤ خانات فأكثر (حروف أو أرقام)) وتأكّد من رقم الجوال أعلاه — يُنشأ له حساب دخول عند «حفظ التعديل». اتركها فارغة إن لم ترد إنشاء حساب.'}</div>` : ''}
       <div class="field" id="p_death_wrap" style="${(p.status === 'dead') ? '' : 'display:none'}"><label>سنة الوفاة</label><input id="p_death" type="text" value="${esc(p.death || '')}" placeholder="إن وُجدت"></div>
       ${fInput('البريد الإلكتروني', 'p_email', p.email, 'email', 'placeholder="اختياري"')}
     </div>
@@ -2491,7 +2491,7 @@ async function screenPersonEdit(arg) {
     if (peShowPw) {
       const pin = (val('pe_pin') || '').trim();
       if (pin) {
-        if (!PIN_RE.test(pin)) { toast('الرقم السري ٤ أرقام على الأقل'); return; }
+        if (!PIN_RE.test(pin)) { toast('كلمة المرور ٤ خانات على الأقل (حروف أو أرقام)'); return; }
         const { data: { session } } = await sb.auth.getSession();
         const tok = (session && session.access_token) || '';
         if (peMem) {
@@ -5486,7 +5486,7 @@ function screenProfile() {
     </div>
 
     <div class="card"><h3>تغيير كلمة المرور (الرقم السري)</h3>
-      <p class="muted" style="font-size:.85rem">رقم سري جديد من ٤ أرقام فأكثر. ستحتاجه في الدخول القادم.</p>
+      <p class="muted" style="font-size:.85rem">رقم سري جديد من ٤ خانات فأكثر (حروف أو أرقام). ستحتاجه في الدخول القادم.</p>
       ${pinField('الرقم السري الجديد', 'pf_pin')}
       ${pinField('تأكيد الرقم السري', 'pf_pin2')}
       <button class="btn" id="pf_savePin">تغيير كلمة المرور</button>
@@ -5538,7 +5538,7 @@ function screenProfile() {
 
   document.getElementById('pf_savePin').addEventListener('click', async () => {
     const pin = val('pf_pin').trim(), pin2 = val('pf_pin2').trim();
-    if (!PIN_RE.test(pin)) { toast('الرقم السري ٤ أرقام على الأقل'); return; }
+    if (!PIN_RE.test(pin)) { toast('كلمة المرور ٤ خانات على الأقل (حروف أو أرقام)'); return; }
     if (pin !== pin2) { toast('التأكيد غير مطابق'); return; }
     if (!(await confirm2('تغيير كلمة المرور؟ ستحتاج الرقم الجديد بالدخول القادم.'))) return;
     const ok = await guard(async () => {
@@ -5948,7 +5948,7 @@ function editUserDataModal(m) {
       const pin = val('eu_pin').trim();
       if (!full_name) { toast('أدخل الاسم'); return; }
       if (phone && phone.length < 7) { toast('رقم جوال غير صحيح'); return; }
-      if (pin && !PIN_RE.test(pin)) { toast('الرقم السري ٤ أرقام على الأقل'); return; }
+      if (pin && !PIN_RE.test(pin)) { toast('كلمة المرور ٤ خانات على الأقل (حروف أو أرقام)'); return; }
       const ok = await guard(async () => {
         const { data: { session } } = await sb.auth.getSession();
         const tok = session && session.access_token;
@@ -5982,7 +5982,7 @@ function addUserModal(initialQuery, memberOnly) {
     </div>
     ${fInput('رقم الجوال', 'nu_phone', '', 'tel', 'inputmode="tel"')}
     ${memberOnly ? '' : `${fInput('اسم المستخدم (اختياري)', 'nu_user', '', 'text', 'autocomplete="off"')}`}
-    ${pinField('كلمة المرور (٤ أرقام فأكثر)', 'nu_pin')}
+    ${pinField('كلمة المرور (٤ خانات فأكثر (حروف أو أرقام))', 'nu_pin')}
     ${memberOnly ? '' : `<div class="field"><label>الدور</label><select id="nu_role">${roleOpts}</select></div>
     <div id="nu_mgrbox">
       <div class="perm-box"><div class="perm-title">الفروع التي يشرف عليها <span class="muted" style="font-weight:normal">(للمشرف العام: اتركها فارغة = كل الفروع)</span>:</div>${branchChks}</div>
@@ -6022,7 +6022,7 @@ function addUserModal(initialQuery, memberOnly) {
       const role = memberOnly || !roleSel ? 'viewer' : roleSel.value;
       if (!full_name) { toast('تعذّر تحديد الاسم'); return; }
       if (phone.length < 7) { toast('أدخل رقم جوال صحيح'); return; }
-      if (!PIN_RE.test(pin)) { toast('الرقم السري ٤ أرقام على الأقل'); return; }
+      if (!PIN_RE.test(pin)) { toast('كلمة المرور ٤ خانات على الأقل (حروف أو أرقام)'); return; }
       const isSup = role === 'branch_manager' || role === 'general_manager';
       const branch_ids = [];
       if (isSup) document.querySelectorAll('input[data-nubranch]').forEach(cb => { if (cb.checked) branch_ids.push(parseInt(cb.dataset.nubranch, 10)); });
@@ -6166,10 +6166,10 @@ const pinToPass = (pin) => `${pin}@Almfrje`;
 const pwKey = () => 'almfrje_pwok_' + (me && me.user_id || '');
 function pwChanged() { try { return localStorage.getItem(pwKey()) === '1'; } catch (e) { return true; } }
 function markPwChanged() { try { localStorage.setItem(pwKey(), '1'); } catch (e) { } }
-const PIN_RE = /^\d{4,}$/;   // ٤ خانات حدّاً أدنى، ويُسمح بالزيادة
+const PIN_RE = /^.{4,}$/;   // كلمة مرور حرّة: ٤ خانات حدّاً أدنى (حروف/أرقام/رموز)
 function pinField(label, id) {
   return `<div class="field pw"><label>${label}</label>
-    <input id="${id}" type="password" inputmode="numeric" pattern="\\d*" autocomplete="off">
+    <input id="${id}" type="password" autocomplete="off">
     <button type="button" class="eye" data-eye="${id}" aria-label="إظهار/إخفاء">👁</button></div>`;
 }
 // ربط أزرار العين (إظهار/إخفاء كلمة المرور) ضمن أي حاوية.

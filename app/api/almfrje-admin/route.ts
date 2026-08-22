@@ -58,7 +58,7 @@ async function handle(request: NextRequest) {
   // تحديث بيانات المصادقة (البريد المشتق من الجوال + كلمة المرور)
   const authUpd: { email?: string; password?: string; email_confirm?: boolean } = {};
   if (typeof body.phone === 'string' && body.phone) { authUpd.email = `${body.phone}@almfrje.app`; authUpd.email_confirm = true; }
-  if (typeof body.pin === 'string' && /^\d{4,}$/.test(body.pin)) authUpd.password = `${body.pin}@Almfrje`;
+  if (typeof body.pin === 'string' && body.pin.length >= 4) authUpd.password = `${body.pin}@Almfrje`;   // كلمة مرور حرّة ٤ خانات فأكثر
   if (authUpd.email || authUpd.password) {
     const { error } = await admin.auth.admin.updateUserById(targetId, authUpd);
     if (error) return NextResponse.json({ ok: false, error: 'تعذّر تحديث الدخول: ' + error.message }, { status: 500 });

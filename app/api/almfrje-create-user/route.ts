@@ -45,7 +45,7 @@ export async function POST(request: NextRequest) {
   }
   if (!full_name) return NextResponse.json({ ok: false, error: 'أدخل الاسم' }, { status: 400 });
   if (phone.length < 7) return NextResponse.json({ ok: false, error: 'أدخل رقم جوال صحيح' }, { status: 400 });
-  if (!/^\d{4,}$/.test(pin)) return NextResponse.json({ ok: false, error: 'الرقم السري ٤ أرقام على الأقل' }, { status: 400 });
+  if (pin.length < 4) return NextResponse.json({ ok: false, error: 'كلمة المرور ٤ خانات على الأقل (حروف أو أرقام)' }, { status: 400 });
 
   const email = `${phone}@almfrje.app`;
   const password = `${pin}@Almfrje`;
