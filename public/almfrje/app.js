@@ -2466,6 +2466,8 @@ async function screenPersonEdit(arg) {
         <div class="field"><label>المدينة</label><input id="p_city" type="text" value="${esc(p.city || '')}" placeholder="اختياري"></div>
         <div class="field"><label>الجوال</label><input id="p_phone" type="tel" inputmode="tel" value="${esc(p.phone || '')}" placeholder="اختياري"></div>
       </div>
+      ${peMem ? `${pinField('🔑 كلمة مرور حساب العضو — رقم سري جديد (اتركه فارغاً لإبقاء القديمة)', 'pe_pin')}
+      <div class="muted" style="font-size:.75rem;margin:-6px 0 8px">لهذا الشخص حساب دخول${peMem.phone ? ' (📱 ' + esc(peMem.phone) + ')' : ''}${peMem.is_active ? '' : ' • موقوف'} — يُحفظ الرقم الجديد مع «حفظ التعديل».</div>` : ''}
       <div class="field" id="p_death_wrap" style="${(p.status === 'dead') ? '' : 'display:none'}"><label>سنة الوفاة</label><input id="p_death" type="text" value="${esc(p.death || '')}" placeholder="إن وُجدت"></div>
       ${fInput('البريد الإلكتروني', 'p_email', p.email, 'email', 'placeholder="اختياري"')}
     </div>
@@ -2474,39 +2476,37 @@ async function screenPersonEdit(arg) {
       ${fInput('رابط الصورة', 'p_photo', p.photo_url, 'text', 'placeholder="اختياري"')}
     </div>
     <div class="card"><h3>ملاحظات (اختياري)</h3>${fTextarea('ملاحظات', 'p_notes', p.notes)}</div>
-    ${peMem ? `<div class="card"><h3>🔑 كلمة مرور حساب العضو</h3>
-      <p class="muted" style="font-size:.85rem;margin-top:-2px">لهذا الشخص حساب دخول${peMem.phone ? ' (📱 ' + esc(peMem.phone) + ')' : ''}${peMem.is_active ? '' : ' • <span style="color:var(--danger)">موقوف</span>'}. لتغيير كلمة مروره اكتب رقماً سرياً جديداً (٤ أرقام فأكثر) واضغط تغيير — تُلغى القديمة فوراً.</p>
-      ${pinField('رقم سري جديد', 'pe_pin')}
-      <button class="btn sm" id="pe_savePin">🔑 تغيير كلمة المرور</button>
-    </div>` : ''}
     <button class="btn btn-lg" id="saveBtn">💾 حفظ التعديل</button>
     ${isAdmin()
       ? `<button class="btn btn-lg danger" id="delBtn" style="margin-top:12px">🗑️ حذف هذا الاسم</button>
     <p class="muted" style="text-align:center;font-size:.8rem;margin-top:6px">الحذف لمدير النظام فقط — تُحفظ نسخة في سلة المحذوفات ويمكن استرجاعها.</p>`
       : `<p class="muted" style="text-align:center;font-size:.82rem;margin-top:8px">🔒 حذف الأسماء غير متاح — التعديل فقط، والنسخة السابقة تُحفظ في سلة المحذوفات.</p>`}`;
-  document.getElementById('saveBtn').addEventListener('click', () => savePerson(id, p));
+  // زرّ العين لإظهار/إخفاء الرقم السري (حين يوجد حقل كلمة المرور)
+  if (peMem) view().querySelectorAll('.eye').forEach(b => b.addEventListener('click', () => { const inp = document.getElementById(b.dataset.eye); if (!inp) return; const show = inp.type === 'password'; inp.type = show ? 'text' : 'password'; b.textContent = show ? '🙈' : '👁'; }));
+  document.getElementById('saveBtn').addEventListener('click', async () => {
+    // إن كان للشخص حساب عضو وأُدخل رقمٌ سري جديد، غيّره أولاً (فارغ = إبقاء القديمة) ثم احفظ البيانات
+    if (peMem) {
+      const pin = (val('pe_pin') || '').trim();
+      if (pin) {
+        if (!PIN_RE.test(pin)) { toast('الرقم السري ٤ أرقام على الأقل'); return; }
+        const okPin = await guard(async () => {
+          const { data: { session } } = await sb.auth.getSession();
+          const r = await fetch('/api/almfrje-admin', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + ((session && session.access_token) || '') },
+            body: JSON.stringify({ user_id: peMem.user_id, pin }),
+          });
+          const j = await r.json().catch(() => ({}));
+          if (!r.ok || !j.ok) throw new Error(j.error || ('فشل تغيير كلمة المرور (' + r.status + ')'));
+        });
+        if (!okPin) return;   // لا تُكمل الحفظ إن فشل تغيير كلمة المرور
+        toast('تم تغيير كلمة المرور ✓');
+      }
+    }
+    savePerson(id, p);
+  });
   const delB = document.getElementById('delBtn');
   if (delB) delB.addEventListener('click', () => deletePerson(id, p));
-  // تغيير كلمة مرور حساب العضو المرتبط (للمدير) — عبر خدمة الإدارة الخادمية
-  if (peMem) {
-    view().querySelectorAll('.eye').forEach(b => b.addEventListener('click', () => { const inp = document.getElementById(b.dataset.eye); if (!inp) return; const show = inp.type === 'password'; inp.type = show ? 'text' : 'password'; b.textContent = show ? '🙈' : '👁'; }));
-    const pb = document.getElementById('pe_savePin');
-    if (pb) pb.addEventListener('click', async () => {
-      const pin = val('pe_pin').trim();
-      if (!PIN_RE.test(pin)) { toast('الرقم السري ٤ أرقام على الأقل'); return; }
-      const ok = await guard(async () => {
-        const { data: { session } } = await sb.auth.getSession();
-        const r = await fetch('/api/almfrje-admin', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + ((session && session.access_token) || '') },
-          body: JSON.stringify({ user_id: peMem.user_id, pin }),
-        });
-        const j = await r.json().catch(() => ({}));
-        if (!r.ok || !j.ok) throw new Error(j.error || ('فشل (' + r.status + ')'));
-      });
-      if (ok) { toast('تم تغيير كلمة المرور ✓'); const el = document.getElementById('pe_pin'); if (el) el.value = ''; }
-    });
-  }
   // سنة الوفاة تظهر للمتوفّى فقط — تُظهر/تُخفى مع تغيير الحالة.
   { const st = document.getElementById('p_status'), dw = document.getElementById('p_death_wrap');
     if (st && dw) st.addEventListener('change', () => { dw.style.display = st.value === 'dead' ? '' : 'none'; if (st.value !== 'dead') { const d = document.getElementById('p_death'); if (d) d.value = ''; } }); }
@@ -5922,9 +5922,8 @@ function editUserDataModal(m) {
   openModal('تعديل بيانات: ' + (m.full_name || '—'), `
     ${fInput('الاسم الكامل', 'eu_name', m.full_name || '')}
     ${fInput('رقم الجوال (للدخول)', 'eu_phone', m.phone || '', 'tel', 'inputmode="tel"')}
+    ${pinField('كلمة المرور — رقم سري جديد (اتركه فارغاً لإبقاء القديمة)', 'eu_pin')}
     ${fInput('اسم المستخدم (اختياري)', 'eu_user', m.username || '', 'text', 'autocomplete="off"')}
-    <div class="muted" style="font-size:.85rem;margin:6px 0">اتركه فارغاً لعدم تغيير كلمة المرور:</div>
-    ${pinField('رقم سري جديد (٤ أرقام فأكثر)', 'eu_pin')}
     <button class="btn" id="eu_save">حفظ التعديلات</button>`, () => {
     document.querySelectorAll('.eye').forEach(b => b.addEventListener('click', () => { const inp = document.getElementById(b.dataset.eye); const show = inp.type === 'password'; inp.type = show ? 'text' : 'password'; b.textContent = show ? '🙈' : '👁'; }));
     document.getElementById('eu_save').addEventListener('click', async () => {
