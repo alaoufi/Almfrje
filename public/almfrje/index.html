@@ -30,10 +30,25 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <meta name="apple-mobile-web-app-title" content="المفارجة" />
-  <!-- الأصول بإعادة تحقّق (ETag): تُحدَّث فور النشر وتُحمَّل بسرعة (304) إن لم تتغيّر -->
-  <link rel="stylesheet" href="/almfrje/app.css">
+  <!-- تنسيقٌ حرجٌ مضمَّن: يُطلى فوراً (شاشة ترحيب) قبل نزول app.css فلا تظهر شاشةٌ بيضاء -->
+  <style>
+    html,body{margin:0;padding:0}
+    body{background:#f3f4f8;color:#1b1b1f;font-family:'Segoe UI',Tahoma,Arial,sans-serif}
+    #splash{position:fixed;inset:0;z-index:99999;display:flex;flex-direction:column;
+      align-items:center;justify-content:center;gap:16px;background:#f3f4f8}
+    #splash .lg{font-size:56px;line-height:1}
+    #splash .tt{color:#4338CA;font-size:1.25rem;font-weight:800;letter-spacing:-.2px}
+    #splash .sp{width:36px;height:36px;border:3px solid #dfe1ea;border-top-color:#4338CA;
+      border-radius:50%;animation:_spin .8s linear infinite}
+    @keyframes _spin{to{transform:rotate(360deg)}}
+  </style>
+  <!-- app.css غير حاجبٍ لأول رسم: يُحمَّل بالتوازي ثم يُفعَّل — وشاشة الترحيب تغطّي حتى جهوزه -->
+  <link rel="preload" href="/almfrje/app.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
+  <noscript><link rel="stylesheet" href="/almfrje/app.css"></noscript>
 </head>
 <body>
+  <!-- شاشة ترحيب فورية (تُطلى لحظة وصول HTML، وتُزال عند جهوز أول شاشة فعلية) -->
+  <div id="splash"><div class="lg">🌳</div><div class="tt">المفارجة</div><div class="sp"></div></div>
   <!-- شاشة المصادقة -->
   <div id="auth" class="auth hidden"></div>
 

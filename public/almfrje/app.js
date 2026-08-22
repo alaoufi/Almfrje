@@ -78,6 +78,8 @@ function showUndoToast(message, onUndo, ms = 30000) {
   setTimeout(() => { if (!done) t.remove(); }, ms);
 }
 function showLoading(b) { document.getElementById('loading').classList.toggle('hidden', !b); }
+// إزالة شاشة الترحيب الفورية (المضمَّنة في HTML) حال ظهور أول شاشةٍ فعلية
+function hideSplash() { try { const s = document.getElementById('splash'); if (s) s.remove(); } catch (e) { /* */ } }
 const row = (k, v) => `<div class="row"><span class="k">${k}</span><span class="v">${v}</span></div>`;
 const noItem = () => '<div class="muted">لا يوجد</div>';
 const noPerm = () => '<div class="center-empty">ليست لديك صلاحية الوصول لهذا القسم.<br>راجع مدير النظام.</div>';
@@ -752,6 +754,7 @@ function render() {
   // ما زال الدور قيد التحميل؟ أبقِ شاشة التحميل بدل وميض «يحتاج تفعيل» مؤقتاً
   if (!meResolved) { showLoading(true); return; }
   if (!me || !me.is_active) { renderPending(); return; }
+  hideSplash();   // ظهرت شاشة فعلية — أزِل شاشة الترحيب
   const { name, arg } = parseHash();
   const r = ROUTES[name] || ROUTES.home;
   try { view().dataset.screen = name; } catch (e) { /* */ }   // وسم الشاشة (للتنسيقات الخاصة بكل شاشة)
@@ -6008,6 +6011,7 @@ function showGreeting(firstName) {
 
 /* ===== شاشة بانتظار التفعيل ===== */
 function renderPending() {
+  hideSplash();
   document.getElementById('screenTitle').textContent = 'المفارجة';
   document.getElementById('backBtn').classList.add('hidden');
   document.getElementById('bottomnav').innerHTML = '';
@@ -6135,6 +6139,7 @@ function gensExample(n) { return ['محمد', 'سالم', 'خالد', 'عبدا�
 // شاشة الدخول — مختصرة: دخول المسؤول/المشرف فقط، أو تصفّح كزائر. لا تسجيل حسابات
 // (الحسابات يُنشئها المدير من داخل التطبيق).
 function renderAuth() {
+  hideSplash();
   document.querySelectorAll('.fab').forEach(f => f.remove());   // أزل الأزرار العائمة عند الخروج
   document.getElementById('app').classList.add('hidden');
   const box = document.getElementById('auth'); box.classList.remove('hidden');
@@ -6387,6 +6392,7 @@ async function enterApp(session) {
 function applyTheme(t) { document.documentElement.setAttribute('data-theme', t); try { localStorage.setItem('almfrje_theme', t); } catch (e) { } const b = document.getElementById('themeBtn'); if (b) b.textContent = t === 'dark' ? '☀️' : '🌙'; }
 function configMissing() { const c = window.ALMFRJE_CONFIG || {}; return !c.SUPABASE_URL || c.SUPABASE_URL.includes('YOUR_PROJECT') || !c.SUPABASE_ANON_KEY || c.SUPABASE_ANON_KEY.includes('YOUR_'); }
 function showSetup() {
+  hideSplash();
   showLoading(false);
   document.getElementById('app').classList.add('hidden');
   const box = document.getElementById('auth'); box.classList.remove('hidden');
@@ -6396,6 +6402,7 @@ function showSetup() {
 }
 // تعذّر الوصول للقاعدة كلياً (حتى عبر وسيط الموقع): شاشة واضحة بتشخيصٍ تلقائي بدل شاشة دخول خاطئة.
 function renderNetFail() {
+  hideSplash();
   document.getElementById('app').classList.add('hidden');
   const box = document.getElementById('auth'); box.classList.remove('hidden');
   box.innerHTML = `<div class="auth-box"><div class="logo">📡</div>
@@ -6416,6 +6423,7 @@ function renderNetFail() {
   })();
 }
 async function init() {
+  setTimeout(hideSplash, 12000);   // أمان: لا تُبقِ شاشة الترحيب عالقة إن تعطّل شيء قبل أول رسم
   applyTheme('light');   // الوضع النهاري فقط (أُلغي العرض الليلي)
   { const shb = document.getElementById('shareBtn'); if (shb) shb.addEventListener('click', shareSite); }
   { const gdb = document.getElementById('guideBtn'); if (gdb) gdb.addEventListener('click', () => setHash('#/guide')); }
