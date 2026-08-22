@@ -21,6 +21,9 @@
   <meta name="twitter:title" content="موقع قبيلة المفارجة" />
   <meta name="twitter:description" content="تصفّح موقع قبيلة المفارجة وشجرتها وأنسابها وفروعها." />
   <link rel="icon" href="/almfrje/icon.svg" type="image/svg+xml" />
+  <!-- تهيئة الاتصال بقاعدة البيانات مبكراً (قبل أول استعلام) لتقليل زمن أول طلب -->
+  <link rel="preconnect" href="https://noupszhgfyqhfotokabj.supabase.co" crossorigin />
+  <link rel="dns-prefetch" href="https://noupszhgfyqhfotokabj.supabase.co" />
   <!-- تثبيت كتطبيق (PWA) -->
   <link rel="manifest" href="/almfrje/manifest.webmanifest" />
   <link rel="apple-touch-icon" href="/almfrje/icon.svg" />
@@ -51,13 +54,15 @@
   <div id="loading" class="loading">… جارٍ التحميل</div>
   <div id="modalRoot"></div>
 
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <!-- supabase-js مستضاف محلياً (على Cloudflare القريب) بإصدارٍ مثبّت — أسرع وأأمن من CDN خارجي.
+       defer على كل السكربتات: تُحمَّل بالتوازي وتُنفَّذ بالترتيب، فلا يحجب أوّلها البقية. -->
+  <script defer src="/almfrje/vendor-supabase-2.112.3.js"></script>
   <!-- مكتبتا Excel و PDF ثقيلتان وتُستخدمان فقط في الاستيراد/التصدير،
        لذا تُحمّلان عند الطلب فقط (lazyLib في app.js) لتسريع البدء. -->
   <!-- احتياطي للاستضافة الثابتة (يُترك فارغاً عند الاعتماد على بيئة alaoufi.me) -->
-  <script src="/almfrje/config.js"></script>
+  <script defer src="/almfrje/config.js"></script>
   <!-- الإعداد التلقائي من متغيّرات بيئة alaoufi.me (مسارٌ قابل للتخزين القصير لتسريع الفتح) -->
-  <script src="/almfrje-config"></script>
-  <script src="/almfrje/app.js"></script>
+  <script defer src="/almfrje-config"></script>
+  <script defer src="/almfrje/app.js"></script>
 </body>
 </html>
