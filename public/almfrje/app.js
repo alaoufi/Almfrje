@@ -432,11 +432,27 @@ async function fetchAll(table, cols = '*', pageSize = 10000) {
 }
 // مصدر الأشخاص: المدير/المشرف يقرؤون الجدول كاملاً (يحتاجون الجوال للإدارة)،
 // والزائر/المطّلع يقرأ منظوراً منقّى بلا (جوال/بريد/ملاحظات) إن وُجد — مع رجوع آمن للجدول.
+// أعمدة البدء (خفيفة): كل ما تحتاجه الشجرة والقوائم والبحث والتصدير — و«الباقي عند الطلب»:
+//   • notes (نصّ قد يطول) يُجلب عند فتح الملف/التعديل فقط (لا يظهر في القوائم).
+//   • field_audit (jsonb) يبقى للمدير (يحتاجه المحرّر الجماعي)، ويُسقَط لمنظور الزائر (لا يستخدمه).
+const PERSONS_FULL_COLS = 'id,name,father_id,branch_id,generation,sex,status,birth,death,phone,email,city,photo_url,sort,created_at,created_by,created_by_name,updated_by_name,updated_at,work,birthplace,nickname,field_audit';
+const PERSONS_PUB_COLS = 'id,name,father_id,branch_id,generation,sex,status,birth,death,city,photo_url,nickname,work,sort,created_at,created_by_name,updated_by_name,updated_at';
 async function fetchPersons() {
   const full = isAdmin() || isManager();
-  if (full) return fetchAll('almfrje_persons');
-  try { return await fetchAll('almfrje_persons_pub'); }
-  catch (e) { return fetchAll('almfrje_persons'); }   // المنظور غير موجود بعد → رجوع
+  if (full) return fetchAll('almfrje_persons', PERSONS_FULL_COLS);
+  try { return await fetchAll('almfrje_persons_pub', PERSONS_PUB_COLS); }
+  catch (e) { return fetchAll('almfrje_persons', PERSONS_FULL_COLS); }   // المنظور غير موجود بعد → رجوع
+}
+// «الباقي عند الطلب»: تُجلب الأعمدة المؤجّلة (notes) لشخصٍ واحد عند فتح ملفه/تعديله.
+// تُجلب طازجةً في كل مرة (استعلام سطرٍ واحد خفيف) فتبقى البيانات حيّة، وتُدمج في الكائن.
+async function loadPersonExtra(id) {
+  id = parseInt(id, 10);
+  if (!id || !(isAdmin() || isManager())) return;   // الزائر لا يرى الملاحظات أصلاً (خارج منظوره)
+  const p = byId.get(id); if (!p) return;
+  try {
+    const { data } = await sb.from('almfrje_persons').select('id,notes').eq('id', id).maybeSingle();
+    if (data) Object.assign(p, data);
+  } catch (e) { /* أفضل جهد — يبقى بلا ملاحظات */ }
 }
 async function loadAll() {
   // الإعدادات تتوازى مع البيانات (كانت تتسلسل بعدها فتبطئ الدخول)
@@ -1572,7 +1588,11 @@ async function screenPerson(arg) {
   showLoading(true);
   let docs = [];
   const showDocs = !hideForGuest('media');   // الزائر (إن أُخفيت الوسائط) لا يرى الصور/الوثائق
-  if (showDocs) { try { const { data } = await sb.from('almfrje_documents').select('*').eq('person_id', id).order('id'); docs = data || []; } catch (e) { } }
+  // الملاحظات (عمود مؤجّل) والوثائق تُجلبان معاً عند فتح الملف
+  await Promise.all([
+    loadPersonExtra(id),
+    (async () => { if (showDocs) { try { const { data } = await sb.from('almfrje_documents').select('*').eq('person_id', id).order('id'); docs = data || []; } catch (e) { } } })()
+  ]);
   showLoading(false);
   view().innerHTML = `
     <div class="card"><div class="person-hd">${avatar(p, true)}
@@ -2415,9 +2435,10 @@ function screenOutline(arg) {
 /* ===== إضافة / تعديل شخص ===== */
 let editFather = null;   // كائن الأب المختار أثناء التحرير
 let presetFather = null;   // أب مُمرّر من زر «إضافة ابن» على صفحة الشخص
-function screenPersonEdit(arg) {
+async function screenPersonEdit(arg) {
   if (!canAdd() && !(parseInt(arg, 10) && canEditPerson(byId.get(parseInt(arg, 10))))) { view().innerHTML = noPerm(); return; }
   const id = parseInt(arg, 10) || 0;
+  if (id) await loadPersonExtra(id);   // اجلب الملاحظات (عمود مؤجّل) قبل عرض النموذج
   const p = id ? byId.get(id) : null;
   if (id && !p) { view().innerHTML = '<div class="center-empty">غير موجود.</div>'; return; }
   if (!id) {
