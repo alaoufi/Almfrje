@@ -2451,7 +2451,7 @@ async function screenPersonEdit(arg) {
   document.getElementById('screenTitle').textContent = 'تعديل: ' + p.name;
   // للمدير: حساب دخول الشخص إن وُجد (لتغيير كلمته)، وإلا يُتاح إنشاء حساب له إن كان حيّاً
   const peMem = isAdmin() ? (C.members || []).find(mm => Number(mm.person_id) === id) : null;
-  const peShowPw = isAdmin() && (peMem || p.status !== 'dead');   // حقل كلمة المرور: تغيير أو إنشاء حساب
+  const peShowPw = isAdmin();   // حقل كلمة المرور يظهر للمدير دائماً: تغيير كلمة الحساب أو إنشاء حساب دخول
   view().innerHTML = `
     <div class="card"><h3>البيانات الأساسية</h3>
       <div class="field"><label>الأب المباشر</label><div class="father-name" style="text-align:right">${editFather ? '👤 ' + esc(editFather.name) : '— (الأصل)'}</div></div>
