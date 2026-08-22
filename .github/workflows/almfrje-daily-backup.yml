@@ -1,0 +1,39 @@
+name: نسخة احتياطية يومية — المفرجي
+
+# نسخة احتياطية كاملة يومياً لقاعدة بيانات المفرجي (تُخزَّن في Supabase Storage،
+# ويحتفظ الخادم بآخر عدّة نسخ). قراءتها لكل الجداول يومياً تُبقي Supabase نشِطاً
+# فلا يتجمّد لقلّة الدخول — فهي نسخةٌ وتنشيطٌ في آنٍ واحد.
+
+on:
+  schedule:
+    - cron: '0 1 * * *'      # يومياً 01:00 UTC (~04:00 صباحاً بتوقيت السعودية)
+  workflow_dispatch: {}       # زرّ تشغيلٍ يدويّ عند الحاجة
+
+# لا نسمح بتشغيلين متوازيين
+concurrency:
+  group: almfrje-daily-backup
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: استدعاء نقطة النسخ الاحتياطي
+        env:
+          CRON_SECRET: ${{ secrets.ALMFRJE_CRON_SECRET }}
+        run: |
+          if [ -z "$CRON_SECRET" ]; then
+            echo "::error::لم يُضبط سرّ ALMFRJE_CRON_SECRET في أسرار المستودع"; exit 1
+          fi
+          code=$(curl -sS -o /tmp/backup.json -w "%{http_code}" \
+            --retry 3 --retry-delay 10 --max-time 120 \
+            -X POST \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            https://almfrje.alaoufi.me/api/almfrje-backup)
+          echo "HTTP $code"
+          cat /tmp/backup.json || true
+          echo ""
+          if [ "$code" != "200" ]; then
+            echo "::error::فشلت النسخة الاحتياطية (HTTP $code)"; exit 1
+          fi
+          echo "✅ تمّت النسخة الاحتياطية بنجاح"
