@@ -1153,3 +1153,4 @@ ul.hier ul.hier > .hier-li::before {
 .pending-banner { display:block; width:100%; box-sizing:border-box; cursor:pointer; margin:0 0 12px; padding:10px 14px; border-radius:12px; font-size:.9rem; font-weight:700; text-align:center; color:#7a3d00; background:linear-gradient(180deg,#fff3e0,#ffe8cc); border:1px solid #f0a55e; box-shadow:0 4px 14px -8px rgba(232,89,12,.5); }
 .pending-banner b { color:#d9480f; font-size:1.05rem; }
 .pending-banner:active { transform:scale(.99); }
+.oh-title.click{cursor:pointer}

@@ -21,13 +21,15 @@ export async function POST(request: NextRequest) {
   const { data: who } = await caller.auth.getUser();
   if (!who || !who.user) return NextResponse.json({ ok: false, error: 'جلسة غير صالحة' }, { status: 401 });
   const admin = createClient(url, service, { auth: { persistSession: false, autoRefreshToken: false } });
-  const { data: mem } = await admin.from('almfrje_members').select('is_active').eq('user_id', who.user.id).maybeSingle();
+  const { data: mem } = await admin.from('almfrje_members').select('is_active,role').eq('user_id', who.user.id).maybeSingle();
   if (!mem || !mem.is_active) return NextResponse.json({ ok: false, error: 'الحساب غير مفعّل' }, { status: 403 });
+  const canSeeNames = mem.role === 'admin' || mem.role === 'general_manager';   // الإدارة العليا ترى الأسماء
 
   let body: any; try { body = await request.json(); } catch { body = {}; }
   const cid = (String(body.clientId || '').replace(/[^a-z0-9]/gi, '').slice(0, 40)) || ('u' + who.user.id.slice(0, 12));
   const first = !!body.first;
   const branch = (body.branch != null && Number.isFinite(Number(body.branch))) ? Number(body.branch) : null;
+  const name = String(body.name || '').replace(/[<>]/g, '').trim().slice(0, 80);   // اسم المتواجد (لعرضه للإدارة)
   const now = Date.now();
 
   const { data: rows } = await admin.from('almfrje_settings').select('key,value').in('key', ['presence', 'visit_stats']);
@@ -39,16 +41,19 @@ export async function POST(request: NextRequest) {
     const ts = (e && typeof e === 'object') ? e.ts : e;
     if (typeof ts !== 'number' || now - ts > TTL) delete pres[k];
   }
-  pres[cid] = { ts: now, branch };
+  pres[cid] = { ts: now, branch, name };
   await admin.from('almfrje_settings').upsert({ key: 'presence', value: pres, updated_at: new Date().toISOString() }, { onConflict: 'key' });
 
-  // عدّ المتواجدين الآن + تفصيلهم حسب الفرع
+  // عدّ المتواجدين الآن + تفصيلهم حسب الفرع + قائمة أسمائهم (للإدارة العليا فقط)
   const byBranch: Record<string, number> = {};
+  const people: { name: string; branch: number | null }[] = [];
   let online = 0;
   for (const k of Object.keys(pres)) {
     online++;
-    const b = pres[k] && typeof pres[k] === 'object' ? pres[k].branch : null;
+    const e = pres[k] && typeof pres[k] === 'object' ? pres[k] : {};
+    const b = e.branch != null ? e.branch : null;
     if (b != null) byBranch[String(b)] = (byBranch[String(b)] || 0) + 1;
+    if (canSeeNames) people.push({ name: String(e.name || ''), branch: b });
   }
 
   let total = 0;
@@ -60,5 +65,5 @@ export async function POST(request: NextRequest) {
   } else {
     total = (map.visit_stats && map.visit_stats.total) || 0;
   }
-  return NextResponse.json({ ok: true, online, byBranch, total });
+  return NextResponse.json({ ok: true, online, byBranch, total, people: canSeeNames ? people : undefined });
 }

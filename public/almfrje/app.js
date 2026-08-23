@@ -235,6 +235,7 @@ const txOpen = new Set([0]);   // مجموعات «النصوص» المفتوح
 let visitStats = { total: 0, byBranch: {}, byCity: {} };   // إحصاء زيارات الزوّار (من الإعدادات)
 let onlineNow = 0;                 // عدد المتواجدين الآن (من مسار التواجد)
 let onlineByBranch = {};           // تفصيلهم حسب الفرع
+let onlinePeople = [];             // أسماء المتواجدين (تصل للإدارة العليا فقط)
 let _presenceTimer = null;
 const DEFAULT_BANNER = 'المفرجي قبيلة من ولد حسين من الصواعد من عوف من حرب';
 let bannerText = DEFAULT_BANNER;
@@ -6437,12 +6438,22 @@ function myPresenceBranch() {
 }
 // مربّع «المتواجدون الآن» (الرئيسية): المجموع فقط — التفصيل حسب الفرع يظهر أمام كل فرع.
 function onlineHomeHtml() {
-  return `<div class="oh-title">🟢 المتواجدون الآن: ${onlineNow}</div>`;
+  const canNames = isAdmin() || isGeneralManager();   // الإدارة العليا ترى الأسماء
+  return `<div class="oh-title${canNames ? ' click' : ''}"${canNames ? ' id="ohNames"' : ''}>🟢 المتواجدون الآن: ${onlineNow}${canNames && onlineNow > 0 ? ' <span class="muted" style="font-size:.72rem;font-weight:normal">— اضغط للأسماء</span>' : ''}</div>`;
+}
+// نافذة أسماء المتواجدين الآن (للإدارة العليا) — مجمّعة حسب الفرع
+function showOnlinePeople() {
+  if (!(isAdmin() || isGeneralManager())) return;
+  const list = (onlinePeople || []).slice().sort((a, b) => (Number(a.branch) || 0) - (Number(b.branch) || 0));
+  const body = list.length
+    ? list.map(p => `<div class="row"><span class="k">${esc(p.name || '—')}</span><span class="v muted" style="font-size:.78rem">${p.branch != null ? esc(branchName(Number(p.branch))) : '—'}</span></div>`).join('')
+    : '<div class="muted" style="padding:8px;text-align:center">لا أحد متواجد الآن.</div>';
+  openModal('🟢 المتواجدون الآن (' + list.length + ')', body);
 }
 function updateOnlineDom() {
   const tl = document.getElementById('visitsTotal'); if (tl) tl.textContent = visitStats.total || 0;
   // الرئيسية: المتواجدون الآن حسب الفرع (يظهر الموجود فقط)
-  const oh = document.getElementById('onlineHome'); if (oh) oh.innerHTML = onlineHomeHtml();
+  const oh = document.getElementById('onlineHome'); if (oh) { oh.innerHTML = onlineHomeHtml(); const ohn = document.getElementById('ohNames'); if (ohn) ohn.addEventListener('click', showOnlinePeople); }
   // شارة المتواجدين أمام كل فرع في قائمة الفروع بالرئيسية
   document.querySelectorAll('.br-online[data-bid]').forEach(el => {
     const n = (onlineByBranch && onlineByBranch[el.dataset.bid]) || 0;
@@ -6463,9 +6474,9 @@ async function pingPresence(first) {
   try {
     const { data: { session } } = await sb.auth.getSession();
     const token = session && session.access_token; if (!token) return;
-    const res = await fetch('/api/almfrje-presence', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token }, body: JSON.stringify({ clientId: clientId(), first: !!first, branch: myPresenceBranch() }) });
+    const res = await fetch('/api/almfrje-presence', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token }, body: JSON.stringify({ clientId: clientId(), first: !!first, branch: myPresenceBranch(), name: (currentUserName() || (me && me.full_name) || '') }) });
     const j = await res.json().catch(() => ({}));
-    if (j && j.ok) { onlineNow = j.online || 0; onlineByBranch = j.byBranch || {}; if (typeof j.total === 'number') visitStats.total = j.total; updateOnlineDom(); }
+    if (j && j.ok) { onlineNow = j.online || 0; onlineByBranch = j.byBranch || {}; onlinePeople = Array.isArray(j.people) ? j.people : []; if (typeof j.total === 'number') visitStats.total = j.total; updateOnlineDom(); }
   } catch (e) { /* أفضل جهد */ }
 }
 function startPresence() {
