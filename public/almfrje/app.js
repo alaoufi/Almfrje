@@ -2732,12 +2732,13 @@ async function savePerson(id, existing) {
     city: val('p_city').trim(), phone: val('p_phone').trim(), email: val('p_email').trim(), notes: val('p_notes').trim(),
   };
   // حماية اختيار العضو: إن كان لهذا الشخص عضوٌ مرتبط اختار «استخدام الموقع فقط»،
-  // فلا يُكتب رقمُه الخاص في ملفه بالشجرة — حتى من الإدارة (القرار له وحده).
+  // فلا يُكتب رقمُه الخاص في ملفه بالشجرة — لكن لا نُلغي الحفظ؛ نحذف الجوال فقط ونكمل حفظ البقية.
+  let phonePrivacyStripped = false;
   if (existing && obj.phone) {
     const lmP = C.members.find(mm => Number(mm.person_id) === existing.id && mm.phone_public === false);
     if (lmP && lmP.phone && normPhone(lmP.phone) === normPhone(obj.phone)) {
-      toast('🔒 صاحب هذا الملف اختار عدم نشر جواله — لا يُحفظ في ملفه. تغيير الخيار له وحده من ملفه الشخصي.');
-      return;
+      obj.phone = existing.phone || '';   // أبقِ ما كان (غالباً فارغ) — لا تنشر جواله الخاص
+      phonePrivacyStripped = true;
     }
   }
   if (existing && nameChanged && existing.name) {
@@ -2767,7 +2768,7 @@ async function savePerson(id, existing) {
       await auditLog('add', ins && ins.id, name);
     }
   });
-  if (ok) { toast(existing ? 'تم حفظ التعديل' : 'تمت إضافة «' + name + '» بنجاح'); await loadAll(); existing ? setHash('#/person/' + id) : goBack(); }
+  if (ok) { toast((existing ? '✅ تم حفظ التعديل' : '✅ تمت إضافة «' + name + '» بنجاح') + (phonePrivacyStripped ? ' — عدا الجوال (اختار صاحبه عدم نشره)' : '')); await loadAll(); existing ? setHash('#/person/' + id) : goBack(); }
 }
 // حذف الأسماء غير متاح لأي مستخدم (قرار نهائي) — يبقى التعديل + التراجع من سلة المحذوفات.
 
