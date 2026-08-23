@@ -108,7 +108,8 @@ async function listBackups(admin: SupabaseClient) {
     name: f.name,
     path: `${PREFIX}/${f.name}`,
     size: f.metadata?.size ?? null,
-    created_at: f.created_at ?? f.updated_at ?? null,
+    // الشرائح الأسبوعية تُحدَّث بالكتابة فوقها؛ نعرض آخر تحديثٍ فعليّ (تاريخ آخر نسخة) لا الإنشاء الأول
+    created_at: f.updated_at ?? f.created_at ?? null,
   }));
   return { ok: true, status: 200, items };
 }

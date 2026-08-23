@@ -3726,8 +3726,9 @@ async function restoreFromObject(backup) {
   if (!Array.isArray(d.persons) || d.persons.length === 0) { toast('النسخة لا تحوي أشخاصاً — أُلغيت الاستعادة حمايةً لبياناتك'); return; }
   if (backup.version != null && Number(backup.version) > 1) { toast('هذه النسخة من إصدارٍ أحدث غير مدعوم — حدّث الموقع أولاً'); return; }
   const np = (d.persons || []).length, nb = (d.branches || []).length;
-  if (!(await confirm2(`ستُحذف البيانات الحالية وتُستبدل بـ ${np} شخص و ${nb} فرع من النسخة (${backup.created_at || ''}). متابعة؟`))) return;
-  const typedR = await uiPrompt('للتأكيد النهائي اكتب كلمة: استعادة', { title: 'تأكيد الاستعادة', placeholder: 'استعادة', danger: true, okText: 'استعادة' });
+  const when = backup.created_at ? fmtDateTime(backup.created_at) : 'غير معروف';
+  if (!(await confirm2(`⚠️ استعادة نسخة احتياطية\n\n📅 تاريخ ووقت النسخة: ${when}\n👥 ${np} شخص  •  🗂️ ${nb} فرع\n\nسيُستبدل كل ما هو موجود الآن ببيانات هذه النسخة، ولا رجوع إلا باستعادة نسخةٍ أخرى.\nهل أنت متأكد من المتابعة؟`, { title: '♻️ تأكيد الاستعادة', okText: 'متابعة', danger: true }))) return;
+  const typedR = await uiPrompt(`للتأكيد النهائي اكتب كلمة: استعادة\n(نسخة ${when})`, { title: 'تأكيد نهائي للاستعادة', placeholder: 'استعادة', danger: true, okText: 'استعادة' });
   if ((typedR || '').trim() !== 'استعادة') { toast('أُلغيت الاستعادة'); return; }
   showLoading(true);
   const ok = await guard(async () => {
