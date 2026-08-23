@@ -6393,8 +6393,11 @@ function clientId() {
 // كل من يدخل يُنسب لفرعه (مدير/مشرف/زائر) — الأصل ألّا يتواجد أحد بلا فرع.
 let _myBranchCache;
 function myPresenceBranch() {
-  // الزائر: فرعه المُتحقَّق عند الدخول (الأدقّ والأسرع).
-  try { const v = parseInt(sessionStorage.getItem('almfrje_guest_branch') || '0', 10); if (v) return v; } catch (e) { /* */ }
+  // الزائر فقط: فرعه المُتحقَّق عند الدخول. (لا يُستخدم للعضو المسجّل كي لا تُنسب قيمةٌ
+  //  قديمةٌ عالقة في الجلسة — من دخول اسمٍ سابق كزائر — لفرعٍ خاطئ. العضو يُنسب لفرع شخصه.)
+  if (isGuestUser()) {
+    try { const v = parseInt(sessionStorage.getItem('almfrje_guest_branch') || '0', 10); if (v) return v; } catch (e) { /* */ }
+  }
   if (_myBranchCache !== undefined) return _myBranchCache;
   let b = null;
   try {
