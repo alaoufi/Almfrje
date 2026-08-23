@@ -153,8 +153,9 @@ export async function POST(request: NextRequest) {
     if (/already|exists|registered|duplicate/i.test(m)) return NextResponse.json({ ok: false, error: 'الجوال مسجّل مسبقاً — يمكنك الدخول به مباشرة.' }, { status: 409 });
     return NextResponse.json({ ok: false, error: m }, { status: 400 });
   }
+  // متصفّح فوراً (is_active=true) لكنه بانتظار توثيق الإدارة (perms.unverified) — لا يعدّل، يطّلع فقط
   const { error: ue } = await admin.from('almfrje_members').upsert({
-    user_id: created.user.id, full_name, phone, role: 'viewer', is_active: false, person_id: pid, perms: {}, phone_public: publish,
+    user_id: created.user.id, full_name, phone, role: 'viewer', is_active: true, person_id: pid, perms: { unverified: true }, phone_public: publish,
   }, { onConflict: 'user_id' });
   if (ue) return NextResponse.json({ ok: false, error: ue.message }, { status: 400 });
 
@@ -169,5 +170,6 @@ export async function POST(request: NextRequest) {
   if (birth && !String(person.birth || '').trim()) patch.birth = birth;
   if (Object.keys(patch).length) { try { await admin.from('almfrje_persons').update(patch).eq('id', pid); } catch { /* */ } }
 
-  return NextResponse.json({ ok: true });
+  // نعيد البريد كي تسجّل الواجهة دخوله فوراً بحسابه الجديد (تصفّح مباشر بانتظار التوثيق)
+  return NextResponse.json({ ok: true, email: `${phone}@almfrje.app` });
 }

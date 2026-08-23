@@ -1148,3 +1148,8 @@ ul.hier ul.hier > .hier-li::before {
 .apr-name { font-weight: 800; font-size: 1rem; }
 .apr-ph { font-size: .85rem; color: var(--text); margin-top: 3px; }
 .apr-acts { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+
+/* ===== شريط «أعضاء بانتظار التوثيق» أعلى الصفحة (للمدير) ===== */
+.pending-banner { display:block; width:100%; box-sizing:border-box; cursor:pointer; margin:0 0 12px; padding:10px 14px; border-radius:12px; font-size:.9rem; font-weight:700; text-align:center; color:#7a3d00; background:linear-gradient(180deg,#fff3e0,#ffe8cc); border:1px solid #f0a55e; box-shadow:0 4px 14px -8px rgba(232,89,12,.5); }
+.pending-banner b { color:#d9480f; font-size:1.05rem; }
+.pending-banner:active { transform:scale(.99); }

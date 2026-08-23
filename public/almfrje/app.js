@@ -760,6 +760,19 @@ function render() {
   bindEyes(view());    // فعّل أزرار العين في كل شاشة
   // تبويبات لوحة التحكم (تظهر في شاشات المدير فقط)
   view().querySelectorAll('.admin-tab').forEach(b => b.addEventListener('click', () => setHash(b.dataset.go)));  guestOnboard();   // التسجيل الإجباري للزائر المتحقَّق (يلاحقه في كل الشاشات حتى يسجّل)
+  renderPendingBanner();   // شريطٌ علويّ للمدير: أعضاءٌ بانتظار التوثيق
+}
+// شريطٌ أعلى الصفحة (للمدير) عند وجود أعضاءٍ سجّلوا وينتظرون التوثيق — يقود لنافذة الموافقة
+function renderPendingBanner() {
+  const old = document.getElementById('pendingBanner'); if (old) old.remove();
+  if (!isAdmin()) return;
+  const n = pendingRegs().length; if (!n) return;
+  const v = view();
+  const bar = document.createElement('div');
+  bar.id = 'pendingBanner'; bar.className = 'pending-banner';
+  bar.innerHTML = `🔔 <b>${n}</b> ${n === 1 ? 'عضوٌ جديد يحتاج توثيق' : 'أعضاء جدد يحتاجون توثيق'} — اضغط للمراجعة`;
+  bar.addEventListener('click', () => { try { sessionStorage.removeItem('almfrje_approvals_shown'); } catch (e) { /* */ } showPendingApprovals(); });
+  v.insertBefore(bar, v.firstChild);
 }
 function addFab(label, onClick) { const f = document.createElement('button'); f.className = 'fab'; f.textContent = label; f.addEventListener('click', onClick); document.body.appendChild(f); }
 // شريط تبويبات لوحة التحكم (للمدير) — كل شاشة إدارية تعرضه أعلاها.
@@ -3302,19 +3315,31 @@ function guestOnboard() {
         if (val('go_pw').trim().length < 4) { toast('كلمة المرور إجبارية — ٤ أحرف/أرقام على الأقل'); return; }
         const priv = document.querySelector('input[name=\"go_priv\"]:checked');
         const body = { pid, phone, password: val('go_pw').trim(), nickname: val('go_nick').trim(), city: val('go_city').trim(), birth: val('go_birth').trim(), publish: !!(priv && priv.value === 'publish') };
+        const pw = val('go_pw').trim();
+        let regEmail = phone + '@almfrje.app';
         const ok = await guard(async () => {
           const { data: { session } } = await sb.auth.getSession();
           const res = await fetch('/api/almfrje-signup', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + (session && session.access_token) }, body: JSON.stringify(body) });
           const j = await res.json().catch(() => ({}));
           if (!res.ok || !j.ok) throw new Error(j.error || 'تعذّر التسجيل');
-          try { sessionStorage.setItem('almfrje_signed', '1'); } catch (e) { /* */ }
-          closeModal();
-          openModal('✅ شكراً لك', `<div style="text-align:center;font-size:1rem;line-height:2;padding:6px 0">استُلمت بياناتك وسوف <b>يُفعَّل حسابك لاحقاً</b> بعد مراجعة الإدارة.<br>بعد التفعيل ادخل بحسابك 📱 برقم جوالك وكلمة المرور التي اخترتها.</div>
-            <button class="btn" id="go_done" style="width:100%">حسناً</button>`, () => {
-            document.getElementById('go_done').addEventListener('click', async () => { try { await sb.auth.signOut(); } catch (e2) { /* */ } location.hash = ''; location.reload(); });
-          }, { noClose: true, noBgClose: true });
+          if (j.email) regEmail = j.email;
         });
-        if (!ok) { /* بقيت النافذة ليصحح */ }
+        if (!ok) return;   // بقيت النافذة ليصحّح
+        // تصفّحٌ فوري: ادخل بحسابه الجديد (يبقى بانتظار توثيق الإدارة — يطّلع ولا يعدّل)
+        try { window._onbPoll = false; } catch (e) { /* */ }
+        try { sessionStorage.removeItem('almfrje_greeted'); } catch (e) { /* */ }
+        const { error: le } = await sb.auth.signInWithPassword({ email: regEmail, password: pinToPass(pw) });
+        closeModal();
+        if (le) {
+          // تعذّر الدخول التلقائي (نادر) — أرشده للدخول اليدوي
+          openModal('✅ تم تسجيلك', `<div style="text-align:center;font-size:1rem;line-height:2;padding:6px 0">تمّ تسجيلك بنجاح ✓<br>ادخل بحسابك 📱 برقم جوالك وكلمة المرور التي اخترتها.</div>
+            <button class="btn" id="go_done" style="width:100%">دخول</button>`, () => {
+            document.getElementById('go_done').addEventListener('click', () => { location.hash = ''; location.reload(); });
+          }, { noClose: true, noBgClose: true });
+        } else {
+          toast('✅ تم تسجيلك — تصفّح الآن، وسيوثّق حسابك أحد المسؤولين قريباً');
+          // onAuthStateChange يلتقط الجلسة الجديدة فيدخل التطبيق تلقائياً
+        }
       });
     }, { noClose: true, noBgClose: true });
   };
@@ -4878,7 +4903,7 @@ function screenControl() {
   const featured = [
     ['📨', 'صندوق الوارد', 'ملاحظات الزوّار: الاعتماد والرد والأرشيف', '#/feedbacks', C.feedbackPending || 0],
     ['⚙️', 'الإعدادات', 'فتح الزوّار • آخر الإضافات • الزيارات', '#/settings', 0],
-    ['👥', 'الأعضاء', 'الحسابات والأدوار والصلاحيات الدقيقة', '#/members', C.members.filter(m => !m.is_active && m.role === 'viewer' && m.person_id).length],
+    ['👥', 'الأعضاء', 'الحسابات والأدوار والصلاحيات الدقيقة', '#/members', C.members.filter(isPendingReg).length],
   ];
   const tiles = [
     ['🗂️', 'الفروع والمشرفون', 'تعريف الفروع وتعيين مشرفيها', '#/branchadmin'],
@@ -5642,7 +5667,9 @@ async function screenMembersForManager() {
   view().querySelectorAll('[data-memtab]').forEach(b => b.addEventListener('click', () => { memTab = b.dataset.memtab; screenMembersForManager(); }));
 }
 /* ===== نافذة موافقة طلبات التسجيل — تظهر للمدير فور دخوله (الاسم + الجوال → موافقة/رفض) ===== */
-function pendingRegs() { return (C.members || []).filter(m => !m.is_active && m.role === 'viewer' && m.person_id); }
+// عضوٌ سجّل نفسه وبانتظار توثيق الإدارة: إمّا قديمٌ غير مفعّل، أو جديدٌ متصفّح موسومٌ unverified
+function isPendingReg(m) { return !!(m && m.role === 'viewer' && m.person_id && (!m.is_active || (m.perms && m.perms.unverified === true))); }
+function pendingRegs() { return (C.members || []).filter(isPendingReg); }
 function pendRegItemHtml(m) {
   const p = m.person_id ? byId.get(Number(m.person_id)) : null;
   return `<div class="apr-item">
@@ -5685,7 +5712,7 @@ function bindApprovals() {
     const cx = e.target.closest('[data-aprcancel]');
     if (okB) {
       okB.disabled = true;
-      const ok = await guard(async () => { await updMember(okB.dataset.aprok, { is_active: true }); });
+      const ok = await guard(async () => { await updMember(okB.dataset.aprok, { is_active: true, perms: {} }); });
       if (ok) { toast('فُعِّل الحساب ✓'); await loadAll(); refresh(); } else okB.disabled = false;
     } else if (noB) {
       // تأكيدٌ مضمّن داخل الصفّ (بلا نافذةٍ أخرى تُزيح هذه)
@@ -5714,7 +5741,7 @@ function screenMembers() {
       <button class="btn sm" id="addUserBtn" style="margin-top:6px">🛡️ إضافة مسؤول</button></div>
 
     ${(() => {
-      const pend = list.filter(m => !m.is_active && m.role === 'viewer' && m.person_id);
+      const pend = list.filter(isPendingReg);
       if (!pend.length) return '';
       return `<div class="card" style="border-inline-start:4px solid #e8590c"><h3>🆕 طلبات تسجيل بانتظار التحقق (${pend.length})</h3>
         <p class="muted" style="font-size:.82rem;margin-top:-4px">سجّلوا بأنفسهم بعد دخولهم بأسمائهم — تحقّق من صحة البيانات ثم فعّل.</p>
@@ -5820,7 +5847,7 @@ function screenMembers() {
     }); }
   view().querySelectorAll('[data-regok]').forEach(b => b.addEventListener('click', async () => {
     const uid = b.dataset.regok;
-    const ok = await guard(async () => { await updMember(uid, { is_active: true }); });
+    const ok = await guard(async () => { await updMember(uid, { is_active: true, perms: {} }); });
     if (ok) { toast('فُعِّل الحساب ✓'); await loadAll(); screenMembers(); }
   }));
   view().querySelectorAll('[data-regno]').forEach(b => b.addEventListener('click', async () => {
