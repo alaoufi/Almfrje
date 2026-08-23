@@ -5290,7 +5290,7 @@ async function screenBackups() {
   const tabs = [];
   if (isAdmin()) tabs.push(['backup', '💾 النسخ الاحتياطية']);
   if (canExport()) tabs.push(['export', '📤 التصدير']);
-  if (isAdmin()) tabs.push(['restore', '♻️ الاستعادة']);
+  // «الاستعادة» أُزيلت من لوحة الإدارة حمايةً من المسح بالخطأ — تُنفَّذ عند الطوارئ عبر المطوّر.
   if (isAdmin()) tabs.push(['cloud', '☁️ النسخ السحابية']);
   if (!tabs.find(t => t[0] === dataTab)) dataTab = tabs[0][0];
 
@@ -5374,7 +5374,6 @@ function cloudRow(f) {
     </div>
     <div class="btn-row" style="margin:0">
       <button class="btn sm outline" data-cldl="${esc(f.path)}">⤓ تنزيل</button>
-      <button class="btn sm" data-clrs="${esc(f.path)}">♻️ استعادة</button>
     </div>
   </div>`;
 }
@@ -5425,7 +5424,6 @@ function backupRow(b) {
     </div>
     <div class="btn-row" style="margin:0">
       <button class="btn sm outline" data-bkdl="${b.id}">⤓ تنزيل</button>
-      <button class="btn sm" data-bkrs="${b.id}">♻️ استعادة</button>
       <button class="btn sm danger" data-bkdel="${b.id}">حذف</button>
     </div></div>`;
 }
