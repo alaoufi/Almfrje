@@ -140,5 +140,6 @@ export async function POST(request: NextRequest) {
   if (persons.some((p) => p.status !== 'dead' && normWord(p.name).includes(toks[0]))) {
     return NextResponse.json({ ok: false, error: 'وُجد اسمك، لكن لم نجد آباءك/أجدادك بما كتبت — تأكّد من ترتيب الأسماء.' });
   }
-  return NextResponse.json({ ok: false });   // غير مسجّل إطلاقاً
+  // غير مسجّل إطلاقاً — الموقع خاصٌّ بالمسجّلين في الشجرة فقط
+  return NextResponse.json({ ok: false, error: '🔒 هذا موقعٌ خاصٌّ بأبناء القبيلة المسجّلين في الشجرة فقط — لم نجد اسمك. تأكّد من كتابته بالترتيب (أنت ثم أبوك ثم جدّك)، أو راجع الإدارة.' });
 }

@@ -252,7 +252,7 @@ let shareTitle = DEFAULT_SHARE_TITLE, shareText = DEFAULT_SHARE_TEXT;
 const DEFAULT_FB_THANKS = 'شكراً لك 🌿\nتم إرسال ملاحظتك، وهي محل اهتمامنا.';
 let feedbackThanks = DEFAULT_FB_THANKS;
 const DEFAULT_GUEST_OK = 'مرحباً بك يا ابن العم {name} 🌿\nداخل مكانك وبين ربعك وجماعتك.. نسعد بوجودك';
-const DEFAULT_GUEST_FAIL = 'مرحباً بك يا {name} 🙏\nنأسف، الاسم غير مسجّل — تأكّد من كتابة اسمك الصحيح بالتسلسل.';
+const DEFAULT_GUEST_FAIL = '🔒 هذا موقعٌ خاصٌّ بأبناء القبيلة المسجّلين في الشجرة فقط.\nلم نجد اسمك «{name}» مطابقاً — تأكّد من كتابته بالترتيب (أنت ثم أبوك ثم جدّك)، أو راجع الإدارة.';
 let guestWelcomeOk = DEFAULT_GUEST_OK;
 let guestWelcomeFail = DEFAULT_GUEST_FAIL;
 // نصوص واجهة قابلة للتعديل من «التحكم ← النصوص» (تظهر للزائر والجميع).
