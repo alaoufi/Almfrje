@@ -2739,7 +2739,9 @@ async function savePerson(id, existing) {
     if (!(await confirm2(`⚠️ أنت على وشك تغيير الاسم:\n«${existing.name}» ← «${name}»${chain ? '\n(ابن ' + chain + ')' : ''}\n\nتغيير الاسم حسّاس في شجرة الأنساب ويظهر في كل المشجّرات والأنساب. تأكد أنه تصحيحٌ صحيح.`, { title: 'تأكيد تغيير الاسم', okText: 'متابعة', danger: true }))) return;
     const typed = await uiPrompt('للتأكيد النهائي اكتب كلمة: تعديل', { title: 'تأكيد نهائي لتغيير الاسم', placeholder: 'تعديل', okText: 'تعديل الاسم' });
     if ((typed || '').trim() !== 'تعديل') { toast('أُلغي تعديل الاسم'); return; }
-  } else if (existing && !(await confirm2('حفظ التعديل على هذا الشخص؟ النسخة السابقة تبقى في سلة المحذوفات.'))) return;
+  }
+  // تعديل الحقول العادية: يُحفظ مباشرةً بلا نافذة تأكيد وبلا نسخة في سلة المحذوفات —
+  // ويبقى في «سجل التعديلات» مع إمكانية التراجع (تُلتقط القيم السابقة للحقول المتغيّرة فقط).
   if (!(await responsibilityOk())) return;
   const ok = await guard(async () => {
     if (photofile) photo_url = await uploadFile(photofile, 'photos');
@@ -2747,12 +2749,13 @@ async function savePerson(id, existing) {
     if (existing) {
       // تتبّع: مَن عدّل ومتى
       obj.updated_by_name = who; obj.updated_at = new Date().toISOString();
-      await trashSnap('persons', id, 'edit', existing.name);
-      // التقط القيم السابقة لإتاحة التراجع من سجل التعديلات لاحقاً
-      const undoCols = ['name', 'nickname', 'father_id', 'branch_id', 'generation', 'status', 'work', 'birth', 'birthplace', 'death', 'city', 'phone', 'email', 'notes', 'photo_url', 'updated_by_name', 'updated_at'];
-      const prev = {}; undoCols.forEach(c => prev[c] = existing[c] ?? null);
+      // التقط القيم السابقة للحقول المتغيّرة فقط — تراجعٌ دقيقٌ على مستوى الحقل، بلا حشوٍ في السجل
+      const undoCols = ['name', 'nickname', 'father_id', 'branch_id', 'generation', 'status', 'work', 'birth', 'birthplace', 'death', 'city', 'phone', 'email', 'notes', 'photo_url'];
+      const prev = {};
+      undoCols.forEach(c => { if ((existing[c] ?? null) !== (obj[c] ?? null)) prev[c] = existing[c] ?? null; });
       const { error } = await sb.from('almfrje_persons').update(obj).eq('id', id); if (error) throw error;
-      await auditLog('edit', id, name, { kind: 'persons', items: [{ id, prev }], label: existing.name });
+      // سجّل التعديل مع بيانات التراجع فقط إن تغيّر حقلٌ فعلاً (لا تراجع فارغ)
+      await auditLog('edit', id, name, Object.keys(prev).length ? { kind: 'persons', items: [{ id, prev }], label: existing.name } : undefined);
     } else {
       // تتبّع: مَن أضاف
       obj.created_by_name = who;
