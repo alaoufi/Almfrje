@@ -3769,7 +3769,26 @@ async function restoreFromObject(backup) {
   showLoading(false);
   if (ok) { toast('تمت الاستعادة'); closeModal(); await loadAll(); setHash('#/home'); render(); }
 }
-function download(filename, text, mime) {
+async function download(filename, text, mime) {
+  // إن دعم المتصفّح منتقي الحفظ (كروم/إيدج على سطح المكتب): يختار المستخدم المجلد والاسم
+  if (window.showSaveFilePicker) {
+    try {
+      const ext = (String(filename).split('.').pop() || 'json').toLowerCase();
+      const handle = await window.showSaveFilePicker({
+        suggestedName: filename,
+        types: [{ description: 'ملف نسخة', accept: { [mime || 'application/octet-stream']: ['.' + ext] } }],
+      });
+      const w = await handle.createWritable();
+      await w.write(new Blob([text], { type: mime }));
+      await w.close();
+      toast('✅ حُفظ الملف في المجلد المختار');
+      return;
+    } catch (e) {
+      if (e && e.name === 'AbortError') return;   // ألغى المستخدم الاختيار — لا شيء
+      // غير ذلك (غير مدعوم/انتهت الصلاحية): اسقط للتنزيل العادي أدناه
+    }
+  }
+  // احتياطي (الجوال ومعظم المتصفّحات): تنزيل عادي إلى مجلد التنزيلات
   const blob = new Blob([text], { type: mime }); const url = URL.createObjectURL(blob);
   const a = document.createElement('a'); a.href = url; a.download = filename; a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000); toast('تم التنزيل');
 }
