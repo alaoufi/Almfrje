@@ -6119,8 +6119,9 @@ async function restoreTrash(t) {
 function openModal(title, body, onMount, opts) {
   opts = opts || {};
   const root = document.getElementById('modalRoot');
-  const closeBtn = opts.noClose ? '' : `<button class="btn outline" id="modalClose" style="margin-top:10px">إلغاء</button>`;
-  root.innerHTML = `<div class="modal-bg"><div class="modal"><h3>${esc(title)}</h3>${body}${closeBtn}</div></div>`;
+  // زرّ إغلاق صغير (✕) في زاوية النافذة بدل زرّ «إلغاء» العريض — أنظف وأوفر للمساحة
+  const closeBtn = opts.noClose ? '' : `<button class="modal-x" id="modalClose" aria-label="إغلاق" title="إغلاق">✕</button>`;
+  root.innerHTML = `<div class="modal-bg"><div class="modal">${closeBtn}<h3>${esc(title)}</h3>${body}</div></div>`;
   if (!opts.noBgClose) root.querySelector('.modal-bg').addEventListener('click', e => { if (e.target.classList.contains('modal-bg')) closeModal(); });
   { const cb = document.getElementById('modalClose'); if (cb) cb.addEventListener('click', closeModal); }
   bindHints(root);
