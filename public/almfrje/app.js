@@ -6341,6 +6341,12 @@ function renderAuth() {
     msg.textContent = '… لحظة';
     const digits = normPhone(ident);
     try {
+      // تسريع الدخول: للجوال، جرّب البريد المتوقّع مباشرةً (جوال@almfrje.app) فنتخطّى دالة
+      // resolve_login البطيئة (~١ث). إن نجح فانتهينا؛ وإلا نرجع إليها بأمان (اسم مستخدم/حساب قديم/كلمة مرور خطأ).
+      if (digits.length >= 9) {
+        const { error: eFast } = await sb.auth.signInWithPassword({ email: phoneToEmail(digits), password: pinToPass(pin) });
+        if (!eFast) { try { sessionStorage.removeItem('almfrje_greeted'); } catch (e0) { /* */ } return; }
+      }
       const { data: email } = await sb.rpc('almfrje_resolve_login', { ident: digits || ident });
       // ① الجوال غير مسجّل → وجّهه للدخول بالاسم والتسجيل
       if (!email) {
