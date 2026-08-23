@@ -2494,18 +2494,20 @@ async function screenPersonEdit(arg) {
         if (!PIN_RE.test(pin)) { toast('كلمة المرور ٤ خانات على الأقل (حروف أو أرقام)'); return; }
         const { data: { session } } = await sb.auth.getSession();
         const tok = (session && session.access_token) || '';
-        if (peMem) {
-          // تغيير كلمة مرور حساب موجود
+        const phone = normPhone(val('p_phone'));
+        // الحساب المرتبط: بالشخص أولاً، وإلا بالجوال نفسه — فلا يُعتبر جواله «مكرراً» عند تعديله
+        const acct = peMem || (phone.length >= 7 ? (C.members || []).find(mm => normPhone(mm.phone || '') === phone) : null);
+        if (acct) {
+          // حساب موجود (له أو بجواله) → غيّر كلمة مروره (لا إنشاء جديد)
           const okPin = await guard(async () => {
-            const r = await fetch('/api/almfrje-admin', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + tok }, body: JSON.stringify({ user_id: peMem.user_id, pin }) });
+            const r = await fetch('/api/almfrje-admin', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + tok }, body: JSON.stringify({ user_id: acct.user_id, pin }) });
             const j = await r.json().catch(() => ({}));
             if (!r.ok || !j.ok) throw new Error(j.error || ('فشل تغيير كلمة المرور (' + r.status + ')'));
           });
           if (!okPin) return;
           toast('تم تغيير كلمة المرور ✓');
         } else {
-          // لا حساب له: أنشئ حساب دخول (عضو) بالجوال وكلمة المرور
-          const phone = normPhone(val('p_phone'));
+          // لا حساب له ولا بجواله: أنشئ حساب دخول (عضو) بالجوال وكلمة المرور
           if (phone.length < 7) { toast('أدخل رقم الجوال أولاً لإنشاء الحساب'); return; }
           const full_name = (val('p_name').trim() || p.name) + (editFather ? ' ' + editFather.name : '');
           const okNew = await guard(async () => {
