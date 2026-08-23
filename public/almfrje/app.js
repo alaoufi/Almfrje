@@ -6446,7 +6446,14 @@ function showOnlinePeople() {
   if (!(isAdmin() || isGeneralManager())) return;
   const list = (onlinePeople || []).slice().sort((a, b) => (Number(a.branch) || 0) - (Number(b.branch) || 0));
   const body = list.length
-    ? list.map(p => `<div class="row"><span class="k">${esc(p.name || '—')}</span><span class="v muted" style="font-size:.78rem">${p.branch != null ? esc(branchName(Number(p.branch))) : '—'}</span></div>`).join('')
+    ? '<div class="online-people">' + list.map(p => {
+      const nm = String(p.name || '').trim();
+      const br = p.branch != null ? branchName(Number(p.branch)) : '';
+      return `<div class="op-item">
+        <div class="op-name">${esc(nm || (br ? 'متواجدٌ من ' + br : 'متواجد') )}</div>
+        ${nm && br ? `<div class="op-branch">🗂️ ${esc(br)}</div>` : ''}
+      </div>`;
+    }).join('') + '</div>'
     : '<div class="muted" style="padding:8px;text-align:center">لا أحد متواجد الآن.</div>';
   openModal('🟢 المتواجدون الآن (' + list.length + ')', body);
 }

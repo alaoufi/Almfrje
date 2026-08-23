@@ -1154,3 +1154,10 @@ ul.hier ul.hier > .hier-li::before {
 .pending-banner b { color:#d9480f; font-size:1.05rem; }
 .pending-banner:active { transform:scale(.99); }
 .oh-title.click{cursor:pointer}
+
+/* ===== قائمة المتواجدين الآن (نافذة الإدارة) — متوسّطة لسهولة القراءة ===== */
+.online-people { display: flex; flex-direction: column; gap: 4px; }
+.op-item { text-align: center; padding: 9px 6px; border-bottom: 1px solid var(--line); }
+.op-item:last-child { border-bottom: none; }
+.op-name { font-weight: 800; font-size: 1.02rem; color: var(--text); }
+.op-branch { font-size: .8rem; color: var(--muted); margin-top: 3px; }
