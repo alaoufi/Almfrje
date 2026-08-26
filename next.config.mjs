@@ -29,11 +29,6 @@ const nextConfig = {
       // منصّة الاستشارات — تُخدَم على /con
       { source: '/con', destination: '/legacy/index.html' },
       { source: '/con/', destination: '/legacy/index.html' },
-      // تطبيق مراح (ويب) — يُخدم من /mrah (و/mrahi مرادف)
-      { source: '/mrah', destination: '/mrahi/index.html' },
-      { source: '/mrah/', destination: '/mrahi/index.html' },
-      { source: '/mrahi', destination: '/mrahi/index.html' },
-      { source: '/mrahi/', destination: '/mrahi/index.html' },
       // تطبيق الملاحظات (notes) — مشروعٌ مستقلّ يُخدم من /notes
       { source: '/notes', destination: '/notes/index.html' },
       { source: '/notes/', destination: '/notes/index.html' },
@@ -70,10 +65,6 @@ const nextConfig = {
       // منصّة الاستشارات على /con (وملفاتها داخل /legacy/)
       { source: '/con', headers: noCache },
       { source: '/legacy/:path*', headers: noCache },
-      // تطبيق مراحي — لا تخزين أثناء التطوير/التجربة
-      { source: '/mrah', headers: noCache },
-      { source: '/mrahi', headers: noCache },
-      { source: '/mrahi/:path*', headers: noCache },
       // نظام المفارجة (الأنساب): صفحة الدخول (index) تبقى بلا تخزين، والأصول الثابتة
       // (app.js/app.css/الأيقونة…) بإعادة تحقّق ETag — أسرع فتحٍ مع بقائها محدّثة دائماً.
       { source: '/almfrji', headers: noCache },

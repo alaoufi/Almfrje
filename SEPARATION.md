@@ -10,18 +10,16 @@
 |---|---|---|---|---|
 | **المفرجي** (شجرة النسب) | `public/almfrje` | `app/api/almfrje-*` | Supabase Auth + RLS | `almfrje_*` |
 | **الاستشارات** | `public/legacy` | `app/api/php/[[...path]]`, `app/api/migrate`, `app/api/setup`, `app/api/upload`, `app/api/ai/*` | JWT مخصّص (HS256) | `users`, `persons`, `appointments`, … (غير مبوّأة) |
-| **مراح** | `public/mrahi` | `app/api/mrahi-config` | Supabase Auth + RLS | `mrahi_*` |
 
-التوجيه بين الواجهات في `next.config.mjs` (rewrites): `/almfrje` و`/con` و`/mrah`.
+التوجيه بين الواجهات في `next.config.mjs` (rewrites): `/almfrje` و`/con`.
 
 ## ٢) عزل الكود (منفّذ — لا تداخل)
 
 - مسارات المفرجي التسعة **مكتفية ذاتياً**: كلٌّ ينشئ عميل Supabase خاصاً به
   داخلياً ولا يشارك حالة قابلة للتغيير مع غيره.
 - `lib/db.ts` يخصّ **الاستشارات فقط** (عميل + JWT). لا يستورده أيّ مسار من
-  مسارات المفرجي أو مراح.
+  مسارات المفرجي.
 - `lib/almfrje-schema.ts` يخصّ المفرجي فقط.
-- مراح ويب يقرأ إعداده من `app/api/mrahi-config` فقط (anon + RLS، بلا مفتاح خدمي).
 
 **القاعدة:** أيّ منطق مشترك جديد يجب ألّا يوضع في وحدة يستوردها أكثر من تطبيق.
 إن لزم تشارك، انسخ أو ضَع الوحدة تحت مجلّد التطبيق الخاص به.
@@ -39,13 +37,10 @@
 2. **اضبط متغيّرات كل تطبيق** في Vercel (راجع `.env.example`، الأقسام ب/ج/د):
    - المفرجي: `ALMFRJE_SUPABASE_URL`, `ALMFRJE_SUPABASE_ANON_KEY`, `ALMFRJE_SERVICE_ROLE_KEY`, `ALMFRJE_SUPABASE_PAT`
    - الاستشارات: `CON_SUPABASE_URL`, `CON_SERVICE_ROLE_KEY`, `JWT_SECRET`, `SETUP_TOKEN`
-   - مراح: `MRAHI_SUPABASE_URL`, `MRAHI_SUPABASE_ANON_KEY`
 3. **أنشئ المخطط في كل قاعدة:**
    - المفرجي: يُنشأ تلقائياً (يستدعي `/api/almfrje-setup` عند أول فتح، باستخدام `ALMFRJE_SUPABASE_PAT`).
    - الاستشارات: شغّل `database/schema.sql` + `database/data.sql`.
-   - مراح: شغّل `marahi-app/schema.sql`.
 4. **انقل البيانات** (إن وُجدت) من القاعدة المشتركة إلى قاعدة كل تطبيق:
-   - المفرجي: استخدم «النسخ والتصدير» داخل التطبيق (تصدير JSON من المشتركة ثم استعادة في قاعدة المفرجي).
    - الاستشارات/مراح: `pg_dump` للجداول المعنيّة ثم استيرادها في القاعدة الجديدة.
 5. **أفرغ متغيّرات القاعدة المشتركة** (القسم أ) — أو خصّصها لتطبيقٍ واحدٍ فقط —
    حتى لا يبقى أيّ رجوعٍ صامت يربط التطبيقات.

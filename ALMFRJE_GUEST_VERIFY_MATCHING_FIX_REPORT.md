@@ -78,7 +78,7 @@
 
 ## 7) حالة البناء
 - `npm install` ✅
-- `prebuild` (حارس الحدود) ✅ «لا تداخل بين almfrji / con / mrahi / notes».
+- `prebuild` (حارس الحدود) ✅ «لا تداخل بين almfrji / con / notes».
 - `npm run build` (Next.js 15.5.18) ✅ `✓ Compiled successfully` (الأنواع صحيحة)،
   `✓ Generating static pages (3/3)`، رمز الخروج `0`. لا سكربت `lint` مستقل.
 
@@ -89,6 +89,6 @@
 ✅ لم تُلمَس — لا `update/insert/delete/import`، لا migration، لا SQL. التعديل منطقُ تحميلٍ
 وتتبّعٍ في كود الخادم فقط.
 
-## 9) تأكيد عدم لمس Alaoufi.me أو marahi
-✅ لم يُلمَس مستودع `alaoufi/Alaoufi.me` ولا `alaoufi/marahi` ولا PR #19. كل العمل داخل
+## 9) تأكيد عدم لمس Alaoufi.me أو المشاريع الخارجية
+✅ لم يُلمَس مستودع `alaoufi/Alaoufi.me` ولا PR #19. كل العمل داخل
 `alaoufi/Almfrje` على فرع `fix-almfrje-guest-verify-matching` فقط.

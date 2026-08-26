@@ -15,7 +15,6 @@
 كل التطبيقات الثلاثة تتشارك **نفس القاعدة** (`vzlivdymyiaplnasplvg`)، بجداول معزولة ببادئات:
 - **المفارجة** (شجرة الأنساب) — جداول `almfrje_*` — تُخدَم على `/almfrje` (والرئيسية `/`).
 - **منصّة الاستشارات** — جداول بلا بادئة (`users`, `submissions`, …) — تُخدَم على `/legacy`.
-- **مراحي** — جداول `mrahi_*` — تُخدَم على `/mrahi`.
 
 ## ⚙️ متغيّرات البيئة على مشروع Vercel `alaoufi-me`
 - `NEXT_PUBLIC_SUPABASE_URL` = `https://vzlivdymyiaplnasplvg.supabase.co`
@@ -24,10 +23,9 @@
 - `JWT_SECRET` = (لمنصّة الاستشارات)
 - `SUPABASE_PAT` = (اختياري — يُمكّن `/api/migrate` و`/api/almfrje-setup` من إنشاء/ترقية الجداول تلقائياً)
 
-ملفات `public/almfrje/config.js` و`public/mrahi/config.js` تشير جميعها لهذه القاعدة (احتياط؛ تُستبدَل من متغيّرات البيئة عبر `/api/*-config`).
+ملف `public/almfrje/config.js` يشير إلى هذه القاعدة (احتياط؛ يُستبدَل من متغيّرات البيئة عبر `/api/almfrje-config`).
 
 ## ❌ غير مستخدَم (يُفضّل حذفه لمنع اللبس)
-- مشروع Supabase `pdhbcvbsfmhopbrnkdsp` (مؤسسة `marahi`، اسمه «alaoufi's Project») — **فارغ، زائد**، أُنشئ بالخطأ ثم نُظّف. لا تستخدمه.
 - مؤسسات/مشاريع Supabase الأخرى تحت حسابات مختلفة (مثل `ryza2030`, `Syanah`, `saud9495's Org` …) لا علاقة لها بهذا الموقع.
 
 > ⚠️ عند العمل على القاعدة من لوحة Supabase، تأكّد أنك في **مشروع «alaoufi» (`vzlivdymyiaplnasplvg`، سنغافورة) تحت مؤسسة `alaoufi.me`** — وفيه ~1507 شخص في `almfrje_persons`. هذا هو الوحيد الصحيح.

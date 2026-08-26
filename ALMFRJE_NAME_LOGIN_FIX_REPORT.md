@@ -90,7 +90,7 @@
 ## 7) حالة البناء
 
 - **`npm install`:** نجح ✅
-- **`prebuild` (حارس الحدود):** اجتاز ✅ «لا تداخل بين almfrji / con / mrahi / notes».
+- **`prebuild` (حارس الحدود):** اجتاز ✅ «لا تداخل بين almfrji / con / notes».
 - **`npm run build`:** نجح ✅ — `next build` (Next.js 15.5.18): `✓ Compiled successfully in 3.5s`،
   فحص الأنواع/الـlint المدمج اجتاز، `✓ Generating static pages (3/3)`، رمز الخروج `0`.
 - لا سكربت `lint` مستقل (الفحص ضمن `next build` + حارس الـ prebuild).
@@ -100,9 +100,9 @@
 تم. **لم تُلمَس قاعدة البيانات إطلاقاً** — لا migration، لا SQL، لا import، لا حذف، لا تعديل صفوف.
 التغيير ضبطُ مشروعِ الاتصال في ملف إعداد الواجهة فقط.
 
-## 9) تأكيد عدم لمس Alaoufi.me أو marahi
+## 9) تأكيد عدم لمس Alaoufi.me أو المشاريع الخارجية
 
-تم. **لم يُلمَس مستودع `alaoufi/Alaoufi.me` ولا `alaoufi/marahi` ولا PR #19** — كل العمل داخل
+تم. **لم يُلمَس مستودع `alaoufi/Alaoufi.me` ولا PR #19** — كل العمل داخل
 `alaoufi/Almfrje` على فرع `fix-almfrje-name-login-matching` فقط.
 
 ## 10) خطة التراجع (Rollback)
@@ -118,4 +118,4 @@
 - ✅ تشخيصٌ قبل التعديل؛ لم أفترض السبب (أثبتُّ أن تغيير المسارات ليس السبب).
 - ✅ إصلاحٌ بأقلّ تعديل (ملف إعداد واحد)؛ لا تغيير لمنطق التطبيق.
 - ✅ لا تعديل لقاعدة البيانات، لا حذف بيانات، لا import.
-- ✅ لم يُلمَس Alaoufi.me ولا marahi ولا PR #19؛ لا merge؛ لا force push؛ لا main مباشرة.
+- ✅ لم يُلمَس Alaoufi.me ولا PR #19؛ لا merge؛ لا force push؛ لا main مباشرة.

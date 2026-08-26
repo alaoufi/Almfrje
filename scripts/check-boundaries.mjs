@@ -4,7 +4,7 @@
 // =============================================================================
 //  يفشل البناء (exit 1) إذا:
 //   (أ) استورد ملفُ مشروعٍ وحدةَ @/lib مملوكةً لمشروعٍ آخر.
-//   (ب) أشار ملفُ مشروعٍ إلى متغيّر بيئةٍ يخصّ مشروعاً آخر (ALMFRJE_/CON_/MRAHI_/NOTES_).
+//   (ب) أشار ملفُ مشروعٍ إلى متغيّر بيئةٍ يخصّ مشروعاً آخر (ALMFRJE_/CON_/NOTES_).
 //  المتغيّرات المشتركة (NEXT_PUBLIC_*, SUPABASE_SERVICE_ROLE_KEY, SUPABASE_PAT)
 //  مسموحة للجميع كرجوعٍ انتقالي. راجع SEPARATION.md و PROJECTS.md.
 //
@@ -21,12 +21,11 @@ const LIB_OWNER = {
   'almfrje-env': 'almfrji',
   'almfrje-schema': 'almfrji',
   'db': 'con',
-  'mrahi-env': 'mrahi',
   'notes-env': 'notes',
 };
 
 // ── بادئات متغيّرات البيئة الخاصة بكل مشروع ──
-const ENV_OWNER = { ALMFRJE_: 'almfrji', CON_: 'con', MRAHI_: 'mrahi', NOTES_: 'notes' };
+const ENV_OWNER = { ALMFRJE_: 'almfrji', CON_: 'con', NOTES_: 'notes' };
 
 // ── تحديد مشروع أي ملف من مساره (نسبةً للجذر، بفواصل /) ──
 function projectOf(rel) {
@@ -36,7 +35,6 @@ function projectOf(rel) {
     return LIB_OWNER[base] || 'shared';
   }
   if (p.startsWith('app/api/almfrje-')) return 'almfrji';
-  if (p.startsWith('app/api/mrahi-')) return 'mrahi';
   if (p.startsWith('app/api/notes-')) return 'notes';
   if (/^app\/api\/(php|migrate|setup|upload|ai|keepalive)\b/.test(p)) return 'con';
   // app/layout.tsx وغيره من البنية المشتركة
@@ -88,4 +86,4 @@ if (violations.length) {
   process.exit(1);
 }
 
-console.log('✅ حدود المشاريع سليمة: لا تداخل بين almfrji / con / mrahi / notes.');
+console.log('✅ حدود المشاريع سليمة: لا تداخل بين almfrji / con / notes.');

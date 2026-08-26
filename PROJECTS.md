@@ -9,7 +9,6 @@
 |---|---|---|---|---|---|
 | **almfrji** (المفرجي) | `/almfrji` | `public/almfrje/` | `app/api/almfrje-*` | `lib/almfrje-env.ts`, `lib/almfrje-schema.ts` | `almfrje_*` |
 | **con** (الاستشارات) | `/con` | `public/legacy/` | `app/api/php`, `migrate`, `setup`, `upload`, `ai/*`, `keepalive` | `lib/db.ts` | `users`, `persons`, … |
-| **mrahi** (مراح) | `/mrah` · `/mrahi` | `public/mrahi/` | `app/api/mrahi-config` | `lib/mrahi-env.ts` | `mrahi_*` |
 | **notes** (الملاحظات) | `/notes` | `public/notes/` | `app/api/notes-config` | `lib/notes-env.ts` | `notes_*` (مستقبلاً) |
 
 > البنية المشتركة (`app/layout.tsx`, `next.config.mjs`, `package.json`,
@@ -20,7 +19,7 @@
 1. **لا استيراد عبر المشاريع:** ملفُ مشروعٍ لا يستورد `@/lib/<module>` مملوكاً
    لمشروعٍ آخر. كلٌّ يستورد وحداته فقط.
 2. **لا متغيّرات بيئة عبر المشاريع:** ملفُ مشروعٍ لا يقرأ متغيّراً ببادئة مشروعٍ
-   آخر (`ALMFRJE_` / `CON_` / `MRAHI_` / `NOTES_`). المشتركة (`NEXT_PUBLIC_*`,
+   آخر (`ALMFRJE_` / `CON_` / `NOTES_`). المشتركة (`NEXT_PUBLIC_*`,
    `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_PAT`) مسموحة كرجوعٍ انتقالي للجميع.
 3. **لا إنشاء مخطط مشروعٍ من آخر:** كلّ مشروع يُنشئ جداوله عبر مسار إعداده الخاص
    على قاعدته (المفرجي: `/api/almfrje-setup`). لا يُنشئ مُهجِّرُ مشروعٍ جداولَ غيره.
@@ -41,7 +40,4 @@ npm run check:boundaries     # فحص يدوي
 
 - **قواعد منفصلة:** اضبط متغيّرات كل مشروع على مشروع Supabase خاص به وأفرغ المشتركة
   (راجع `SEPARATION.md`). آليّة الكود جاهزة؛ يبقى الإعداد في Vercel.
-- **مخطط مراح داخل `/api/migrate`:** لا يزال SQL الخاص بمراح مُضمّناً في مُهجِّر
-  الاستشارات (محتوى، ليس استيراداً). يُنقل لاحقاً إلى `lib/mrahi-schema.ts` + مسار
-  إعدادٍ خاص بمراح عند الحاجة. (لا يخرق الحارس لأنه ليس استيراداً/متغيّر بيئة.)
 - **سرّ JWT للاستشارات:** يجب تدويره (راجع المراجعة الأمنية).
