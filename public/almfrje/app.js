@@ -1835,6 +1835,10 @@ function addDocModal(p) {
     ${fInput('رابط مباشر (اختياري)', 'd_url', '')}
     <button class="btn" id="d_save">حفظ</button>`, () => {
     document.getElementById('d_save').addEventListener('click', async () => {
+      const btn = document.getElementById('d_save');
+      if (btn.disabled) return;                          // منع تكرار الحفظ عند الضغط مرتين
+      btn.disabled = true; const oldTxt = btn.textContent; btn.textContent = '… جارٍ الرفع والحفظ';
+      showLoading(true);                                 // مؤشّر تحميل أثناء الرفع
       const file = document.getElementById('d_file').files[0];
       let url = val('d_url').trim();
       const ok = await guard(async () => {
@@ -1843,7 +1847,9 @@ function addDocModal(p) {
         const { error } = await sb.from('almfrje_documents').insert({ person_id: p.id, kind: val('d_kind'), url, label: val('d_label').trim() });
         if (error) throw error;
       });
-      if (ok) { closeModal(); toast('تم الحفظ'); screenPerson(String(p.id)); }
+      showLoading(false);
+      if (ok) { closeModal(); toast('✅ تم الحفظ'); screenPerson(String(p.id)); }
+      else { btn.disabled = false; btn.textContent = oldTxt; }   // فشل → أعِد الزرّ للمحاولة
     });
   });
 }
@@ -2709,6 +2715,7 @@ async function saveBirth(name) {
   });
   if (ok) { toast('تمت إضافة «' + name + '»'); await loadAll(); goBack(); }
 }
+let _savePersonBusy = false;   // يمنع تكرار حفظ الشخص عند الضغط مرتين أثناء الرفع
 async function savePerson(id, existing) {
   const name = val('p_name').trim();
   if (!name) { toast('أدخل اسم المولود'); return; }
@@ -2747,6 +2754,8 @@ async function savePerson(id, existing) {
   // تعديل الحقول العادية: يُحفظ مباشرةً بلا نافذة تأكيد وبلا نسخة في سلة المحذوفات —
   // ويبقى في «سجل التعديلات» مع إمكانية التراجع (تُلتقط القيم السابقة للحقول المتغيّرة فقط).
   if (!(await responsibilityOk())) return;
+  if (_savePersonBusy) return;                 // منع تكرار الحفظ عند الضغط مرتين
+  _savePersonBusy = true; showLoading(true);    // مؤشّر تحميل أثناء الرفع/الحفظ
   const ok = await guard(async () => {
     if (photofile) photo_url = await uploadFile(photofile, 'photos');
     obj.photo_url = photo_url;
@@ -2767,6 +2776,7 @@ async function savePerson(id, existing) {
       await auditLog('add', ins && ins.id, name);
     }
   });
+  showLoading(false); _savePersonBusy = false;
   if (ok) { toast(existing ? '✅ تم حفظ التعديل' : '✅ تمت إضافة «' + name + '» بنجاح'); await loadAll(); existing ? setHash('#/person/' + id) : goBack(); }
 }
 // حذف الأسماء غير متاح لأي مستخدم (قرار نهائي) — يبقى التعديل + التراجع من سلة المحذوفات.
