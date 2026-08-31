@@ -740,6 +740,7 @@ const ROUTES = {
   guide: { t: 'دليل الزوّار', back: true, fn: screenGuide },
   guideadmin: { t: 'تعليمات الإدارة', back: true, fn: screenGuideAdmin },
   faq: { t: 'الأسئلة الشائعة', back: true, fn: screenFaq },
+  photostree: { t: 'مشجّرة الصور', back: true, fn: screenPhotosTree },
 };
 function parseHash() { const raw = (location.hash || '#/home').replace(/^#\//, ''); const p = raw.split('/'); return { name: p[0] || 'home', arg: p[1] }; }
 function render() {
@@ -1666,7 +1667,7 @@ async function screenPerson(arg) {
       const poemCard = (d) => `<div class="poem-card">${d.label ? `<div class="poem-title">${esc(d.label)}${lock(d)}</div>` : `<div class="poem-title">قصيدة${lock(d)}</div>`}${d.body ? `<div class="poem-body">${esc(d.body)}</div>` : ''}${d.url ? `<a href="${esc(d.url)}" target="_blank" rel="noopener" class="poem-file">📎 المرفق</a>` : ''}${canDelete() ? `<button class="btn sm danger" data-ddel="${d.id}" style="margin-top:6px">حذف</button>` : ''}</div>`;
       return `<div class="card"><h3>الصور والوثائق ${N ? '(' + N + ')' : ''}</h3>
         ${galleryPhotos.length ? `<div class="ph-grid">${galleryPhotos.map((ph, i) => `<div class="ph-thumb" data-lb="${i}"><img src="${esc(ph.url)}" loading="lazy" alt="">${ph.hidden ? '<span class="ph-lock">🔒</span>' : ''}${ph.id && canDelete() ? `<button class="ph-del" data-phdel="${ph.id}" title="حذف الصورة">🗑</button>` : ''}</div>`).join('')}</div>
-          <button class="btn sm outline" id="phGallery" style="margin-top:8px">🖼️ مشجّرة الصور (${galleryPhotos.length})</button>` : ''}
+          <button class="btn sm outline" id="phGallery" style="margin-top:8px">🖼️ معرض صوره (${galleryPhotos.length})</button>` : ''}
         ${files.length ? `<div style="margin-top:8px">${files.map(d => `<div class="row"><span class="k">${d.kind === 'pdf' ? '📄' : '📎'} <a href="${esc(d.url)}" target="_blank" rel="noopener" style="color:var(--brand);text-decoration:none">${esc(d.label || 'ملف')}</a>${lock(d)}</span>${canDelete() ? `<button class="btn sm danger" data-ddel="${d.id}">حذف</button>` : ''}</div>`).join('')}</div>` : ''}
         ${!N ? noItem() : ''}
         ${canEditPerson(p) ? `<button class="btn outline" id="addDoc" style="margin-top:8px">➕ إضافة صورة/وثيقة/قصيدة</button>` : ''}
@@ -1873,6 +1874,29 @@ function screenReorder() {
   q.addEventListener('input', debounce(() => (q.value.trim() ? renderSearch() : renderBrowse()), 130));
   renderBrowse();
 }
+let _docEnhanced = null;   // نسخة الصورة المحسّنة (blob) إن وافق المستخدم على التحسين
+// تحسينٌ تلقائي بزرّ واحد: يرفع التباين والتشبّع والسطوع قليلاً (canvas) — مع تصغيرٍ للأحجام الكبيرة.
+function enhanceDocImage(file) {
+  const img = new Image();
+  img.onload = () => {
+    const MAX = 1600; let w = img.width, h = img.height;
+    if (Math.max(w, h) > MAX) { const s = MAX / Math.max(w, h); w = Math.round(w * s); h = Math.round(h * s); }
+    const c = document.createElement('canvas'); c.width = w; c.height = h;
+    const ctx = c.getContext('2d');
+    try { ctx.filter = 'contrast(1.12) saturate(1.12) brightness(1.04)'; } catch (e) { /* */ }
+    ctx.drawImage(img, 0, 0, w, h);
+    c.toBlob((blob) => {
+      if (!blob) { toast('تعذّر التحسين'); return; }
+      _docEnhanced = blob;
+      const pi = document.getElementById('d_pimg'); if (pi) pi.src = URL.createObjectURL(blob);
+      const note = document.getElementById('d_enh_note');
+      if (note) { note.innerHTML = '✅ نسخة محسّنة — <a href="#" id="d_revert" style="color:var(--brand)">استعادة الأصلية</a>';
+        const rv = document.getElementById('d_revert'); if (rv) rv.addEventListener('click', (e) => { e.preventDefault(); _docEnhanced = null; const p2 = document.getElementById('d_pimg'); if (p2) p2.src = URL.createObjectURL(file); note.textContent = 'رجعت الأصلية'; }); }
+    }, 'image/jpeg', 0.9);
+  };
+  img.onerror = () => toast('تعذّرت قراءة الصورة');
+  img.src = URL.createObjectURL(file);
+}
 const DOC_CATS = [
   { k: 'photo', ar: '🖼️ صورة (للمعرض)' },
   { k: 'doc', ar: '📄 وثيقة / PDF' },
@@ -1885,6 +1909,7 @@ function addDocModal(p) {
     ${fInput('العنوان / الوصف', 'd_label', '')}
     <div class="field" id="d_body_wrap" style="display:none"><label>نصّ القصيدة</label><textarea id="d_body" rows="5" placeholder="اكتب أبيات القصيدة هنا…"></textarea></div>
     <div class="field" id="d_file_wrap"><label>رفع ملف (صورة/PDF) — أو رابطٌ أدناه</label><input id="d_file" type="file" accept="image/*,application/pdf"></div>
+    <div id="d_preview" class="d-preview" style="display:none"></div>
     ${fInput('رابط مباشر (اختياري)', 'd_url', '')}
     <label class="perm-chk" id="d_main_wrap"><input type="checkbox" id="d_main"><span>🌳 اجعلها صورته الرئيسية (تظهر في الشجرة)</span></label>
     <div class="field"><label>مَن يراها؟</label>
@@ -1901,6 +1926,15 @@ function addDocModal(p) {
         const fi = document.getElementById('d_file'); if (fi) fi.accept = v === 'photo' ? 'image/*' : 'image/*,application/pdf';
       };
       cat.addEventListener('change', sync); sync(); }
+    // معاينة الصورة عند اختيارها + زرّ «✨ تحسين تلقائي» (معاينة ثم موافقة قبل الرفع)
+    _docEnhanced = null;
+    { const fi = document.getElementById('d_file'); if (fi) fi.addEventListener('change', () => {
+      _docEnhanced = null; const f = fi.files[0]; const pv = document.getElementById('d_preview');
+      if (!f || !f.type.startsWith('image/')) { pv.style.display = 'none'; pv.innerHTML = ''; return; }
+      pv.style.display = ''; pv.innerHTML = `<img id="d_pimg" class="d-pimg" src="${URL.createObjectURL(f)}" alt="">
+        <div class="btn-row" style="margin-top:6px"><button type="button" class="btn sm" id="d_enh">✨ تحسين تلقائي</button><span class="muted" id="d_enh_note" style="align-self:center;font-size:.78rem"></span></div>`;
+      const eb = document.getElementById('d_enh'); if (eb) eb.addEventListener('click', () => enhanceDocImage(f));
+    }); }
     document.getElementById('d_save').addEventListener('click', async () => {
       const btn = document.getElementById('d_save');
       if (btn.disabled) return;                          // منع تكرار الحفظ عند الضغط مرتين
@@ -1915,7 +1949,10 @@ function addDocModal(p) {
       const is_public = (document.querySelector('input[name="d_vis"]:checked') || {}).value !== 'private';
       const asMain = cat === 'photo' && document.getElementById('d_main') && document.getElementById('d_main').checked;
       const ok = await guard(async () => {
-        if (file) url = await uploadFile(file, 'docs');
+        if (file) {
+          const toUp = _docEnhanced ? new File([_docEnhanced], ((file.name || 'photo').replace(/\.\w+$/, '') || 'photo') + '.jpg', { type: 'image/jpeg' }) : file;
+          url = await uploadFile(toUp, 'docs');
+        }
         url = url || '';
         const kind = cat === 'photo' ? 'photo' : (file && file.type === 'application/pdf') ? 'pdf' : 'doc';
         const rec = { person_id: p.id, kind, url, label: val('d_label').trim(), category: isPoem ? cat : '', is_public, body };
@@ -2171,6 +2208,7 @@ function screenTree(arg) {
     </div>
     <div class="btn-row"><button class="btn sm outline" id="t_expand">توسيع المستوى الأول</button><button class="btn sm outline" id="t_collapse">طيّ الكل</button>
       <button class="btn sm ${treePhotos ? '' : 'outline'}" id="t_photos">🖼️ مشجّرة مصوّرة</button>
+      <button class="btn sm outline" data-go="#/photostree">🖼️ مشجّرة الصور</button>
       <button class="btn sm outline" data-go="#/hierarchy/${rootId}">عرض هرمي</button></div>
     </div>
     <div class="card tree" id="treeBox"></div>
@@ -2195,6 +2233,25 @@ function screenTree(arg) {
   document.getElementById('t_expand').addEventListener('click', () => { childrenOf(rootId).forEach(c => treeOpen.add(c.id)); renderTree(rootId); });
   document.getElementById('t_collapse').addEventListener('click', () => { treeOpen.clear(); treeOpen.add(rootId); renderTree(rootId); });
   { const tp = document.getElementById('t_photos'); if (tp) tp.addEventListener('click', () => { treePhotos = !treePhotos; tp.classList.toggle('outline', !treePhotos); renderTree(rootId); }); }
+}
+// مشجّرة الصور: كل من أُضيفت له صورة (photo_url) في شبكة صورٍ بأسمائهم — اضغط لفتح ملفه.
+function screenPhotosTree() {
+  const withPhoto = hideForGuest('media') ? [] : C.persons.filter(p => p.photo_url && String(p.photo_url).trim());
+  view().innerHTML = `<div class="card"><h3>🖼️ مشجّرة الصور (${withPhoto.length})</h3>
+    <p class="muted" style="font-size:.82rem;margin-top:-2px">كل من أُضيفت له صورة — اضغط الصورة لفتح ملفه.</p>
+    <div class="field"><input id="pt_q" type="text" placeholder="🔍 ابحث بالاسم…"></div>
+    <div id="ptGrid"></div></div>`;
+  const grid = document.getElementById('ptGrid');
+  const render = () => {
+    const q = normalizeAr((document.getElementById('pt_q') || { value: '' }).value.trim());
+    const hits = q ? withPhoto.filter(p => (p._n || normalizeAr(p.name)).includes(q) || normalizeAr(lineageShort(p.id, 4)).includes(q)) : withPhoto;
+    grid.innerHTML = hits.length
+      ? `<div class="pt-grid">${hits.slice(0, 300).map(p => `<div class="pt-card" data-go="#/person/${p.id}">${avatar(p, true)}<div class="pt-name">${esc(p.name)}</div><div class="pt-sub muted">${esc(lineageShort(p.id, 3))}</div></div>`).join('')}${hits.length > 300 ? '<div class="muted" style="grid-column:1/-1;padding:8px">عُرضت أول ٣٠٠ — ضيّق بالبحث</div>' : ''}</div>`
+      : '<div class="center-empty">لا صور بعد — أضِف صورةً «رئيسية» لأي شخص من ملفه.</div>';
+    bindGo(grid);
+  };
+  render();
+  { const q = document.getElementById('pt_q'); if (q) q.addEventListener('input', debounce(render, 200)); }
 }
 // رسمٌ خفيف: يكتفي بتحديث HTML؛ النقر يُدار بتفويضٍ واحد على الحاوية (لا إعادة ربط لكل عقدة).
 function renderTree(rootId) {

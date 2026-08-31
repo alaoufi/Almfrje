@@ -1193,3 +1193,17 @@ ul.hier ul.hier > .hier-li::before {
 .poem-file { display: inline-block; margin-top: 6px; color: var(--brand); text-decoration: none; font-size: .85rem; }
 .doc-lock { color: var(--danger); font-size: .8rem; }
 .ph-lock { position: absolute; top: 4px; inset-inline-end: 4px; font-size: .78rem; background: rgba(0,0,0,.55); border-radius: 6px; padding: 1px 4px; }
+
+/* ===== معاينة الصورة وتحسينها في نافذة الإضافة ===== */
+.d-preview { margin: 4px 0 8px; }
+.d-pimg { max-width: 100%; max-height: 240px; border-radius: 12px; border: 1px solid var(--line); display: block; margin: 0 auto; object-fit: contain; }
+
+/* ===== مشجّرة الصور: شبكةُ صورِ الأشخاص ===== */
+.pt-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 12px; margin-top: 6px; }
+.pt-card { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 10px 6px; border: 1px solid var(--line); border-radius: 14px; background: var(--card); cursor: pointer; text-align: center; transition: transform .08s, box-shadow .12s; }
+.pt-card:active { transform: scale(.97); }
+.pt-card:hover { box-shadow: 0 4px 14px rgba(0,0,0,.08); }
+.pt-card .avatar { width: 76px; height: 76px; font-size: 1.6rem; border-radius: 50%; overflow: hidden; }
+.pt-card img.avatar { object-fit: cover; }
+.pt-name { font-weight: 800; font-size: .9rem; line-height: 1.25; }
+.pt-sub { font-size: .74rem; line-height: 1.2; }
