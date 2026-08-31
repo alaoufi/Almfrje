@@ -2035,6 +2035,7 @@ function exportDescendantsText(rootId) {
 
 /* ===== الشجرة التفاعلية ===== */
 const treeOpen = new Set();
+let treePhotos = false;   // مشجّرة مصوّرة: إظهار صورة كل شخص مع اسمه في العرض التفاعلي
 /* ===== (7) وضع تتبّع الفرع ===== */
 const TRACK_KEY = 'almfrje_tracked_branch';
 function getTracked() { try { const v = parseInt(localStorage.getItem(TRACK_KEY) || '0', 10); return (v && branchById.get(v)) ? v : 0; } catch (e) { return 0; } }
@@ -2078,6 +2079,7 @@ function screenTree(arg) {
       <div class="field"><label>اذهب لشخص</label><button class="btn outline" id="t_pick" style="margin-top:0">🔍 اختر شخصاً</button></div>
     </div>
     <div class="btn-row"><button class="btn sm outline" id="t_expand">توسيع المستوى الأول</button><button class="btn sm outline" id="t_collapse">طيّ الكل</button>
+      <button class="btn sm ${treePhotos ? '' : 'outline'}" id="t_photos">🖼️ مشجّرة مصوّرة</button>
       <button class="btn sm outline" data-go="#/hierarchy/${rootId}">عرض هرمي</button></div>
     </div>
     <div class="card tree" id="treeBox"></div>
@@ -2101,6 +2103,7 @@ function screenTree(arg) {
   document.getElementById('t_pick').addEventListener('click', () => pickPerson('اختر شخصاً للشجرة', (p) => p && setHash('#/tree/' + p.id)));
   document.getElementById('t_expand').addEventListener('click', () => { childrenOf(rootId).forEach(c => treeOpen.add(c.id)); renderTree(rootId); });
   document.getElementById('t_collapse').addEventListener('click', () => { treeOpen.clear(); treeOpen.add(rootId); renderTree(rootId); });
+  { const tp = document.getElementById('t_photos'); if (tp) tp.addEventListener('click', () => { treePhotos = !treePhotos; tp.classList.toggle('outline', !treePhotos); renderTree(rootId); }); }
 }
 // رسمٌ خفيف: يكتفي بتحديث HTML؛ النقر يُدار بتفويضٍ واحد على الحاوية (لا إعادة ربط لكل عقدة).
 function renderTree(rootId) {
@@ -2111,7 +2114,7 @@ function treeNodeHtml(id) {
   const p = byId.get(id); if (!p) return '';
   const cs = childrenOf(id); const open = treeOpen.has(id); const has = cs.length > 0;
   const toggle = has ? `<button class="ttoggle" data-tog="${id}">${open ? '−' : '+'}</button>` : `<span class="ttoggle leaf">•</span>`;
-  let html = `<div class="tnode"><div class="trow">${toggle}<span class="tname ${nameCls(p)}" data-open="${id}"${nameTitle(p)}>${esc(p.name)}</span>${nickSuffix(p)}${statusTag(p)}${has ? `<span class="tcount">(${cs.length} • ${descCount.get(id) || 0})</span>` : ''}</div>`;
+  let html = `<div class="tnode"><div class="trow${treePhotos ? ' tphoto' : ''}">${toggle}${treePhotos ? `<span class="tav" data-open="${id}">${avatar(p)}</span>` : ''}<span class="tname ${nameCls(p)}" data-open="${id}"${nameTitle(p)}>${esc(p.name)}</span>${nickSuffix(p)}${statusTag(p)}${has ? `<span class="tcount">(${cs.length} • ${descCount.get(id) || 0})</span>` : ''}</div>`;
   if (open && has) html += `<div class="tkids">${cs.map(c => treeNodeHtml(c.id)).join('')}</div>`;
   html += `</div>`;
   return html;
