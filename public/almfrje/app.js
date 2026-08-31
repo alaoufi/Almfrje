@@ -1654,19 +1654,25 @@ async function screenPerson(arg) {
     </div>
     <div class="card"><h3>الأبناء (${cs.length})</h3>${cs.length > 1 && canReorder(p) ? '<div class="reorder-hint"><b>↕️ ترتيب الأبناء</b> — رتّب بالسهمين ▲▼ لكل ابن. يبقى ضمن إخوته فقط ولا يتجاوز الأب.</div>' : ''}<div id="childList" class="${cs.length > 1 && canReorder(p) ? 'reorder-list' : ''}">${cs.length ? cs.map(c => `<div class="row child-row"${cs.length > 1 && canReorder(p) ? ` data-reorder-id="${c.id}"` : ''}>${cs.length > 1 && canReorder(p) ? `<span class="reorder-arrows"><button class="reorder-up" data-up="${c.id}" aria-label="تحريك لأعلى">▲</button><button class="reorder-down" data-down="${c.id}" aria-label="تحريك لأسفل">▼</button></span>` : ''}<span class="k"><a href="#/person/${c.id}" style="color:var(--brand);text-decoration:none">${esc(c.name)}</a>${nickSuffix(c)}</span><span class="v">${descCount.get(c.id) || 0} ذرية</span></div>`).join('') : noItem()}</div></div>
     ${showDocs ? (() => {
-      // معرض الصور: صورة الشخص «الخاصة» (photo_url) أولاً ثم صور مكتبته، مع lightbox. والوثائق روابط.
+      // مكتبة الشخص بأقسامها: صور (معرض) + وثائق + قصائد له + قصائد فيه. المخفيّ يظهر بقفلٍ لمن يراه.
       galleryPhotos = [];
       if (p.photo_url) galleryPhotos.push({ url: p.photo_url, label: p.nickname || p.name });
-      docs.filter(d => d.kind === 'photo' && d.url !== p.photo_url).forEach(d => galleryPhotos.push({ url: d.url, label: d.label || '', id: d.id }));
-      const files = docs.filter(d => d.kind !== 'photo');
-      const N = galleryPhotos.length + files.length;
-      return `<div class="card"><h3>الصور والوثائق (${N})</h3>
-        ${galleryPhotos.length ? `<div class="ph-grid">${galleryPhotos.map((ph, i) => `<div class="ph-thumb" data-lb="${i}"><img src="${esc(ph.url)}" loading="lazy" alt="">${ph.id && canDelete() ? `<button class="ph-del" data-phdel="${ph.id}" title="حذف الصورة">🗑</button>` : ''}</div>`).join('')}</div>
+      docs.filter(d => (d.category || '') === '' && d.kind === 'photo' && d.url !== p.photo_url).forEach(d => galleryPhotos.push({ url: d.url, label: d.label || '', id: d.id, hidden: d.is_public === false }));
+      const files = docs.filter(d => (d.category || '') === '' && d.kind !== 'photo');
+      const poemsBy = docs.filter(d => d.category === 'poem_by');
+      const poemsAbout = docs.filter(d => d.category === 'poem_about');
+      const lock = (d) => d.is_public === false ? ' <span class="doc-lock" title="مخفية — لا يراها إلا صاحبها والإدارة وذريّته">🔒</span>' : '';
+      const N = galleryPhotos.length + files.length + poemsBy.length + poemsAbout.length;
+      const poemCard = (d) => `<div class="poem-card">${d.label ? `<div class="poem-title">${esc(d.label)}${lock(d)}</div>` : `<div class="poem-title">قصيدة${lock(d)}</div>`}${d.body ? `<div class="poem-body">${esc(d.body)}</div>` : ''}${d.url ? `<a href="${esc(d.url)}" target="_blank" rel="noopener" class="poem-file">📎 المرفق</a>` : ''}${canDelete() ? `<button class="btn sm danger" data-ddel="${d.id}" style="margin-top:6px">حذف</button>` : ''}</div>`;
+      return `<div class="card"><h3>الصور والوثائق ${N ? '(' + N + ')' : ''}</h3>
+        ${galleryPhotos.length ? `<div class="ph-grid">${galleryPhotos.map((ph, i) => `<div class="ph-thumb" data-lb="${i}"><img src="${esc(ph.url)}" loading="lazy" alt="">${ph.hidden ? '<span class="ph-lock">🔒</span>' : ''}${ph.id && canDelete() ? `<button class="ph-del" data-phdel="${ph.id}" title="حذف الصورة">🗑</button>` : ''}</div>`).join('')}</div>
           <button class="btn sm outline" id="phGallery" style="margin-top:8px">🖼️ مشجّرة الصور (${galleryPhotos.length})</button>` : ''}
-        ${files.length ? `<div style="margin-top:8px">${files.map(d => `<div class="row"><span class="k">${d.kind === 'pdf' ? '📄' : '📎'} <a href="${esc(d.url)}" target="_blank" rel="noopener" style="color:var(--brand);text-decoration:none">${esc(d.label || 'ملف')}</a></span>${canDelete() ? `<button class="btn sm danger" data-ddel="${d.id}">حذف</button>` : ''}</div>`).join('')}</div>` : ''}
+        ${files.length ? `<div style="margin-top:8px">${files.map(d => `<div class="row"><span class="k">${d.kind === 'pdf' ? '📄' : '📎'} <a href="${esc(d.url)}" target="_blank" rel="noopener" style="color:var(--brand);text-decoration:none">${esc(d.label || 'ملف')}</a>${lock(d)}</span>${canDelete() ? `<button class="btn sm danger" data-ddel="${d.id}">حذف</button>` : ''}</div>`).join('')}</div>` : ''}
         ${!N ? noItem() : ''}
-        ${canEditPerson(p) ? `<button class="btn outline" id="addDoc" style="margin-top:8px">➕ إضافة صورة/وثيقة</button>` : ''}
-      </div>`;
+        ${canEditPerson(p) ? `<button class="btn outline" id="addDoc" style="margin-top:8px">➕ إضافة صورة/وثيقة/قصيدة</button>` : ''}
+      </div>
+      ${poemsBy.length ? `<div class="card"><h3>📜 قصائد له (${poemsBy.length})</h3>${poemsBy.map(poemCard).join('')}</div>` : ''}
+      ${poemsAbout.length ? `<div class="card"><h3>📜 قصائد قيلت فيه (${poemsAbout.length})</h3>${poemsAbout.map(poemCard).join('')}</div>` : ''}`;
     })() : ''}
     <div class="btn-row no-print">
       <button class="btn" id="toolsP">🧭 أدوات النسب</button>
@@ -1867,44 +1873,67 @@ function screenReorder() {
   q.addEventListener('input', debounce(() => (q.value.trim() ? renderSearch() : renderBrowse()), 130));
   renderBrowse();
 }
+const DOC_CATS = [
+  { k: 'photo', ar: '🖼️ صورة (للمعرض)' },
+  { k: 'doc', ar: '📄 وثيقة / PDF' },
+  { k: 'poem_by', ar: '📜 قصيدة له' },
+  { k: 'poem_about', ar: '📜 قصيدة قيلت فيه' },
+];
 function addDocModal(p) {
-  openModal('إضافة صورة / وثيقة', `
-    ${fSelect('النوع', 'd_kind', [{ k: 'photo', ar: 'صورة' }, { k: 'pdf', ar: 'ملف PDF' }, { k: 'doc', ar: 'وثيقة أخرى' }], 'photo')}
-    <div class="field" id="d_scope_wrap"><label>تصنيف الصورة</label>
-      <label class="perm-chk"><input type="radio" name="d_scope" value="private" checked><span>🌳 خاصة — تُعرض في الشجرة كصورته</span></label>
-      <label class="perm-chk"><input type="radio" name="d_scope" value="public"><span>📁 عامة — في مكتبة ملفه فقط</span></label>
-    </div>
-    ${fInput('الوصف', 'd_label', '')}
-    <div class="field"><label>رفع ملف (إلى التخزين) — أو ضع رابطاً أدناه</label><input id="d_file" type="file" accept="image/*,application/pdf"></div>
+  openModal('➕ إضافة إلى مكتبة الشخص', `
+    ${fSelect('النوع', 'd_cat', DOC_CATS, 'photo')}
+    ${fInput('العنوان / الوصف', 'd_label', '')}
+    <div class="field" id="d_body_wrap" style="display:none"><label>نصّ القصيدة</label><textarea id="d_body" rows="5" placeholder="اكتب أبيات القصيدة هنا…"></textarea></div>
+    <div class="field" id="d_file_wrap"><label>رفع ملف (صورة/PDF) — أو رابطٌ أدناه</label><input id="d_file" type="file" accept="image/*,application/pdf"></div>
     ${fInput('رابط مباشر (اختياري)', 'd_url', '')}
+    <label class="perm-chk" id="d_main_wrap"><input type="checkbox" id="d_main"><span>🌳 اجعلها صورته الرئيسية (تظهر في الشجرة)</span></label>
+    <div class="field"><label>مَن يراها؟</label>
+      <label class="perm-chk"><input type="radio" name="d_vis" value="public" checked><span>👁 عامّة — يراها الجميع</span></label>
+      <label class="perm-chk"><input type="radio" name="d_vis" value="private"><span>🔒 مخفية — صاحبها والإدارة وذريّته فقط</span></label>
+    </div>
     <button class="btn" id="d_save">حفظ</button>`, () => {
-    // إظهار تصنيف «خاصة/عامة» للصور فقط
-    { const kd = document.getElementById('d_kind'), sw = document.getElementById('d_scope_wrap');
-      const sync = () => { if (sw) sw.style.display = kd.value === 'photo' ? '' : 'none'; };
-      if (kd) kd.addEventListener('change', sync); sync(); }
+    // تكييف الحقول حسب النوع: القصائد نصّ + رفع اختياري؛ الصورة تُتيح «الرئيسية»
+    { const cat = document.getElementById('d_cat');
+      const sync = () => {
+        const v = cat.value, isPoem = v === 'poem_by' || v === 'poem_about';
+        const bw = document.getElementById('d_body_wrap'); if (bw) bw.style.display = isPoem ? '' : 'none';
+        const mw = document.getElementById('d_main_wrap'); if (mw) mw.style.display = v === 'photo' ? '' : 'none';
+        const fi = document.getElementById('d_file'); if (fi) fi.accept = v === 'photo' ? 'image/*' : 'image/*,application/pdf';
+      };
+      cat.addEventListener('change', sync); sync(); }
     document.getElementById('d_save').addEventListener('click', async () => {
       const btn = document.getElementById('d_save');
       if (btn.disabled) return;                          // منع تكرار الحفظ عند الضغط مرتين
-      btn.disabled = true; const oldTxt = btn.textContent; btn.textContent = '… جارٍ الرفع والحفظ';
-      showLoading(true);                                 // مؤشّر تحميل أثناء الرفع
+      const cat = val('d_cat'), isPoem = cat === 'poem_by' || cat === 'poem_about';
+      const body = isPoem ? (document.getElementById('d_body').value || '').trim() : '';
       const file = document.getElementById('d_file').files[0];
       let url = val('d_url').trim();
+      if (isPoem && !body && !file && !url) { toast('اكتب نصّ القصيدة أو أرفق ملفاً'); return; }
+      if (!isPoem && !file && !url) { toast('أرفق ملفاً أو ضع رابطاً'); return; }
+      btn.disabled = true; const oldTxt = btn.textContent; btn.textContent = '… جارٍ الرفع والحفظ';
+      showLoading(true);
+      const is_public = (document.querySelector('input[name="d_vis"]:checked') || {}).value !== 'private';
+      const asMain = cat === 'photo' && document.getElementById('d_main') && document.getElementById('d_main').checked;
       const ok = await guard(async () => {
         if (file) url = await uploadFile(file, 'docs');
-        if (!url) throw new Error('أضِف ملفاً أو رابطاً');
-        const kind = val('d_kind');
-        const { error } = await sb.from('almfrje_documents').insert({ person_id: p.id, kind, url, label: val('d_label').trim() });
+        url = url || '';
+        const kind = cat === 'photo' ? 'photo' : (file && file.type === 'application/pdf') ? 'pdf' : 'doc';
+        const rec = { person_id: p.id, kind, url, label: val('d_label').trim(), category: isPoem ? cat : '', is_public, body };
+        let { error } = await sb.from('almfrje_documents').insert(rec);
+        // مرونة: إن لم تُطبَّق ترقية المخطط بعد (أعمدة category/is_public/body مفقودة) — رقّها ثم أعد
+        if (error && /column|schema cache/i.test(error.message || '')) {
+          try { await fetch('/api/almfrje-setup', { method: 'POST' }); await new Promise(r => setTimeout(r, 1500)); } catch (e) { /* */ }
+          ({ error } = await sb.from('almfrje_documents').insert(rec));
+        }
         if (error) throw error;
-        // «خاصة» للصورة: اجعلها صورة الشخص (photo_url) فتظهر في الشجرة تلقائياً
-        const scope = (document.querySelector('input[name="d_scope"]:checked') || {}).value;
-        if (kind === 'photo' && scope === 'private') {
+        if (asMain && url) {
           const { error: e2 } = await sb.from('almfrje_persons').update({ photo_url: url, updated_at: new Date().toISOString() }).eq('id', p.id); if (e2) throw e2;
           const pp = byId.get(p.id); if (pp) pp.photo_url = url;
         }
       });
       showLoading(false);
       if (ok) { closeModal(); toast('✅ تم الحفظ'); screenPerson(String(p.id)); }
-      else { btn.disabled = false; btn.textContent = oldTxt; }   // فشل → أعِد الزرّ للمحاولة
+      else { btn.disabled = false; btn.textContent = oldTxt; }
     });
   });
 }
