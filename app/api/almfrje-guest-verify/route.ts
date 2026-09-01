@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { almfrjeEnv } from '@/lib/almfrje-env';
 import { normalizePhone } from '@/lib/almfrje-phone';
+import { signRegToken } from '@/lib/almfrje-regtoken';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -128,7 +129,9 @@ export async function POST(request: NextRequest) {
         }
       }
     } catch { /* أفضل جهد */ }
-    return NextResponse.json({ ok: true, branch: liveMatches[0].branch_id, name: fullName, pid: liveMatches[0].id, has_phone: !!(liveMatches[0].phone && String(liveMatches[0].phone).trim()), has_account: hasAccount });
+    // رمزٌ موقّع يُثبت أن هذه الجلسة طابقت هذا الشخص فعلاً — يلزمه التسجيل لاحقاً (منع الانتحال)
+    const regToken = await signRegToken(liveMatches[0].id, service);
+    return NextResponse.json({ ok: true, branch: liveMatches[0].branch_id, name: fullName, pid: liveMatches[0].id, regToken, has_phone: !!(liveMatches[0].phone && String(liveMatches[0].phone).trim()), has_account: hasAccount });
   }
   if (liveMatches.length > 1) {
     return NextResponse.json({ ok: false, error: 'اسمك يطابق أكثر من شخص حيّ — أضِف اسم جدٍّ آخر للتمييز.' });

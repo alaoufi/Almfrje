@@ -3499,7 +3499,8 @@ function guestOnboard() {
         if (phone.length < 9) { toast('رقم الجوال إجباري — اكتبه صحيحاً'); return; }
         if (val('go_pw').trim().length < 4) { toast('كلمة المرور إجبارية — ٤ أحرف/أرقام على الأقل'); return; }
         const priv = document.querySelector('input[name=\"go_priv\"]:checked');
-        const body = { pid, phone, password: val('go_pw').trim(), nickname: val('go_nick').trim(), city: val('go_city').trim(), birth: val('go_birth').trim(), publish: !!(priv && priv.value === 'publish') };
+        let regTok = ''; try { regTok = sessionStorage.getItem('almfrje_guest_regtok') || ''; } catch (e) { /* */ }
+        const body = { pid, regToken: regTok, phone, password: val('go_pw').trim(), nickname: val('go_nick').trim(), city: val('go_city').trim(), birth: val('go_birth').trim(), publish: !!(priv && priv.value === 'publish') };
         const pw = val('go_pw').trim();
         let regEmail = phone + '@almfrje.app';
         const ok = await guard(async () => {
@@ -6479,7 +6480,7 @@ async function guestGateEnter() {
     const res = await fetch('/api/almfrje-guest-verify', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ input: inp }) });
     const j = await res.json().catch(() => ({}));
     if (res.ok && j.ok) {
-      try { sessionStorage.setItem('almfrje_guest_name', (j.name && String(j.name).trim()) || inp); if (j.branch != null) sessionStorage.setItem('almfrje_guest_branch', String(j.branch)); if (j.pid) sessionStorage.setItem('almfrje_guest_pid', String(j.pid)); sessionStorage.setItem('almfrje_guest_hasphone', j.has_phone ? '1' : '0'); sessionStorage.setItem('almfrje_guest_hasacct', j.has_account ? '1' : '0'); sessionStorage.removeItem('almfrje_greeted'); sessionStorage.removeItem('almfrje_onboard'); } catch (e) { /* */ }
+      try { sessionStorage.setItem('almfrje_guest_name', (j.name && String(j.name).trim()) || inp); if (j.branch != null) sessionStorage.setItem('almfrje_guest_branch', String(j.branch)); if (j.pid) sessionStorage.setItem('almfrje_guest_pid', String(j.pid)); if (j.regToken) sessionStorage.setItem('almfrje_guest_regtok', String(j.regToken)); sessionStorage.setItem('almfrje_guest_hasphone', j.has_phone ? '1' : '0'); sessionStorage.setItem('almfrje_guest_hasacct', j.has_account ? '1' : '0'); sessionStorage.removeItem('almfrje_greeted'); sessionStorage.removeItem('almfrje_onboard'); } catch (e) { /* */ }
       location.hash = '#/home';
       // رسالة الترحيب تظهر الآن فور الدخول من داخل enterApp (الجزء الأوسط العلوي) — لا نافذة مؤجَّلة هنا
       await browseAsGuest(m);

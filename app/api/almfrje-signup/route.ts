@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { almfrjeEnv } from '@/lib/almfrje-env';
 import { normalizePhone } from '@/lib/almfrje-phone';
+import { verifyRegToken } from '@/lib/almfrje-regtoken';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -20,7 +21,7 @@ export async function POST(request: NextRequest) {
   const { data: who } = await caller.auth.getUser();
   if (!who || !who.user) return NextResponse.json({ ok: false, error: 'جلسة غير صالحة' }, { status: 401 });
 
-  let b: { action?: unknown; pid?: unknown; phone?: unknown; password?: unknown; nickname?: unknown; city?: unknown; birth?: unknown; publish?: unknown; username?: unknown };
+  let b: { action?: unknown; pid?: unknown; phone?: unknown; password?: unknown; nickname?: unknown; city?: unknown; birth?: unknown; publish?: unknown; username?: unknown; regToken?: unknown };
   try { b = await request.json(); } catch { return NextResponse.json({ ok: false, error: 'طلب غير صالح' }, { status: 400 }); }
 
   const admin0 = createClient(url, service, { auth: { persistSession: false, autoRefreshToken: false } });
@@ -103,6 +104,11 @@ export async function POST(request: NextRequest) {
   const birth = String(b.birth || '').trim().slice(0, 30);
   const publish = b.publish === true;   // «أسمح بنشره في دليل الموقع» — وإلا فللموقع فقط
   if (!Number.isFinite(pid) || pid <= 0) return NextResponse.json({ ok: false, error: 'مُعرّف الشخص ناقص — ادخل باسمك أولاً' }, { status: 400 });
+  // منع الانتحال: لا تسجيل إلا برمزٍ موقّع يُثبت أن هذه الجلسة طابقت هذا الشخص فعلاً عبر
+  // /api/almfrje-guest-verify (لا يكفي تمرير pid عشوائي). ينتهي الرمز بعد ساعة.
+  if (!(await verifyRegToken(b.regToken, pid, service))) {
+    return NextResponse.json({ ok: false, error: 'انتهت صلاحية التحقّق — اضغط 🔄 لتحديث الصفحة ثم أعد إدخال اسمك للتسجيل.' }, { status: 403 });
+  }
   if (phone.length < 9) return NextResponse.json({ ok: false, error: 'أدخل رقم جوال صحيح (إجباري)' }, { status: 400 });
   if (password.length < 4) return NextResponse.json({ ok: false, error: 'كلمة المرور إجبارية — ٤ أحرف/أرقام على الأقل' }, { status: 400 });
 
