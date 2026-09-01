@@ -1,6 +1,6 @@
 # Security Hardening Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+Steps use checkbox (`- [ ]`) syntax for tracking, implemented task-by-task.
 
 **Goal:** Remove the forgeable legacy JWT fallback, establish baseline browser security headers, and refresh vulnerable production dependencies.
 
