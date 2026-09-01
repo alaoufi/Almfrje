@@ -1711,12 +1711,29 @@ async function loadDocsCard(p, refresh) {
   const canDel = canManageMedia(p);   // إضافة/حذف عناصر المكتبة: المدير أو صاحب الحساب نفسه
   const N = galleryPhotos.length + files.length + poemsBy.length + poemsAbout.length;
   const poemCard = (d) => `<div class="poem-card">${d.label ? `<div class="poem-title">${esc(d.label)}${lock(d)}</div>` : `<div class="poem-title">قصيدة${lock(d)}</div>`}${d.body ? `<div class="poem-body">${esc(d.body)}</div>` : ''}${d.url ? `<a href="${esc(d.url)}" target="_blank" rel="noopener" class="poem-file">📎 المرفق</a>` : ''}${canDel ? `<button class="btn sm danger" data-ddel="${d.id}" style="margin-top:6px">حذف</button>` : ''}</div>`;
-  box.innerHTML = `<div class="card"><h3>الصور والوثائق ${N ? '(' + N + ')' : ''}</h3>
-      ${galleryPhotos.length ? `<div class="ph-grid">${galleryPhotos.map((ph, i) => `<div class="ph-thumb" data-lb="${i}"><img src="${esc(ph.url)}" loading="lazy" decoding="async" alt="">${ph.hidden ? '<span class="ph-lock">🔒</span>' : ''}${ph.main ? '<span class="ph-main" title="الصورة الرئيسية">🌳</span>' : ''}${ph.id && canDel ? `<button class="ph-del" data-phdel="${ph.id}" title="حذف الصورة">🗑</button>` : ''}${ph.main && !ph.id && canDel ? `<button class="ph-del" data-mainclear="1" title="إزالة الصورة الرئيسية">🗑</button>` : ''}</div>`).join('')}</div>
+  // زرّا الخصوصية أمام كل عنصرٍ (وضع الإدارة): «للجميع» أو «لذريته فقط».
+  const visBtns = (id, isPub) => `<button type="button" class="dm-chip ${isPub ? 'on' : ''}" data-vis="${id}" data-pub="1">👁 للجميع</button><button type="button" class="dm-chip ${!isPub ? 'on' : ''}" data-vis="${id}" data-pub="0">🔒 لذريته فقط</button>`;
+  // وضع الإدارة (المدير/صاحب الحساب): لكل صورة/ملف تحكّمٌ أمامه — رئيسية/النشر/حذف.
+  const managePhotos = galleryPhotos.map((ph, i) => `<div class="dm-item">
+      <img class="dm-thumb" src="${esc(ph.url)}" data-lb="${i}" loading="lazy" decoding="async" alt="">
+      <div class="dm-ctrl">
+        ${ph.main ? '<span class="dm-chip on">🌳 الرئيسية الحالية</span>' : `<button type="button" class="dm-chip" data-setmain="${esc(ph.url)}">🌳 اجعلها الرئيسية</button>`}
+        ${ph.main ? '<span class="dm-chip on">👁 تظهر في الشجرة للجميع</span>' : visBtns(ph.id, !ph.hidden)}
+        ${ph.main ? '<button type="button" class="dm-chip danger" data-mainclear="1">🗑 إزالة</button>' : `<button type="button" class="dm-chip danger" data-phdel="${ph.id}">🗑 حذف</button>`}
+      </div></div>`).join('');
+  const manageFiles = files.map(d => `<div class="dm-item dm-file">
+      <span class="dm-name">${d.kind === 'pdf' ? '📄' : '📎'} <a href="${esc(d.url)}" target="_blank" rel="noopener">${esc(d.label || 'ملف')}</a></span>
+      <div class="dm-ctrl">${visBtns(d.id, d.is_public !== false)}<button type="button" class="dm-chip danger" data-ddel="${d.id}">🗑 حذف</button></div></div>`).join('');
+  const manageView = `${(galleryPhotos.length || files.length) ? '<p class="muted dm-note">🛈 لكل صورة/ملف: اجعلها الرئيسية، أو انشرها «للجميع» أو اجعلها «لذريته فقط». والإدارة تطّلع على الكل لإدارته عند الحاجة.</p>' : ''}
+      ${galleryPhotos.length ? `<div class="dm-list">${managePhotos}</div>` : ''}
+      ${files.length ? `<div class="dm-list dm-files">${manageFiles}</div>` : ''}`;
+  const viewOnly = `${galleryPhotos.length ? `<div class="ph-grid">${galleryPhotos.map((ph, i) => `<div class="ph-thumb" data-lb="${i}"><img src="${esc(ph.url)}" loading="lazy" decoding="async" alt="">${ph.hidden ? '<span class="ph-lock">🔒</span>' : ''}${ph.main ? '<span class="ph-main" title="الصورة الرئيسية">🌳</span>' : ''}</div>`).join('')}</div>
         <button class="btn sm outline" id="phGallery" style="margin-top:8px">🖼️ معرض صوره (${galleryPhotos.length})</button>` : ''}
-      ${files.length ? `<div style="margin-top:8px">${files.map(d => `<div class="row"><span class="k">${d.kind === 'pdf' ? '📄' : '📎'} <a href="${esc(d.url)}" target="_blank" rel="noopener" style="color:var(--brand);text-decoration:none">${esc(d.label || 'ملف')}</a>${lock(d)}</span>${canDel ? `<button class="btn sm danger" data-ddel="${d.id}">حذف</button>` : ''}</div>`).join('')}</div>` : ''}
+      ${files.length ? `<div style="margin-top:8px">${files.map(d => `<div class="row"><span class="k">${d.kind === 'pdf' ? '📄' : '📎'} <a href="${esc(d.url)}" target="_blank" rel="noopener" style="color:var(--brand);text-decoration:none">${esc(d.label || 'ملف')}</a>${lock(d)}</span></div>`).join('')}</div>` : ''}`;
+  box.innerHTML = `<div class="card"><h3>الصور والوثائق ${N ? '(' + N + ')' : ''}</h3>
+      ${canDel ? manageView : viewOnly}
       ${!N ? noItem() : ''}
-      ${canManageMedia(p) ? `<button class="btn outline" id="addDoc" style="margin-top:8px">➕ إضافة صورة/وثيقة/قصيدة</button>` : ''}
+      ${canManageMedia(p) ? `<button class="btn outline" id="addDoc" style="margin-top:10px">➕ إضافة صورة/وثيقة/قصيدة</button>` : ''}
     </div>
     ${poemsBy.length ? `<div class="card"><h3>📜 قصائد له (${poemsBy.length})</h3>${poemsBy.map(poemCard).join('')}</div>` : ''}
     ${poemsAbout.length ? `<div class="card"><h3>📜 قصائد قيلت فيه (${poemsAbout.length})</h3>${poemsAbout.map(poemCard).join('')}</div>` : ''}`;
@@ -1739,6 +1756,20 @@ async function loadDocsCard(p, refresh) {
     if (!(await confirm2('حذف هذا الملف؟'))) return;
     const ok = await guard(async () => { const { error } = await sb.from('almfrje_documents').delete().eq('id', b.dataset.ddel); if (error) throw error; });
     if (ok) { toast('تم الحذف'); reload(); }
+  }));
+  // «اجعلها الرئيسية»: تُضبط صورة الشخص (photo_url) على هذه الصورة
+  box.querySelectorAll('[data-setmain]').forEach(b => b.addEventListener('click', async (e) => {
+    e.stopPropagation();
+    const u = b.dataset.setmain;
+    const ok = await guard(async () => { const { error } = await sb.from('almfrje_persons').update({ photo_url: u, updated_at: new Date().toISOString() }).eq('id', p.id); if (error) throw error; const pp = byId.get(p.id); if (pp) pp.photo_url = u; });
+    if (ok) { toast('صارت الصورة الرئيسية'); reload(); }
+  }));
+  // تغيير خصوصية عنصرٍ: «للجميع» (is_public=true) أو «لذريته فقط» (is_public=false)
+  box.querySelectorAll('[data-vis]').forEach(b => b.addEventListener('click', async (e) => {
+    e.stopPropagation();
+    const pub = b.dataset.pub === '1';
+    const ok = await guard(async () => { const { error } = await sb.from('almfrje_documents').update({ is_public: pub }).eq('id', b.dataset.vis); if (error) throw error; });
+    if (ok) { toast(pub ? 'صارت تُعرض للجميع' : 'صارت لذريته فقط'); reload(); }
   }));
 }
 // إعادة ترتيب الأبناء بالسحب والإفلات — يُفعَّل بالضغط المطوّل، ويبقى ضمن إخوته (نفس الأب).

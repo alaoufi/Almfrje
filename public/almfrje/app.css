@@ -1210,6 +1210,20 @@ ul.hier ul.hier > .hier-li::before {
 .ph-lock { position: absolute; top: 4px; inset-inline-end: 4px; font-size: .78rem; background: rgba(0,0,0,.55); border-radius: 6px; padding: 1px 4px; }
 .ph-main { position: absolute; bottom: 4px; inset-inline-end: 4px; font-size: .8rem; background: rgba(0,0,0,.5); border-radius: 6px; padding: 1px 4px; }
 
+/* ===== لوحة إدارة الصور/الملفات: تحكّمٌ أمام كل عنصر (رئيسية/النشر/حذف) ===== */
+.dm-note { font-size: .82rem; line-height: 1.7; background: color-mix(in srgb, var(--brand) 7%, var(--card)); border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; margin: 4px 0 10px; }
+.dm-list { display: flex; flex-direction: column; gap: 8px; }
+.dm-item { display: flex; align-items: center; gap: 10px; border: 1px solid var(--line); border-radius: 12px; padding: 8px; background: var(--card); }
+.dm-thumb { width: 64px; height: 64px; flex: none; object-fit: cover; border-radius: 10px; cursor: pointer; border: 1px solid var(--line); }
+.dm-name { flex: 1; font-size: .9rem; overflow-wrap: anywhere; }
+.dm-name a { color: var(--brand); text-decoration: none; }
+.dm-ctrl { display: flex; flex-wrap: wrap; gap: 5px; flex: 1; align-content: center; }
+.dm-chip { font: inherit; font-size: .74rem; font-weight: 800; padding: 5px 9px; border-radius: 999px; border: 1px solid var(--line); background: var(--bg); color: var(--text); cursor: pointer; white-space: nowrap; }
+.dm-chip.on { background: var(--brand); color: #fff; border-color: var(--brand); }
+.dm-chip.danger { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 40%, var(--line)); background: color-mix(in srgb, var(--danger) 8%, var(--card)); }
+.dm-chip.danger:active { background: color-mix(in srgb, var(--danger) 20%, var(--card)); }
+.dm-file .dm-ctrl { flex: none; }
+
 /* ===== معاينة الصورة وتحسينها في نافذة الإضافة ===== */
 .d-preview { margin: 4px 0 8px; }
 .d-pimg { max-width: 100%; max-height: 240px; border-radius: 12px; border: 1px solid var(--line); display: block; margin: 0 auto; object-fit: contain; }
