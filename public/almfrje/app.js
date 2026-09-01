@@ -443,9 +443,30 @@ const PERSONS_FULL_COLS = 'id,name,father_id,branch_id,generation,sex,status,bir
 const PERSONS_PUB_COLS = 'id,name,father_id,branch_id,generation,sex,status,birth,death,city,photo_url,nickname,work,sort,created_at,created_by_name,updated_by_name,updated_at';
 async function fetchPersons() {
   const full = isAdmin() || isManager();
-  if (full) return fetchAll('almfrje_persons', PERSONS_FULL_COLS);
-  try { return await fetchAll('almfrje_persons_pub', PERSONS_PUB_COLS); }
-  catch (e) { return fetchAll('almfrje_persons', PERSONS_FULL_COLS); }   // المنظور غير موجود بعد → رجوع
+  if (full) return fetchAllFast('almfrje_persons', PERSONS_FULL_COLS);
+  try { return await fetchAllFast('almfrje_persons_pub', PERSONS_PUB_COLS); }
+  catch (e) { return fetchAllFast('almfrje_persons', PERSONS_FULL_COLS); }   // المنظور غير موجود بعد → رجوع
+}
+// نسخةٌ أسرع للجداول الكبيرة (الأشخاص): تجلب أوّل صفحتين بالتوازي (شجرتنا > 1000 صف)،
+// ثم تكمّل تسلسلياً فقط إن تجاوزت 2000 — فتُختصر رحلةٌ شبكية كاملة من زمن الإقلاع.
+async function fetchAllFast(table, cols = '*', pageSize = 1000) {
+  const [r0, r1] = await Promise.all([
+    sb.from(table).select(cols).range(0, pageSize - 1),
+    sb.from(table).select(cols).range(pageSize, 2 * pageSize - 1),
+  ]);
+  if (r0.error) throw r0.error;
+  const out = (r0.data || []).slice();
+  if (out.length < pageSize) return out;                     // صفحةٌ واحدة كفت
+  if (r1.error) throw r1.error;
+  out.push(...(r1.data || []));
+  if (!r1.data || r1.data.length < pageSize) return out;     // انتهى ضمن صفحتين
+  for (let from = 2 * pageSize; ; from += pageSize) {         // تكملةٌ نادرة (>2000 صف)
+    const r = await sb.from(table).select(cols).range(from, from + pageSize - 1);
+    if (r.error) throw r.error;
+    out.push(...(r.data || []));
+    if (!r.data || r.data.length < pageSize) break;
+  }
+  return out;
 }
 // «الباقي عند الطلب»: تُجلب الأعمدة المؤجّلة (notes) لشخصٍ واحد عند فتح ملفه/تعديله.
 // تُجلب طازجةً في كل مرة (استعلام سطرٍ واحد خفيف) فتبقى البيانات حيّة، وتُدمج في الكائن.
@@ -459,12 +480,11 @@ async function loadPersonExtra(id) {
   } catch (e) { /* أفضل جهد — يبقى بلا ملاحظات */ }
 }
 async function loadAll() {
-  // الإعدادات تتوازى مع البيانات (كانت تتسلسل بعدها فتبطئ الدخول)
+  // البيانات الثلاث بالتوازي. الإعدادات تُجلب مرّة واحدة في enterApp/init (أُزيل تكرارها هنا).
   const [pr, br, mr] = await Promise.all([
     fetchPersons().then(d => ({ data: d }), e => ({ error: e })),
     fetchAll('almfrje_branches').then(d => ({ data: d }), e => ({ error: e })),
     fetchAll('almfrje_members').then(d => ({ data: d }), e => ({ error: e })),
-    loadSettings().catch(() => { /* */ }),
   ]);
   C.persons = pr.error ? [] : (pr.data || []);
   C.branches = br.error ? [] : (br.data || []);
@@ -6707,7 +6727,20 @@ async function enterApp(session) {
   buildNav();
   showLoading(true);
   meResolved = false;   // الدور قيد التحديد — لا تعرض «يحتاج تفعيل» حتى ينتهي
-  let { data: mem } = await sb.from('almfrje_members').select('*').eq('user_id', session.user.id).maybeSingle();
+  // الإعدادات وجلب العضو بالتوازي (كانا متسلسلَين في init ثم هنا فيبطّئان الإقلاع رحلةً كاملة).
+  const settingsP = loadSettings().catch(() => { /* أفضل جهد — يبقى بالافتراضات */ });
+  const memP = sb.from('almfrje_members').select('*').eq('user_id', session.user.id).maybeSingle();
+  await settingsP;   // تلزم لفحوص جلسة الزائر والتحية
+  // فحوص جلسة الزائر (نُقلت من init لتُطبَّق على كل مسارات الدخول بما فيها onAuthStateChange).
+  const guestSess = session.user.email === GUEST_EMAIL;
+  if (guestSess && (isAdminLoginUrl() || !guestOpen)) {
+    _authUid = null; me = null; meResolved = false; await sb.auth.signOut(); showLoading(false); renderAuth(); return;
+  }
+  if (guestSess && guestGens > 0 && !guestSessionFresh()) {
+    await endGuestSession(); showLoading(false); renderAuth(); return;
+  }
+  if (guestSess) bumpGuestTs();
+  let { data: mem } = await memP;
   me = mem || { user_id: session.user.id, full_name: '', role: 'viewer', is_active: false, perms: {} };
   // علاجٌ لمرة واحدة: التتبّع الذي ثُبّت تلقائياً بالخطأ للمشرف العام (كان يعلّقه على فرع مرزوق)
   try {
@@ -6744,7 +6777,7 @@ async function enterApp(session) {
   if (!me.is_active) { showLoading(false); renderPending(); return; }
   // الزائر حساب مشترك تلقائي — لا يحتاج زرّ خروج (يبقى للمسؤول/المشرف).
   document.getElementById('signoutBtn').classList.toggle('hidden', isGuestUser() && guestGens <= 0);
-  // loadAll يحمّل الإعدادات والبيانات بالتوازي — فلا حاجة لجلب الإعدادات متسلسلاً قبله (رحلة زائدة أُزيلت)
+  // البيانات (أشخاص/فروع/أعضاء) بالتوازي؛ الإعدادات جُلبت آنفاً بالتوازي مع جلب العضو.
   try { await loadAll(); } catch (e) { toast('خطأ تحميل: ' + e.message); }
   try {   // التحية تعتمد على الإعدادات (جهزت الآن مع loadAll)
     let fn = '';
@@ -6848,28 +6881,15 @@ async function init() {
   // رابط مُشارَك يحمل ‎#login‎/‎#admin‎؟ يُمسح عند كل فتحٍ جديد للصفحة، فلا تظهر شاشة
   // دخول المسؤول أبداً عبر رابطٍ مرسل — تظهر فقط بالنقر داخل الجلسة (المزيد ← دخول المسؤول).
   if (isAdminLoginUrl()) { try { history.replaceState(null, '', location.pathname + location.search); } catch (e) { location.hash = ''; } }
-  await loadSettings();
-  // فشل تحميل الإعدادات كلياً (حتى عبر الوسيط)؟ لا تعرض شاشة المسؤول خطأً — اعرض شاشة
-  // «تعذّر الاتصال» بتشخيصٍ يوضّح الجهة المحجوبة، إلا لمن لديه جلسة قائمة.
-  if (!settingsOk) {
-    const { data: { session: s0 } } = await sb.auth.getSession();
-    if (!s0) { showLoading(false); renderNetFail(); return; }
-  }
+  // الجلسة أولاً (قراءةٌ محلّية سريعة): إن وُجدت جلسة دخلنا التطبيق مباشرةً — وenterApp
+  // يجلب الإعدادات والعضو والبيانات بالتوازي ويُجري فحوص الزائر. وإلا نحمّل الإعدادات
+  // (تلزم لشاشة الدخول) ثم نعرضها — أو شاشة «تعذّر الاتصال» إن فشلت كلياً.
   const { data: { session } } = await sb.auth.getSession();
-  const wantAdmin = isAdminLoginUrl();
   if (session && session.user) {
-    const guestSess = session.user.email === GUEST_EMAIL;
-    // جلسة زائر مع طلب دخول الإدارة أو إغلاق الموقع → سجّل خروج الزائر واعرض شاشة الدخول
-    if (guestSess && (wantAdmin || !guestOpen)) {
-      _authUid = null; me = null; meResolved = false; await sb.auth.signOut(); showLoading(false); renderAuth();
-    } else if (guestSess && guestGens > 0 && !guestSessionFresh()) {
-      // جلسة زائر لكن أُغلق التبويب سابقاً (sessionStorage مُسح) أو مرّت ساعة خمول → أعد التحقق
-      await endGuestSession(); showLoading(false); renderAuth();
-    } else {
-      if (guestSess) bumpGuestTs();
-      _authUid = session.user.id; await enterApp(session);
-    }
+    _authUid = session.user.id; await enterApp(session);
   } else {
+    await loadSettings();
+    if (!settingsOk) { showLoading(false); renderNetFail(); return; }
     showLoading(false); renderAuth();
   }
   setupInstallPrompt();
