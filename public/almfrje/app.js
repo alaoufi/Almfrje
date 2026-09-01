@@ -1618,15 +1618,9 @@ async function screenPerson(arg) {
   const f = p.father_id ? byId.get(p.father_id) : null;
   const cs = childrenOf(id);
   const grand = cs.flatMap(c => childrenOf(c.id));
-  showLoading(true);
-  let docs = [];
+  await loadPersonExtra(id);   // الملاحظات: صفٌّ واحد سريع بمفتاحٍ أساسي — لا يُبطئ الفتح
   const showDocs = !hideForGuest('media');   // الزائر (إن أُخفيت الوسائط) لا يرى الصور/الوثائق
-  // الملاحظات (عمود مؤجّل) والوثائق تُجلبان معاً عند فتح الملف
-  await Promise.all([
-    loadPersonExtra(id),
-    (async () => { if (showDocs) { try { const { data } = await sb.from('almfrje_documents').select('*').eq('person_id', id).order('id'); docs = data || []; } catch (e) { } } })()
-  ]);
-  showLoading(false);
+  // الصور/الوثائق تُجلب لاحقاً (استعلامٌ قد يبطؤ بسبب فحص الخصوصية) فلا تؤخّر ظهور الأزرار
   view().innerHTML = `
     <div class="card"><div class="person-hd">${avatar(p, true)}
       <div><div class="li-title" style="font-size:1.3rem"><span class="${nameCls(p)}"${nameTitle(p)}>${esc(p.name)}</span>${nickSuffix(p)}</div>
@@ -1654,27 +1648,7 @@ async function screenPerson(arg) {
       <div class="stat g"><div class="n">${descCount.get(id) || 0}</div><div class="l">إجمالي الذرية</div></div>
     </div>
     <div class="card"><h3>الأبناء (${cs.length})</h3>${cs.length > 1 && canReorder(p) ? '<div class="reorder-hint"><b>↕️ ترتيب الأبناء</b> — رتّب بالسهمين ▲▼ لكل ابن. يبقى ضمن إخوته فقط ولا يتجاوز الأب.</div>' : ''}<div id="childList" class="${cs.length > 1 && canReorder(p) ? 'reorder-list' : ''}">${cs.length ? cs.map(c => `<div class="row child-row"${cs.length > 1 && canReorder(p) ? ` data-reorder-id="${c.id}"` : ''}>${cs.length > 1 && canReorder(p) ? `<span class="reorder-arrows"><button class="reorder-up" data-up="${c.id}" aria-label="تحريك لأعلى">▲</button><button class="reorder-down" data-down="${c.id}" aria-label="تحريك لأسفل">▼</button></span>` : ''}<span class="k"><a href="#/person/${c.id}" style="color:var(--brand);text-decoration:none">${esc(c.name)}</a>${nickSuffix(c)}</span><span class="v">${descCount.get(c.id) || 0} ذرية</span></div>`).join('') : noItem()}</div></div>
-    ${showDocs ? (() => {
-      // مكتبة الشخص بأقسامها: صور (معرض) + وثائق + قصائد له + قصائد فيه. المخفيّ يظهر بقفلٍ لمن يراه.
-      galleryPhotos = [];
-      if (p.photo_url) galleryPhotos.push({ url: p.photo_url, label: p.nickname || p.name });
-      docs.filter(d => (d.category || '') === '' && d.kind === 'photo' && d.url !== p.photo_url).forEach(d => galleryPhotos.push({ url: d.url, label: d.label || '', id: d.id, hidden: d.is_public === false }));
-      const files = docs.filter(d => (d.category || '') === '' && d.kind !== 'photo');
-      const poemsBy = docs.filter(d => d.category === 'poem_by');
-      const poemsAbout = docs.filter(d => d.category === 'poem_about');
-      const lock = (d) => d.is_public === false ? ' <span class="doc-lock" title="مخفية — لا يراها إلا صاحبها والإدارة وذريّته">🔒</span>' : '';
-      const N = galleryPhotos.length + files.length + poemsBy.length + poemsAbout.length;
-      const poemCard = (d) => `<div class="poem-card">${d.label ? `<div class="poem-title">${esc(d.label)}${lock(d)}</div>` : `<div class="poem-title">قصيدة${lock(d)}</div>`}${d.body ? `<div class="poem-body">${esc(d.body)}</div>` : ''}${d.url ? `<a href="${esc(d.url)}" target="_blank" rel="noopener" class="poem-file">📎 المرفق</a>` : ''}${canDelete() ? `<button class="btn sm danger" data-ddel="${d.id}" style="margin-top:6px">حذف</button>` : ''}</div>`;
-      return `<div class="card"><h3>الصور والوثائق ${N ? '(' + N + ')' : ''}</h3>
-        ${galleryPhotos.length ? `<div class="ph-grid">${galleryPhotos.map((ph, i) => `<div class="ph-thumb" data-lb="${i}"><img src="${esc(ph.url)}" loading="lazy" alt="">${ph.hidden ? '<span class="ph-lock">🔒</span>' : ''}${ph.id && canDelete() ? `<button class="ph-del" data-phdel="${ph.id}" title="حذف الصورة">🗑</button>` : ''}</div>`).join('')}</div>
-          <button class="btn sm outline" id="phGallery" style="margin-top:8px">🖼️ معرض صوره (${galleryPhotos.length})</button>` : ''}
-        ${files.length ? `<div style="margin-top:8px">${files.map(d => `<div class="row"><span class="k">${d.kind === 'pdf' ? '📄' : '📎'} <a href="${esc(d.url)}" target="_blank" rel="noopener" style="color:var(--brand);text-decoration:none">${esc(d.label || 'ملف')}</a>${lock(d)}</span>${canDelete() ? `<button class="btn sm danger" data-ddel="${d.id}">حذف</button>` : ''}</div>`).join('')}</div>` : ''}
-        ${!N ? noItem() : ''}
-        ${canEditPerson(p) ? `<button class="btn outline" id="addDoc" style="margin-top:8px">➕ إضافة صورة/وثيقة/قصيدة</button>` : ''}
-      </div>
-      ${poemsBy.length ? `<div class="card"><h3>📜 قصائد له (${poemsBy.length})</h3>${poemsBy.map(poemCard).join('')}</div>` : ''}
-      ${poemsAbout.length ? `<div class="card"><h3>📜 قصائد قيلت فيه (${poemsAbout.length})</h3>${poemsAbout.map(poemCard).join('')}</div>` : ''}`;
-    })() : ''}
+    ${showDocs ? '<div id="docsCard"><div class="card"><h3>الصور والوثائق</h3><div class="muted" style="padding:8px 2px">… جارٍ التحميل</div></div></div>' : ''}
     <div class="btn-row no-print">
       <button class="btn" id="toolsP">🧭 أدوات النسب</button>
       <button class="btn outline" data-go="#/tree/${id}">🌳 الشجرة</button>
@@ -1687,21 +1661,47 @@ async function screenPerson(arg) {
   { const tb = document.getElementById('toolsP'); if (tb) tb.addEventListener('click', () => openLens(id)); }
   const as = document.getElementById('addSon'); if (as) as.addEventListener('click', () => { presetFather = p; setHash('#/person-edit/0'); });
   const pr = document.getElementById('printP'); if (pr) pr.addEventListener('click', () => window.print());
-  const ad = document.getElementById('addDoc'); if (ad) ad.addEventListener('click', () => addDocModal(p));
-  view().querySelectorAll('[data-lb]').forEach(t => t.addEventListener('click', () => openLightbox(galleryPhotos, parseInt(t.dataset.lb, 10))));
-  { const pg = document.getElementById('phGallery'); if (pg) pg.addEventListener('click', () => openLightbox(galleryPhotos, 0)); }
-  view().querySelectorAll('[data-phdel]').forEach(b => b.addEventListener('click', async (e) => {
-    e.stopPropagation();   // لا تفتح العارض
-    if (!(await confirm2('حذف هذه الصورة من مكتبة الشخص؟'))) return;
-    const ok = await guard(async () => { const { error } = await sb.from('almfrje_documents').delete().eq('id', b.dataset.phdel); if (error) throw error; });
-    if (ok) { toast('تم الحذف'); screenPerson(arg); }
-  }));
+  if (showDocs) loadDocsCard(p, arg);   // الصور/الوثائق تُملأ لاحقاً في حاوية docsCard دون تأخير الأزرار
   if (cs.length > 1 && canReorder(p)) {
     const childList = document.getElementById('childList');
     bindChildArrows(childList, id);                              // الترتيب الدقيق بالأسهم ▲▼
     enableReorder(childList, cs.map(c => c.id), id);             // وسحبٌ مطوّل اختياري
   }
-  view().querySelectorAll('[data-ddel]').forEach(b => b.addEventListener('click', async () => {
+}
+// مكتبة الشخص: تُجلب الصور/الوثائق/القصائد بعد ظهور الملف وتُملأ حاوية docsCard — فلا تؤخّر الأزرار.
+async function loadDocsCard(p, arg) {
+  const box = document.getElementById('docsCard'); if (!box) return;
+  let docs = [];
+  try { const { data } = await sb.from('almfrje_documents').select('*').eq('person_id', p.id).order('id'); docs = data || []; } catch (e) { }
+  if (!document.getElementById('docsCard')) return;   // غادر المستخدم الصفحة أثناء الجلب
+  galleryPhotos = [];
+  if (p.photo_url) galleryPhotos.push({ url: p.photo_url, label: p.nickname || p.name });
+  docs.filter(d => (d.category || '') === '' && d.kind === 'photo' && d.url !== p.photo_url).forEach(d => galleryPhotos.push({ url: d.url, label: d.label || '', id: d.id, hidden: d.is_public === false }));
+  const files = docs.filter(d => (d.category || '') === '' && d.kind !== 'photo');
+  const poemsBy = docs.filter(d => d.category === 'poem_by');
+  const poemsAbout = docs.filter(d => d.category === 'poem_about');
+  const lock = (d) => d.is_public === false ? ' <span class="doc-lock" title="مخفية — لا يراها إلا صاحبها والإدارة وذريّته">🔒</span>' : '';
+  const N = galleryPhotos.length + files.length + poemsBy.length + poemsAbout.length;
+  const poemCard = (d) => `<div class="poem-card">${d.label ? `<div class="poem-title">${esc(d.label)}${lock(d)}</div>` : `<div class="poem-title">قصيدة${lock(d)}</div>`}${d.body ? `<div class="poem-body">${esc(d.body)}</div>` : ''}${d.url ? `<a href="${esc(d.url)}" target="_blank" rel="noopener" class="poem-file">📎 المرفق</a>` : ''}${canDelete() ? `<button class="btn sm danger" data-ddel="${d.id}" style="margin-top:6px">حذف</button>` : ''}</div>`;
+  box.innerHTML = `<div class="card"><h3>الصور والوثائق ${N ? '(' + N + ')' : ''}</h3>
+      ${galleryPhotos.length ? `<div class="ph-grid">${galleryPhotos.map((ph, i) => `<div class="ph-thumb" data-lb="${i}"><img src="${esc(ph.url)}" loading="lazy" alt="">${ph.hidden ? '<span class="ph-lock">🔒</span>' : ''}${ph.id && canDelete() ? `<button class="ph-del" data-phdel="${ph.id}" title="حذف الصورة">🗑</button>` : ''}</div>`).join('')}</div>
+        <button class="btn sm outline" id="phGallery" style="margin-top:8px">🖼️ معرض صوره (${galleryPhotos.length})</button>` : ''}
+      ${files.length ? `<div style="margin-top:8px">${files.map(d => `<div class="row"><span class="k">${d.kind === 'pdf' ? '📄' : '📎'} <a href="${esc(d.url)}" target="_blank" rel="noopener" style="color:var(--brand);text-decoration:none">${esc(d.label || 'ملف')}</a>${lock(d)}</span>${canDelete() ? `<button class="btn sm danger" data-ddel="${d.id}">حذف</button>` : ''}</div>`).join('')}</div>` : ''}
+      ${!N ? noItem() : ''}
+      ${canEditPerson(p) ? `<button class="btn outline" id="addDoc" style="margin-top:8px">➕ إضافة صورة/وثيقة/قصيدة</button>` : ''}
+    </div>
+    ${poemsBy.length ? `<div class="card"><h3>📜 قصائد له (${poemsBy.length})</h3>${poemsBy.map(poemCard).join('')}</div>` : ''}
+    ${poemsAbout.length ? `<div class="card"><h3>📜 قصائد قيلت فيه (${poemsAbout.length})</h3>${poemsAbout.map(poemCard).join('')}</div>` : ''}`;
+  const ad = document.getElementById('addDoc'); if (ad) ad.addEventListener('click', () => addDocModal(p));
+  box.querySelectorAll('[data-lb]').forEach(t => t.addEventListener('click', () => openLightbox(galleryPhotos, parseInt(t.dataset.lb, 10))));
+  { const pg = document.getElementById('phGallery'); if (pg) pg.addEventListener('click', () => openLightbox(galleryPhotos, 0)); }
+  box.querySelectorAll('[data-phdel]').forEach(b => b.addEventListener('click', async (e) => {
+    e.stopPropagation();
+    if (!(await confirm2('حذف هذه الصورة من مكتبة الشخص؟'))) return;
+    const ok = await guard(async () => { const { error } = await sb.from('almfrje_documents').delete().eq('id', b.dataset.phdel); if (error) throw error; });
+    if (ok) { toast('تم الحذف'); screenPerson(arg); }
+  }));
+  box.querySelectorAll('[data-ddel]').forEach(b => b.addEventListener('click', async () => {
     if (!(await confirm2('حذف هذا الملف؟'))) return;
     const ok = await guard(async () => { const { error } = await sb.from('almfrje_documents').delete().eq('id', b.dataset.ddel); if (error) throw error; });
     if (ok) { toast('تم الحذف'); screenPerson(arg); }
@@ -2234,20 +2234,30 @@ function screenTree(arg) {
   document.getElementById('t_collapse').addEventListener('click', () => { treeOpen.clear(); treeOpen.add(rootId); renderTree(rootId); });
   { const tp = document.getElementById('t_photos'); if (tp) tp.addEventListener('click', () => { treePhotos = !treePhotos; tp.classList.toggle('outline', !treePhotos); renderTree(rootId); }); }
 }
-// مشجّرة الصور: كل من أُضيفت له صورة (photo_url) في شبكة صورٍ بأسمائهم — اضغط لفتح ملفه.
-function screenPhotosTree() {
-  const withPhoto = hideForGuest('media') ? [] : C.persons.filter(p => p.photo_url && String(p.photo_url).trim());
-  view().innerHTML = `<div class="card"><h3>🖼️ مشجّرة الصور (${withPhoto.length})</h3>
+// مشجّرة الصور: كلُّ من أُضيفت له صورة — رئيسية أو في معرض صوره — بأسمائهم؛ اضغط لفتح ملفه.
+async function screenPhotosTree() {
+  if (hideForGuest('media')) { view().innerHTML = noPerm(); return; }
+  view().innerHTML = `<div class="card"><h3>🖼️ مشجّرة الصور</h3>
     <p class="muted" style="font-size:.82rem;margin-top:-2px">كل من أُضيفت له صورة — اضغط الصورة لفتح ملفه.</p>
     <div class="field"><input id="pt_q" type="text" placeholder="🔍 ابحث بالاسم…"></div>
-    <div id="ptGrid"></div></div>`;
-  const grid = document.getElementById('ptGrid');
+    <div id="ptGrid"><div class="muted" style="padding:8px 2px">… جارٍ التحميل</div></div></div>`;
+  // صورةٌ تمثيليةٌ لكل شخص: الرئيسية إن وُجدت، وإلا أوّل صورةٍ في معرضه (تحترم الخصوصية عبر RLS).
+  const photoBy = new Map();
+  try {
+    const { data } = await sb.from('almfrje_documents').select('person_id,url,kind').eq('kind', 'photo').order('id');
+    (data || []).forEach(d => { if (d.url && !photoBy.has(d.person_id)) photoBy.set(d.person_id, d.url); });
+  } catch (e) { }
+  const withPhoto = C.persons
+    .map(p => ({ p, url: (p.photo_url && String(p.photo_url).trim()) ? p.photo_url : photoBy.get(p.id) }))
+    .filter(x => x.url);
+  const grid = document.getElementById('ptGrid'); if (!grid) return;
+  const hd = view().querySelector('h3'); if (hd) hd.textContent = `🖼️ مشجّرة الصور (${withPhoto.length})`;
   const render = () => {
     const q = normalizeAr((document.getElementById('pt_q') || { value: '' }).value.trim());
-    const hits = q ? withPhoto.filter(p => (p._n || normalizeAr(p.name)).includes(q) || normalizeAr(lineageShort(p.id, 4)).includes(q)) : withPhoto;
+    const hits = q ? withPhoto.filter(x => (x.p._n || normalizeAr(x.p.name)).includes(q) || normalizeAr(lineageShort(x.p.id, 4)).includes(q)) : withPhoto;
     grid.innerHTML = hits.length
-      ? `<div class="pt-grid">${hits.slice(0, 300).map(p => `<div class="pt-card" data-go="#/person/${p.id}">${avatar(p, true)}<div class="pt-name">${esc(p.name)}</div><div class="pt-sub muted">${esc(lineageShort(p.id, 3))}</div></div>`).join('')}${hits.length > 300 ? '<div class="muted" style="grid-column:1/-1;padding:8px">عُرضت أول ٣٠٠ — ضيّق بالبحث</div>' : ''}</div>`
-      : '<div class="center-empty">لا صور بعد — أضِف صورةً «رئيسية» لأي شخص من ملفه.</div>';
+      ? `<div class="pt-grid">${hits.slice(0, 300).map(x => `<div class="pt-card" data-go="#/person/${x.p.id}"><img class="avatar lg" src="${esc(x.url)}" loading="lazy" alt="" onerror="this.outerHTML='<div class=\\'avatar lg\\'>👤</div>'"><div class="pt-name">${esc(x.p.name)}</div><div class="pt-sub muted">${esc(lineageShort(x.p.id, 3))}</div></div>`).join('')}${hits.length > 300 ? '<div class="muted" style="grid-column:1/-1;padding:8px">عُرضت أول ٣٠٠ — ضيّق بالبحث</div>' : ''}</div>`
+      : '<div class="center-empty">لا صور بعد — أضِف صورةً لأي شخص من ملفه.</div>';
     bindGo(grid);
   };
   render();
