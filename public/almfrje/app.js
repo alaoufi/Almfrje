@@ -1702,8 +1702,11 @@ async function loadDocsCard(p, refresh) {
   try { const { data } = await sb.from('almfrje_documents').select('*').eq('person_id', p.id).order('id'); docs = data || []; } catch (e) { }
   if (!document.getElementById('docsCard')) return;   // غادر المستخدم الصفحة أثناء الجلب
   galleryPhotos = [];
-  if (p.photo_url) galleryPhotos.push({ url: p.photo_url, label: p.nickname || p.name, main: true });
-  docs.filter(d => (d.category || '') === '' && d.kind === 'photo' && d.url !== p.photo_url).forEach(d => galleryPhotos.push({ url: d.url, label: d.label || '', id: d.id, hidden: d.is_public === false }));
+  const photoDocs = docs.filter(d => (d.category || '') === '' && d.kind === 'photo');
+  // صورةٌ رئيسيةٌ برابطٍ مباشر بلا وثيقة (بيانات قديمة): تُعرض رئيسيةً عامّة بلا تبديل خصوصية
+  if (p.photo_url && !photoDocs.some(d => d.url === p.photo_url)) galleryPhotos.push({ url: p.photo_url, label: p.nickname || p.name, main: true });
+  photoDocs.forEach(d => galleryPhotos.push({ url: d.url, label: d.label || '', id: d.id, hidden: d.is_public === false, main: d.url === p.photo_url }));
+  galleryPhotos.sort((a, b2) => (b2.main ? 1 : 0) - (a.main ? 1 : 0));   // الرئيسية أولاً
   const files = docs.filter(d => (d.category || '') === '' && d.kind !== 'photo');
   const poemsBy = docs.filter(d => d.category === 'poem_by');
   const poemsAbout = docs.filter(d => d.category === 'poem_about');
@@ -1712,20 +1715,20 @@ async function loadDocsCard(p, refresh) {
   const N = galleryPhotos.length + files.length + poemsBy.length + poemsAbout.length;
   const poemCard = (d) => `<div class="poem-card">${d.label ? `<div class="poem-title">${esc(d.label)}${lock(d)}</div>` : `<div class="poem-title">قصيدة${lock(d)}</div>`}${d.body ? `<div class="poem-body">${esc(d.body)}</div>` : ''}${d.url ? `<a href="${esc(d.url)}" target="_blank" rel="noopener" class="poem-file">📎 المرفق</a>` : ''}${canDel ? `<button class="btn sm danger" data-ddel="${d.id}" style="margin-top:6px">حذف</button>` : ''}</div>`;
   // زرّا الخصوصية أمام كل عنصرٍ (وضع الإدارة): «للجميع» أو «لذريته فقط».
-  // مربّع اختيارٍ واضح: المفعّل ✅ (أخضر) وغير المفعّل ⬜ — فيُعرف الوضع بنظرة.
-  const opt = (id, pub, cur, label) => `<button type="button" class="dm-opt ${cur ? 'on' : ''}" data-vis="${id}" data-pub="${pub}"><span class="dm-box">${cur ? '✔' : ''}</span>${label}</button>`;
-  const visBtns = (id, isPub) => opt(id, '1', isPub, '👁 تُعرض للجميع') + opt(id, '0', !isPub, '🔒 لذريّته فقط');
+  // مربّع اختيارٍ واضح: المفعّل ✔ (أخضر) وغير المفعّل ⬜ — فيُعرف الوضع بنظرة.
+  const opt = (id, pub, cur, label, isMain) => `<button type="button" class="dm-opt ${cur ? 'on' : ''}" data-vis="${id}" data-pub="${pub}"${isMain ? ' data-ismain="1"' : ''}><span class="dm-box">${cur ? '✔' : ''}</span>${label}</button>`;
+  const visBtns = (id, isPub, isMain) => opt(id, '1', isPub, '👁 تُعرض للجميع', isMain) + opt(id, '0', !isPub, '🔒 لذريّته فقط', isMain);
   // وضع الإدارة (المدير/صاحب الحساب): لكل صورة/ملف تحكّمٌ أمامه — رئيسية/النشر/حذف.
   const managePhotos = galleryPhotos.map((ph, i) => `<div class="dm-item">
       <img class="dm-thumb" src="${esc(ph.url)}" data-lb="${i}" loading="lazy" decoding="async" alt="">
       <div class="dm-ctrl">
         ${ph.main
           ? '<span class="dm-opt on"><span class="dm-box">✔</span>🌳 الصورة الرئيسية</span>'
-          : `<button type="button" class="dm-opt" data-setmain="${esc(ph.url)}"><span class="dm-box"></span>🌳 اجعلها الرئيسية</button>`}
-        ${ph.main ? '' : visBtns(ph.id, !ph.hidden)}
-        ${ph.main
-          ? '<button type="button" class="dm-opt danger" data-mainclear="1">🗑 إزالة</button>'
-          : `<button type="button" class="dm-opt danger" data-phdel="${ph.id}">🗑 حذف</button>`}
+          : `<button type="button" class="dm-opt" data-setmain="${esc(ph.url)}"${ph.id ? ` data-mainid="${ph.id}"` : ''}><span class="dm-box"></span>🌳 اجعلها الرئيسية</button>`}
+        ${ph.id ? visBtns(ph.id, !ph.hidden, ph.main) : '<span class="dm-opt on"><span class="dm-box">✔</span>👁 تظهر للجميع في الشجرة</span>'}
+        ${ph.id
+          ? `<button type="button" class="dm-opt danger" data-phdel="${ph.id}"${ph.main ? ' data-delmain="1"' : ''}>🗑 حذف</button>`
+          : '<button type="button" class="dm-opt danger" data-mainclear="1">🗑 إزالة</button>'}
       </div></div>`).join('');
   const manageFiles = files.map(d => `<div class="dm-item dm-file">
       <span class="dm-name">${d.kind === 'pdf' ? '📄' : '📎'} <a href="${esc(d.url)}" target="_blank" rel="noopener">${esc(d.label || 'ملف')}</a></span>
@@ -1749,7 +1752,10 @@ async function loadDocsCard(p, refresh) {
   box.querySelectorAll('[data-phdel]').forEach(b => b.addEventListener('click', async (e) => {
     e.stopPropagation();
     if (!(await confirm2('حذف هذه الصورة من مكتبة الشخص؟'))) return;
-    const ok = await guard(async () => { const { error } = await sb.from('almfrje_documents').delete().eq('id', b.dataset.phdel); if (error) throw error; });
+    const ok = await guard(async () => {
+      const { error } = await sb.from('almfrje_documents').delete().eq('id', b.dataset.phdel); if (error) throw error;
+      if (b.dataset.delmain) { await sb.from('almfrje_persons').update({ photo_url: '', updated_at: new Date().toISOString() }).eq('id', p.id); const pp = byId.get(p.id); if (pp) pp.photo_url = ''; }
+    });
     if (ok) { toast('تم الحذف'); reload(); }
   }));
   box.querySelectorAll('[data-mainclear]').forEach(b => b.addEventListener('click', async (e) => {
@@ -1767,15 +1773,23 @@ async function loadDocsCard(p, refresh) {
   box.querySelectorAll('[data-setmain]').forEach(b => b.addEventListener('click', async (e) => {
     e.stopPropagation();
     const u = b.dataset.setmain;
-    const ok = await guard(async () => { const { error } = await sb.from('almfrje_persons').update({ photo_url: u, updated_at: new Date().toISOString() }).eq('id', p.id); if (error) throw error; const pp = byId.get(p.id); if (pp) pp.photo_url = u; });
+    const ok = await guard(async () => {
+      const { error } = await sb.from('almfrje_persons').update({ photo_url: u, updated_at: new Date().toISOString() }).eq('id', p.id); if (error) throw error; const pp = byId.get(p.id); if (pp) pp.photo_url = u;
+      if (b.dataset.mainid) await sb.from('almfrje_documents').update({ is_public: true }).eq('id', b.dataset.mainid);   // الرئيسية تظهر للجميع في الشجرة
+    });
     if (ok) { toast('صارت الصورة الرئيسية'); reload(); }
   }));
-  // تغيير خصوصية عنصرٍ: «للجميع» (is_public=true) أو «لذريته فقط» (is_public=false)
+  // تغيير خصوصية عنصرٍ: «للجميع» (is_public=true) أو «لذريته فقط» (is_public=false).
+  // جعل الرئيسية «لذريّته فقط» يُلغي كونها رئيسية (لأنها لن تظهر للجميع في الشجرة).
   box.querySelectorAll('[data-vis]').forEach(b => b.addEventListener('click', async (e) => {
     e.stopPropagation();
     const pub = b.dataset.pub === '1';
-    const ok = await guard(async () => { const { error } = await sb.from('almfrje_documents').update({ is_public: pub }).eq('id', b.dataset.vis); if (error) throw error; });
-    if (ok) { toast(pub ? 'صارت تُعرض للجميع' : 'صارت لذريته فقط'); reload(); }
+    const demote = !pub && b.dataset.ismain === '1';
+    const ok = await guard(async () => {
+      const { error } = await sb.from('almfrje_documents').update({ is_public: pub }).eq('id', b.dataset.vis); if (error) throw error;
+      if (demote) { await sb.from('almfrje_persons').update({ photo_url: '', updated_at: new Date().toISOString() }).eq('id', p.id); const pp = byId.get(p.id); if (pp) pp.photo_url = ''; }
+    });
+    if (ok) { toast(pub ? 'صارت تُعرض للجميع' : (demote ? 'صارت لذريّته فقط وأُزيلت من الشجرة' : 'صارت لذريّته فقط')); reload(); }
   }));
 }
 // إعادة ترتيب الأبناء بالسحب والإفلات — يُفعَّل بالضغط المطوّل، ويبقى ضمن إخوته (نفس الأب).
