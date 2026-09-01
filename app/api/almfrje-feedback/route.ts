@@ -26,6 +26,7 @@ export async function POST(request: NextRequest) {
   const caller = createClient(url, anon, { global: { headers: { Authorization: `Bearer ${token}` } }, auth: { persistSession: false, autoRefreshToken: false } });
   const { data: who } = await caller.auth.getUser();
   if (!who || !who.user) return NextResponse.json({ ok: false, error: 'جلسة غير صالحة' }, { status: 401 });
+  const uid = who.user.id;   // مُلتقَط بعد الفحص (التضييق لا يُحفظ داخل الدوال المتداخلة)
 
   const admin: SupabaseClient = createClient(url, service, { auth: { persistSession: false, autoRefreshToken: false } });
 
@@ -40,7 +41,7 @@ export async function POST(request: NextRequest) {
   async function ownsName(reqName: string): Promise<boolean> {
     const want = normAr(reqName);
     if (!want) return false;
-    const { data: memRow } = await admin.from('almfrje_members').select('full_name,is_active').eq('user_id', who!.user.id).maybeSingle();
+    const { data: memRow } = await admin.from('almfrje_members').select('full_name,is_active').eq('user_id', uid).maybeSingle();
     if (memRow && memRow.is_active && memRow.full_name) return normAr(String(memRow.full_name)) === want;
     const pid = Number(body.pid);
     if (!Number.isFinite(pid) || pid <= 0) return false;
