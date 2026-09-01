@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { almfrjeEnv } from '@/lib/almfrje-env';
+import { verifyRegToken } from '@/lib/almfrje-regtoken';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -28,16 +29,37 @@ export async function POST(request: NextRequest) {
 
   const admin: SupabaseClient = createClient(url, service, { auth: { persistSession: false, autoRefreshToken: false } });
 
-  let body: { action?: string; id?: number; reply?: string; name?: string; ids?: unknown[] };
+  let body: { action?: string; id?: number; reply?: string; name?: string; ids?: unknown[]; pid?: unknown; regToken?: unknown };
   try { body = await request.json(); } catch { body = {}; }
   const action = String(body.action || 'list');
   const id = body.id != null ? Number(body.id) : null;
 
-  // ردود الإدارة على ملاحظات المرسل نفسه — متاحة لأي جلسةٍ صالحة (زائر/عضو) باسم دخوله.
+  // يثبت أن المُنادي صاحبُ الاسم المطلوب فعلاً — فلا يقرأ أحدٌ ردود غيره باسمه (سدّ IDOR).
+  // العضو المفعّل: باسمه المسجّل حصراً. الزائر: برمز تحقّقه (regToken) المربوط بشخصه، مع
+  // مطابقة الاسم المشتقّ من شخصه للاسم المطلوب. غير ذلك: لا كشف.
+  async function ownsName(reqName: string): Promise<boolean> {
+    const want = normAr(reqName);
+    if (!want) return false;
+    const { data: memRow } = await admin.from('almfrje_members').select('full_name,is_active').eq('user_id', who!.user.id).maybeSingle();
+    if (memRow && memRow.is_active && memRow.full_name) return normAr(String(memRow.full_name)) === want;
+    const pid = Number(body.pid);
+    if (!Number.isFinite(pid) || pid <= 0) return false;
+    if (!(await verifyRegToken(body.regToken, pid, service!))) return false;
+    // الاسم الرباعي من الشجرة لهذا الشخص (هو ثم آباؤه) — مطابقةً تطبيعية
+    const parts: string[] = [];
+    let cur: number | null = pid; let hops = 0;
+    while (cur != null && parts.length < 4 && hops++ < 12) {
+      const { data: f } = await admin.from('almfrje_persons').select('name,father_id').eq('id', cur).maybeSingle();
+      if (!f) break; parts.push(String(f.name)); cur = (f.father_id as number | null);
+    }
+    return !!parts.length && normAr(parts.join(' بن ')) === want;
+  }
+
+  // ردود الإدارة على ملاحظات المرسل نفسه — لصاحب الاسم حصراً (عضواً كان أو زائراً متحقَّقاً).
   // تُعاد حقول محدودة فقط (الموضوع/الرد/التواريخ) — لا تفاصيل ولا أسماء رادّين.
   if (action === 'myreplies') {
     const name = String(body.name || '').trim();
-    if (!name) return NextResponse.json({ ok: true, rows: [] });
+    if (!name || !(await ownsName(name))) return NextResponse.json({ ok: true, rows: [] });
     const { data, error } = await admin.from('almfrje_feedback')
       .select('id,subject,reply,replied_at,created_at,reply_seen')
       .eq('created_by_name', name).neq('reply', '')
@@ -50,7 +72,7 @@ export async function POST(request: NextRequest) {
   if (action === 'replyseen') {
     const name = String(body.name || '').trim();
     const idList = (Array.isArray(body.ids) ? body.ids : []).map((x) => Number(x)).filter((x) => Number.isFinite(x));
-    if (!name || !idList.length) return NextResponse.json({ ok: true });
+    if (!name || !idList.length || !(await ownsName(name))) return NextResponse.json({ ok: true });
     const { error } = await admin.from('almfrje_feedback')
       .update({ reply_seen: true }).eq('created_by_name', name).in('id', idList);
     if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 });

@@ -3366,8 +3366,12 @@ async function sendFeedback() {
 async function loadMyReplies() {
   const el = document.getElementById('fbMyReplies'); if (!el) return;
   const name = currentUserName(); if (!name) return;
+  // هويّة الزائر لإثبات ملكيّته للاسم (يتجاهلها الخادم للعضو ويستعمل حسابه) — سدّ قراءة ردود الغير
+  let gpid = 0, gtok = '';
+  try { gpid = parseInt(sessionStorage.getItem('almfrje_guest_pid') || '0', 10) || 0; gtok = sessionStorage.getItem('almfrje_guest_regtok') || ''; } catch (e) { /* */ }
+  const ident = { pid: gpid, regToken: gtok };
   try {
-    const j = await fbApi('myreplies', null, { name });
+    const j = await fbApi('myreplies', null, Object.assign({ name }, ident));
     const rows = j.rows || []; if (!rows.length) return;
     el.innerHTML = `<div style="margin-top:12px;font-weight:800;font-size:.9rem">↩️ ردود الإدارة على ملاحظاتك</div>` +
       rows.map(r => `<div style="margin-top:6px;padding:8px 10px;background:color-mix(in srgb, var(--brand) 6%, var(--card));border:1px solid var(--line);border-inline-start:3px solid var(--brand);border-radius:8px;font-size:.86rem;line-height:1.8">
@@ -3386,7 +3390,7 @@ async function loadMyReplies() {
           <span class="muted" style="font-size:.74rem">${esc(r.subject)} • ${fmtDateTime(r.replied_at || r.created_at)}</span><br>${esc(r.reply)}</div>`).join('')}
         <button class="btn" id="fbSeenBtn" style="width:100%">قرأتها ✓</button>`, () => {
         document.getElementById('fbSeenBtn').addEventListener('click', async () => {
-          try { await fbApi('replyseen', null, { name, ids: unseen.map(r => r.id) }); } catch (e) { /* */ }
+          try { await fbApi('replyseen', null, Object.assign({ name, ids: unseen.map(r => r.id) }, ident)); } catch (e) { /* */ }
           closeModal();
         });
       });
