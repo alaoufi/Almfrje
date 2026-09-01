@@ -825,7 +825,7 @@ function avatar(p, lg) {
   const fallback = p && p.sex === 'female' ? '👩' : '👤';
   if (p && p.photo_url && !hideForGuest('media')) {
     // عند فشل تحميل الصورة (رابط معطّل/مجلّد غير عام) استبدلها بالأيقونة بدل إطار فارغ.
-    return `<img class="${cls}" src="${esc(p.photo_url)}" alt="" loading="lazy" onerror="this.outerHTML='<div class=\\'${cls}\\'>${fallback}</div>'">`;
+    return `<img class="${cls}" src="${esc(p.photo_url)}" alt="" loading="lazy" decoding="async" onerror="this.outerHTML='<div class=\\'${cls}\\'>${fallback}</div>'">`;
   }
   return `<div class="${cls}">${fallback}</div>`;
 }
@@ -986,7 +986,7 @@ function screenHome() {
     ${!isGuestUser() && !pwChanged() ? `<div class="notice-pw">🔐 ننصحك بتغيير كلمة المرور الآن لحماية حسابك. <button class="btn sm" id="pwGo" style="margin-top:6px">تغيير كلمة المرور</button> <button class="btn sm outline" id="pwSkip" style="margin-top:6px">لاحقاً</button></div>` : ''}
     <div class="home-greet">أهلاً <span class="hg-name">${esc(currentUserName() || me.full_name || '')}</span>${isGuestUser() ? '' : `<span class="hg-role"> • ${esc(arOf(ROLES, me.role))}</span>`}${isManager() && myBranches().length ? `<span class="hg-role"> (${(isGeneralManager() && !(Array.isArray(me.branch_ids) && me.branch_ids.length) && !me.branch_id) ? 'كل الفروع' : myBranches().map(b => esc(branchName(b))).join('، ')})</span>` : ''}</div>
     ${tribeDocs.length ? `<div class="card doc-card click" data-go="#/documents">
-      <img class="doc-thumb" src="${esc((tribeDocs[0] && tribeDocs[0].url) || '/almfrje/lazma-1173-thumb.jpg')}" alt="وثائق القبيلة" loading="lazy">
+      <img class="doc-thumb" src="${esc((tribeDocs[0] && tribeDocs[0].url) || '/almfrje/lazma-1173-thumb.jpg')}" alt="وثائق القبيلة" loading="lazy" decoding="async">
       <div class="doc-card-body">
         <div class="li-title">📜 ${tribeDocs.length === 1 ? esc(tribeDocs[0].title || 'وثيقة') : 'وثائق القبيلة (' + tribeDocs.length + ')'}</div>
         <div class="li-sub muted">اضغط لعرض الوثيقة وتفريغ نصّها</div>
@@ -1707,7 +1707,7 @@ async function loadDocsCard(p, arg) {
   const N = galleryPhotos.length + files.length + poemsBy.length + poemsAbout.length;
   const poemCard = (d) => `<div class="poem-card">${d.label ? `<div class="poem-title">${esc(d.label)}${lock(d)}</div>` : `<div class="poem-title">قصيدة${lock(d)}</div>`}${d.body ? `<div class="poem-body">${esc(d.body)}</div>` : ''}${d.url ? `<a href="${esc(d.url)}" target="_blank" rel="noopener" class="poem-file">📎 المرفق</a>` : ''}${canDelete() ? `<button class="btn sm danger" data-ddel="${d.id}" style="margin-top:6px">حذف</button>` : ''}</div>`;
   box.innerHTML = `<div class="card"><h3>الصور والوثائق ${N ? '(' + N + ')' : ''}</h3>
-      ${galleryPhotos.length ? `<div class="ph-grid">${galleryPhotos.map((ph, i) => `<div class="ph-thumb" data-lb="${i}"><img src="${esc(ph.url)}" loading="lazy" alt="">${ph.hidden ? '<span class="ph-lock">🔒</span>' : ''}${ph.id && canDelete() ? `<button class="ph-del" data-phdel="${ph.id}" title="حذف الصورة">🗑</button>` : ''}</div>`).join('')}</div>
+      ${galleryPhotos.length ? `<div class="ph-grid">${galleryPhotos.map((ph, i) => `<div class="ph-thumb" data-lb="${i}"><img src="${esc(ph.url)}" loading="lazy" decoding="async" alt="">${ph.hidden ? '<span class="ph-lock">🔒</span>' : ''}${ph.id && canDelete() ? `<button class="ph-del" data-phdel="${ph.id}" title="حذف الصورة">🗑</button>` : ''}</div>`).join('')}</div>
         <button class="btn sm outline" id="phGallery" style="margin-top:8px">🖼️ معرض صوره (${galleryPhotos.length})</button>` : ''}
       ${files.length ? `<div style="margin-top:8px">${files.map(d => `<div class="row"><span class="k">${d.kind === 'pdf' ? '📄' : '📎'} <a href="${esc(d.url)}" target="_blank" rel="noopener" style="color:var(--brand);text-decoration:none">${esc(d.label || 'ملف')}</a>${lock(d)}</span>${canDelete() ? `<button class="btn sm danger" data-ddel="${d.id}">حذف</button>` : ''}</div>`).join('')}</div>` : ''}
       ${!N ? noItem() : ''}
@@ -2281,7 +2281,7 @@ async function screenPhotosTree() {
     const q = normalizeAr((document.getElementById('pt_q') || { value: '' }).value.trim());
     const hits = q ? withPhoto.filter(x => (x.p._n || normalizeAr(x.p.name)).includes(q) || normalizeAr(lineageShort(x.p.id, 4)).includes(q)) : withPhoto;
     grid.innerHTML = hits.length
-      ? `<div class="pt-grid">${hits.slice(0, 300).map(x => `<div class="pt-card" data-go="#/person/${x.p.id}"><img class="avatar lg" src="${esc(x.url)}" loading="lazy" alt="" onerror="this.outerHTML='<div class=\\'avatar lg\\'>👤</div>'"><div class="pt-name">${esc(x.p.name)}</div><div class="pt-sub muted">${esc(lineageShort(x.p.id, 3))}</div></div>`).join('')}${hits.length > 300 ? '<div class="muted" style="grid-column:1/-1;padding:8px">عُرضت أول ٣٠٠ — ضيّق بالبحث</div>' : ''}</div>`
+      ? `<div class="pt-grid">${hits.slice(0, 300).map(x => `<div class="pt-card" data-go="#/person/${x.p.id}"><img class="avatar lg" src="${esc(x.url)}" loading="lazy" decoding="async" alt="" onerror="this.outerHTML='<div class=\\'avatar lg\\'>👤</div>'"><div class="pt-name">${esc(x.p.name)}</div><div class="pt-sub muted">${esc(lineageShort(x.p.id, 3))}</div></div>`).join('')}${hits.length > 300 ? '<div class="muted" style="grid-column:1/-1;padding:8px">عُرضت أول ٣٠٠ — ضيّق بالبحث</div>' : ''}</div>`
       : '<div class="center-empty">لا صور بعد — أضِف صورةً لأي شخص من ملفه.</div>';
     bindGo(grid);
   };
@@ -4688,7 +4688,7 @@ function screenDocuments() {
       <div class="doc-wrap"><div class="doc-3d">
         <div class="doc-eyebrow">وثيقة تاريخية</div>
         ${d.title ? `<h2 class="doc-title">${esc(d.title)}</h2>` : ''}
-        <div class="doc-frame"><img class="doc-img" data-docfull="${i}" src="${esc(d.url)}" alt="${esc(d.title || 'وثيقة')}" loading="lazy"></div>
+        <div class="doc-frame"><img class="doc-img" data-docfull="${i}" src="${esc(d.url)}" alt="${esc(d.title || 'وثيقة')}" loading="lazy" decoding="async"></div>
         <div class="doc-actions no-print"><button class="btn sm outline" data-docfull="${i}">🔍 عرض كامل الوثيقة</button>${admin ? `<button class="btn sm outline" data-docedit="${i}">✎ تعديل</button><button class="btn sm danger" data-docdel="${i}">🗑 حذف</button>` : ''}</div>
         ${d.text ? `<div class="doc-text">${esc(d.text)}</div>` : ''}
       </div></div>`).join('') : '<div class="center-empty">لا توجد وثائق بعد.</div>'}`;
