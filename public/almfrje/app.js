@@ -1684,7 +1684,7 @@ async function screenPerson(arg) {
   { const tb = document.getElementById('toolsP'); if (tb) tb.addEventListener('click', () => openLens(id)); }
   const as = document.getElementById('addSon'); if (as) as.addEventListener('click', () => { presetFather = p; setHash('#/person-edit/0'); });
   const pr = document.getElementById('printP'); if (pr) pr.addEventListener('click', () => window.print());
-  if (showDocs) loadDocsCard(p, arg);   // الصور/الوثائق تُملأ لاحقاً في حاوية docsCard دون تأخير الأزرار
+  if (showDocs) loadDocsCard(p, () => screenPerson(arg));   // الصور/الوثائق تُملأ لاحقاً في حاوية docsCard دون تأخير الأزرار
   if (cs.length > 1 && canReorder(p)) {
     const childList = document.getElementById('childList');
     bindChildArrows(childList, id);                              // الترتيب الدقيق بالأسهم ▲▼
@@ -1692,7 +1692,9 @@ async function screenPerson(arg) {
   }
 }
 // مكتبة الشخص: تُجلب الصور/الوثائق/القصائد بعد ظهور الملف وتُملأ حاوية docsCard — فلا تؤخّر الأزرار.
-async function loadDocsCard(p, arg) {
+// refresh: دالّةٌ تُستدعى بعد إضافة/حذف عنصر (لتُعيد رسم الشاشة الحالية — الملف أو التعديل).
+async function loadDocsCard(p, refresh) {
+  const reload = (typeof refresh === 'function') ? refresh : (() => screenPerson(String(p.id)));
   const box = document.getElementById('docsCard'); if (!box) return;
   let docs = [];
   try { const { data } = await sb.from('almfrje_documents').select('*').eq('person_id', p.id).order('id'); docs = data || []; } catch (e) { }
@@ -1715,19 +1717,19 @@ async function loadDocsCard(p, arg) {
     </div>
     ${poemsBy.length ? `<div class="card"><h3>📜 قصائد له (${poemsBy.length})</h3>${poemsBy.map(poemCard).join('')}</div>` : ''}
     ${poemsAbout.length ? `<div class="card"><h3>📜 قصائد قيلت فيه (${poemsAbout.length})</h3>${poemsAbout.map(poemCard).join('')}</div>` : ''}`;
-  const ad = document.getElementById('addDoc'); if (ad) ad.addEventListener('click', () => addDocModal(p));
+  const ad = document.getElementById('addDoc'); if (ad) ad.addEventListener('click', () => addDocModal(p, reload));
   box.querySelectorAll('[data-lb]').forEach(t => t.addEventListener('click', () => openLightbox(galleryPhotos, parseInt(t.dataset.lb, 10))));
   { const pg = document.getElementById('phGallery'); if (pg) pg.addEventListener('click', () => openLightbox(galleryPhotos, 0)); }
   box.querySelectorAll('[data-phdel]').forEach(b => b.addEventListener('click', async (e) => {
     e.stopPropagation();
     if (!(await confirm2('حذف هذه الصورة من مكتبة الشخص؟'))) return;
     const ok = await guard(async () => { const { error } = await sb.from('almfrje_documents').delete().eq('id', b.dataset.phdel); if (error) throw error; });
-    if (ok) { toast('تم الحذف'); screenPerson(arg); }
+    if (ok) { toast('تم الحذف'); reload(); }
   }));
   box.querySelectorAll('[data-ddel]').forEach(b => b.addEventListener('click', async () => {
     if (!(await confirm2('حذف هذا الملف؟'))) return;
     const ok = await guard(async () => { const { error } = await sb.from('almfrje_documents').delete().eq('id', b.dataset.ddel); if (error) throw error; });
-    if (ok) { toast('تم الحذف'); screenPerson(arg); }
+    if (ok) { toast('تم الحذف'); reload(); }
   }));
 }
 // إعادة ترتيب الأبناء بالسحب والإفلات — يُفعَّل بالضغط المطوّل، ويبقى ضمن إخوته (نفس الأب).
@@ -1953,7 +1955,8 @@ const DOC_CATS = [
   { k: 'poem_by', ar: '📜 قصيدة له' },
   { k: 'poem_about', ar: '📜 قصيدة قيلت فيه' },
 ];
-function addDocModal(p) {
+function addDocModal(p, refresh) {
+  const reload = (typeof refresh === 'function') ? refresh : (() => screenPerson(String(p.id)));
   openModal('➕ إضافة إلى مكتبة الشخص', `
     ${fSelect('النوع', 'd_cat', DOC_CATS, 'photo')}
     <!-- وضع الصور: اختَر صورةً أو أكثر دفعةً واحدة، وحدّد الشخصية منها -->
@@ -2042,7 +2045,7 @@ function addDocModal(p) {
           }
         });
         showLoading(false);
-        if (ok) { closeModal(); toast('✅ حُفظت ' + picks.length + (picks.length === 1 ? ' صورة' : ' صور')); screenPerson(String(p.id)); }
+        if (ok) { closeModal(); toast('✅ حُفظت ' + picks.length + (picks.length === 1 ? ' صورة' : ' صور')); reload(); }
         else { btn.disabled = false; btn.textContent = oldTxt; }
         return;
       }
@@ -2061,7 +2064,7 @@ function addDocModal(p) {
         await insertDoc({ person_id: p.id, kind, url, label, category: isPoem ? v : '', is_public, body });
       });
       showLoading(false);
-      if (ok) { closeModal(); toast('✅ تم الحفظ'); screenPerson(String(p.id)); }
+      if (ok) { closeModal(); toast('✅ تم الحفظ'); reload(); }
       else { btn.disabled = false; btn.textContent = oldTxt; }
     });
   });
@@ -2741,16 +2744,21 @@ async function screenPersonEdit(arg) {
       <div class="field" id="p_death_wrap" style="${(p.status === 'dead') ? '' : 'display:none'}"><label>سنة الوفاة</label><input id="p_death" type="text" value="${esc(p.death || '')}" placeholder="إن وُجدت"></div>
       ${fInput('البريد الإلكتروني', 'p_email', p.email, 'email', 'placeholder="اختياري"')}
     </div>
-    <div class="card"><h3>الصورة الشخصية (اختياري)</h3>
+    <div class="card"><h3>الصورة الرئيسية (اختياري)</h3>
+      <p class="muted" style="font-size:.82rem;margin-top:-4px">الصورة التي تظهر في الشجرة وأعلى الملف. أو اضبطها من «الصور والوثائق» أدناه بزرّ «🌳 الشخصية».</p>
       <div class="field"><label>رفع صورة — أو ضع رابطاً</label><input id="p_photofile" type="file" accept="image/*"></div>
       ${fInput('رابط الصورة', 'p_photo', p.photo_url, 'text', 'placeholder="اختياري"')}
     </div>
+    ${!hideForGuest('media') ? '<div id="docsCard"></div>' : ''}
     <div class="card"><h3>ملاحظات (اختياري)</h3>${fTextarea('ملاحظات', 'p_notes', p.notes)}</div>
     <button class="btn btn-lg" id="saveBtn">💾 حفظ التعديل</button>
     ${isAdmin()
       ? `<button class="btn btn-lg danger" id="delBtn" style="margin-top:12px">🗑️ حذف هذا الاسم</button>
     <p class="muted" style="text-align:center;font-size:.8rem;margin-top:6px">الحذف لمدير النظام فقط — تُحفظ نسخة في سلة المحذوفات ويمكن استرجاعها.</p>`
       : `<p class="muted" style="text-align:center;font-size:.82rem;margin-top:8px">🔒 حذف الأسماء غير متاح — التعديل فقط، والنسخة السابقة تُحفظ في سلة المحذوفات.</p>`}`;
+  // مكتبة الصور/الوثائق نفسها التي في الملف — تظهر هنا في التعديل (الصور السابقة + خصوصية كلّ
+  // عنصر + إضافة عدّة صور + تحديد الشخصية)، وتُعيد رسم شاشة التعديل بعد أي إضافة/حذف.
+  if (!hideForGuest('media')) loadDocsCard(p, () => screenPersonEdit(arg));
   // زرّ العين لإظهار/إخفاء الرقم السري (حين يوجد حقل كلمة المرور)
   if (peShowPw) view().querySelectorAll('.eye').forEach(b => b.addEventListener('click', () => { const inp = document.getElementById(b.dataset.eye); if (!inp) return; const show = inp.type === 'password'; inp.type = show ? 'text' : 'password'; b.textContent = show ? '🙈' : '👁'; }));
   document.getElementById('saveBtn').addEventListener('click', async () => {
