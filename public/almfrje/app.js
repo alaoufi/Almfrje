@@ -1899,6 +1899,29 @@ function screenReorder() {
   q.addEventListener('input', debounce(() => (q.value.trim() ? renderSearch() : renderBrowse()), 130));
   renderBrowse();
 }
+// تصغيرٌ وضغطٌ للصور قبل الرفع: صورةٌ بحجم ٤م.ب تصبح ~٢٠٠ك.ب، فيُسرَّع الحفظ كثيراً
+// ويخفّ ثقل التمرير والعرض. غير الصور (PDF…) تعود كما هي، وإن لم يُجدِ الضغط يُبقى الأصل.
+function compressImage(file, maxDim = 1600, quality = 0.85) {
+  return new Promise((resolve) => {
+    if (!file || !file.type || !file.type.startsWith('image/')) { resolve(file); return; }
+    const img = new Image();
+    img.onload = () => {
+      let w = img.width, h = img.height;
+      if (!w || !h) { resolve(file); return; }
+      if (Math.max(w, h) > maxDim) { const s = maxDim / Math.max(w, h); w = Math.round(w * s); h = Math.round(h * s); }
+      try {
+        const c = document.createElement('canvas'); c.width = w; c.height = h;
+        c.getContext('2d').drawImage(img, 0, 0, w, h);
+        c.toBlob((blob) => {
+          if (!blob || blob.size >= file.size) { resolve(file); return; }   // لا فائدة → الأصل
+          resolve(new File([blob], (file.name || 'photo').replace(/\.\w+$/, '') + '.jpg', { type: 'image/jpeg' }));
+        }, 'image/jpeg', quality);
+      } catch (e) { resolve(file); }
+    };
+    img.onerror = () => resolve(file);
+    img.src = URL.createObjectURL(file);
+  });
+}
 let _docEnhanced = null;   // نسخة الصورة المحسّنة (blob) إن وافق المستخدم على التحسين
 // تحسينٌ تلقائي بزرّ واحد: يرفع التباين والتشبّع والسطوع قليلاً (canvas) — مع تصغيرٍ للأحجام الكبيرة.
 function enhanceDocImage(file) {
@@ -1975,7 +1998,8 @@ function addDocModal(p) {
       const asMain = cat === 'photo' && document.getElementById('d_main') && document.getElementById('d_main').checked;
       const ok = await guard(async () => {
         if (file) {
-          const toUp = _docEnhanced ? new File([_docEnhanced], ((file.name || 'photo').replace(/\.\w+$/, '') || 'photo') + '.jpg', { type: 'image/jpeg' }) : file;
+          // المحسّنة جاهزة؛ وإلا نصغّر الصور تلقائياً قبل الرفع (أسرع حفظاً)، وغير الصور تُرفع كما هي.
+          const toUp = _docEnhanced ? new File([_docEnhanced], ((file.name || 'photo').replace(/\.\w+$/, '') || 'photo') + '.jpg', { type: 'image/jpeg' }) : await compressImage(file);
           url = await uploadFile(toUp, 'docs');
         }
         url = url || '';
@@ -2934,7 +2958,7 @@ async function savePerson(id, existing) {
   if (_savePersonBusy) return;                 // منع تكرار الحفظ عند الضغط مرتين
   _savePersonBusy = true; showLoading(true);    // مؤشّر تحميل أثناء الرفع/الحفظ
   const ok = await guard(async () => {
-    if (photofile) photo_url = await uploadFile(photofile, 'photos');
+    if (photofile) photo_url = await uploadFile(await compressImage(photofile), 'photos');
     obj.photo_url = photo_url;
     if (existing) {
       // تتبّع: مَن عدّل ومتى
