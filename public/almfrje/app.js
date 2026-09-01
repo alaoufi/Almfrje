@@ -408,6 +408,20 @@ function canExport() { return isAdmin() || isManager(); }
 function canDelete() { return isAdmin(); }                    // الحذف للمدير فقط
 // إدارة مكتبة صور/ملفات شخصٍ (إضافة/حذف): للمدير أو لصاحب الحساب نفسه (المرتبط بهذا الشخص) حصراً.
 function canManageMedia(p) { return isAdmin() || (!!p && !!myPersonId() && myPersonId() === Number(p.id)); }
+// مجموعة معرّفات «نفسي + أصولي»: المشاهدُ يُعدّ من ذريّة كلٍّ منها، فيرى صورَهم «لذريّته فقط».
+let _lineageSet = null;
+function myLineageSet() {
+  if (_lineageSet) return _lineageSet;
+  const set = new Set(); let cur = myPersonId(), guard = 0;
+  while (cur && guard++ < 200) { set.add(Number(cur)); const pp = byId.get(Number(cur)); cur = pp ? pp.father_id : null; }
+  _lineageSet = set; return set;
+}
+// هل تُعرض الصورة الرئيسية (صورة الشجرة) للمشاهد؟ العامّة للجميع؛ والمخفية لصاحبها/ذريّته/الإدارة.
+function canSeeMainPhoto(p) {
+  if (!p || p.photo_public !== false) return true;
+  if (isAdmin()) return true;
+  return myLineageSet().has(Number(p.id));
+}
 // صلاحيات المشرف الدقيقة: المدير مفتوح؛ المشرف بلا صلاحيات محدّدة = الكل مفعّل (توافق رجعي).
 const MGR_PERMS = [['add_birth', 'إضافة مولود'], ['approve_birth', 'تأكيد إضافة مولود'], ['reorder', 'تعديل ترتيب الأبناء'], ['edit_profile', 'تعديل الملف الشخصي (الجوال/الحالة/الحالة الوظيفية/المدينة…)']];
 function mgrPerm(k) {
@@ -441,13 +455,25 @@ async function fetchAll(table, cols = '*', pageSize = 1000) {
 // أعمدة البدء (خفيفة): كل ما تحتاجه الشجرة والقوائم والبحث والتصدير — و«الباقي عند الطلب»:
 //   • notes (نصّ قد يطول) يُجلب عند فتح الملف/التعديل فقط (لا يظهر في القوائم).
 //   • field_audit (jsonb) يبقى للمدير (يحتاجه المحرّر الجماعي)، ويُسقَط لمنظور الزائر (لا يستخدمه).
-const PERSONS_FULL_COLS = 'id,name,father_id,branch_id,generation,sex,status,birth,death,phone,email,city,photo_url,sort,created_at,created_by,created_by_name,updated_by_name,updated_at,work,birthplace,nickname,field_audit';
-const PERSONS_PUB_COLS = 'id,name,father_id,branch_id,generation,sex,status,birth,death,city,photo_url,nickname,work,sort,created_at,created_by_name,updated_by_name,updated_at';
+const PERSONS_FULL_COLS = 'id,name,father_id,branch_id,generation,sex,status,birth,death,phone,email,city,photo_url,photo_public,sort,created_at,created_by,created_by_name,updated_by_name,updated_at,work,birthplace,nickname,field_audit';
+const PERSONS_PUB_COLS = 'id,name,father_id,branch_id,generation,sex,status,birth,death,city,photo_url,photo_public,nickname,work,sort,created_at,created_by_name,updated_by_name,updated_at';
+// مرونةٌ ضد عمودٍ حديث (photo_public) لم تُطبَّق ترقيته بعد: إن فشل الاستعلام بسببه
+// نرقّ المخطط بالخلفية ونعيد المحاولة بلا العمود — فلا ينكسر التحميل قبل دخول المدير.
+async function fetchPersonsCols(table, cols) {
+  try { return await fetchAllFast(table, cols); }
+  catch (e) {
+    if (/photo_public|column|does not exist|schema cache/i.test(e.message || '')) {
+      try { fetch('/api/almfrje-setup', { method: 'POST' }).catch(() => {}); } catch (_) { }
+      return fetchAllFast(table, cols.replace(',photo_public', ''));
+    }
+    throw e;
+  }
+}
 async function fetchPersons() {
   const full = isAdmin() || isManager();
-  if (full) return fetchAllFast('almfrje_persons', PERSONS_FULL_COLS);
-  try { return await fetchAllFast('almfrje_persons_pub', PERSONS_PUB_COLS); }
-  catch (e) { return fetchAllFast('almfrje_persons', PERSONS_FULL_COLS); }   // المنظور غير موجود بعد → رجوع
+  if (full) return fetchPersonsCols('almfrje_persons', PERSONS_FULL_COLS);
+  try { return await fetchPersonsCols('almfrje_persons_pub', PERSONS_PUB_COLS); }
+  catch (e) { return fetchPersonsCols('almfrje_persons', PERSONS_FULL_COLS); }   // المنظور غير موجود بعد → رجوع
 }
 // نسخةٌ أسرع للجداول الكبيرة (الأشخاص): تجلب أوّل صفحتين بالتوازي (شجرتنا > 1000 صف)،
 // ثم تكمّل تسلسلياً فقط إن تجاوزت 2000 — فتُختصر رحلةٌ شبكية كاملة من زمن الإقلاع.
@@ -585,6 +611,7 @@ function applyHintOverrides(ov) {
   }
 }
 function buildIndex() {
+  _lineageSet = null;   // تتغيّر البيانات/المستخدم — أعِد حساب مجموعة النسب عند أول حاجة
   byId = new Map(); kids = new Map(); branchById = new Map(); branchRootCache = new Map();
   C.branches.forEach(b => branchById.set(b.id, b));
   C.persons.forEach(p => { p._n = normalizeAr(p.name + ' ' + (p.nickname || '')); p._ln = null; byId.set(p.id, p); });
@@ -825,7 +852,7 @@ function adminTabBar(active) {
 function avatar(p, lg) {
   const cls = 'avatar' + (lg ? ' lg' : '');
   const fallback = p && p.sex === 'female' ? '👩' : '👤';
-  if (p && p.photo_url && !hideForGuest('media')) {
+  if (p && p.photo_url && !hideForGuest('media') && canSeeMainPhoto(p)) {
     // عند فشل تحميل الصورة (رابط معطّل/مجلّد غير عام) استبدلها بالأيقونة بدل إطار فارغ.
     return `<img class="${cls}" src="${esc(p.photo_url)}" alt="" loading="lazy" decoding="async" onerror="this.outerHTML='<div class=\\'${cls}\\'>${fallback}</div>'">`;
   }
@@ -1719,13 +1746,15 @@ async function loadDocsCard(p, refresh) {
   const opt = (id, pub, cur, label, isMain) => `<button type="button" class="dm-opt ${cur ? 'on' : ''}" data-vis="${id}" data-pub="${pub}"${isMain ? ' data-ismain="1"' : ''}><span class="dm-box">${cur ? '✔' : ''}</span>${label}</button>`;
   const visBtns = (id, isPub, isMain) => opt(id, '1', isPub, '👁 تُعرض للجميع', isMain) + opt(id, '0', !isPub, '🔒 لذريّته فقط', isMain);
   // وضع الإدارة (المدير/صاحب الحساب): لكل صورة/ملف تحكّمٌ أمامه — رئيسية/النشر/حذف.
+  const pMainPub = p.photo_public !== false;   // خصوصية الصورة الرئيسية (صورة الشجرة)
+  const personVis = `<button type="button" class="dm-opt ${pMainPub ? 'on' : ''}" data-visperson data-pub="1"><span class="dm-box">${pMainPub ? '✔' : ''}</span>👁 تُعرض للجميع</button><button type="button" class="dm-opt ${!pMainPub ? 'on' : ''}" data-visperson data-pub="0"><span class="dm-box">${!pMainPub ? '✔' : ''}</span>🔒 تُعرض لذريّته فقط</button>`;
   const managePhotos = galleryPhotos.map((ph, i) => `<div class="dm-item">
       <img class="dm-thumb" src="${esc(ph.url)}" data-lb="${i}" loading="lazy" decoding="async" alt="">
       <div class="dm-ctrl">
         ${ph.main
           ? '<span class="dm-opt on"><span class="dm-box">✔</span>🌳 الصورة الرئيسية</span>'
           : `<button type="button" class="dm-opt" data-setmain="${esc(ph.url)}"${ph.id ? ` data-mainid="${ph.id}"` : ''}><span class="dm-box"></span>🌳 اجعلها الرئيسية</button>`}
-        ${ph.id ? visBtns(ph.id, !ph.hidden, ph.main) : '<span class="dm-opt on"><span class="dm-box">✔</span>👁 تظهر للجميع في الشجرة</span>'}
+        ${ph.main ? personVis : (ph.id ? visBtns(ph.id, !ph.hidden, false) : '')}
         ${ph.id
           ? `<button type="button" class="dm-opt danger" data-phdel="${ph.id}"${ph.main ? ' data-delmain="1"' : ''}>🗑 حذف</button>`
           : '<button type="button" class="dm-opt danger" data-mainclear="1">🗑 إزالة</button>'}
@@ -1774,10 +1803,17 @@ async function loadDocsCard(p, refresh) {
     e.stopPropagation();
     const u = b.dataset.setmain;
     const ok = await guard(async () => {
-      const { error } = await sb.from('almfrje_persons').update({ photo_url: u, updated_at: new Date().toISOString() }).eq('id', p.id); if (error) throw error; const pp = byId.get(p.id); if (pp) pp.photo_url = u;
-      if (b.dataset.mainid) await sb.from('almfrje_documents').update({ is_public: true }).eq('id', b.dataset.mainid);   // الرئيسية تظهر للجميع في الشجرة
+      const { error } = await sb.from('almfrje_persons').update({ photo_url: u, photo_public: true, updated_at: new Date().toISOString() }).eq('id', p.id); if (error) throw error; const pp = byId.get(p.id); if (pp) { pp.photo_url = u; pp.photo_public = true; }
+      if (b.dataset.mainid) await sb.from('almfrje_documents').update({ is_public: true }).eq('id', b.dataset.mainid);   // الرئيسية تظهر للجميع في الشجرة افتراضياً
     });
     if (ok) { toast('صارت الصورة الرئيسية'); reload(); }
+  }));
+  // خصوصية الصورة الرئيسية (صورة الشجرة): «للجميع» أو «لذريّته فقط» — تُحفظ على الشخص نفسه.
+  box.querySelectorAll('[data-visperson]').forEach(b => b.addEventListener('click', async (e) => {
+    e.stopPropagation();
+    const pub = b.dataset.pub === '1';
+    const ok = await guard(async () => { const { error } = await sb.from('almfrje_persons').update({ photo_public: pub, updated_at: new Date().toISOString() }).eq('id', p.id); if (error) throw error; const pp = byId.get(p.id); if (pp) pp.photo_public = pub; });
+    if (ok) { toast(pub ? 'تُعرض للجميع في الشجرة' : 'تُعرض لذريّته فقط'); reload(); }
   }));
   // تغيير خصوصية عنصرٍ: «للجميع» (is_public=true) أو «لذريته فقط» (is_public=false).
   // جعل الرئيسية «لذريّته فقط» يُلغي كونها رئيسية (لأنها لن تظهر للجميع في الشجرة).
@@ -2071,11 +2107,9 @@ function addDocModal(p, refresh) {
         if (mainIdx === idx) mainIdx = (picks.length ? 0 : -1); else if (mainIdx > idx) mainIdx--;
         renderGrid();
       }));
-      grid.querySelectorAll('[data-main]').forEach(b => b.addEventListener('click', () => { mainIdx = +b.dataset.main; if (vis[mainIdx] === 'private') vis[mainIdx] = 'public'; renderGrid(); }));
+      grid.querySelectorAll('[data-main]').forEach(b => b.addEventListener('click', () => { mainIdx = +b.dataset.main; renderGrid(); }));
       grid.querySelectorAll('[data-setvis]').forEach(b => b.addEventListener('click', () => {
-        const i = +b.dataset.setvis; const pub = b.dataset.pub === '1';
-        vis[i] = pub ? 'public' : 'private';
-        if (!pub && mainIdx === i) mainIdx = -1;   // «لذريّته فقط» لا تكون شخصيةً (لا تظهر في الشجرة)
+        const i = +b.dataset.setvis; vis[i] = (b.dataset.pub === '1') ? 'public' : 'private';
         renderGrid();
       }));
     };
@@ -2112,13 +2146,14 @@ function addDocModal(p, refresh) {
             btn.textContent = `… جارٍ الرفع (${i + 1}/${picks.length})`;
             const toUp = await compressImage(picks[i], 1600, 0.85, enhance);
             const u = await uploadFile(toUp, 'docs');
-            const itemPublic = (i === mainIdx) ? true : (vis[i] !== 'private');   // الشخصية تُعرض للجميع
+            const itemPublic = vis[i] !== 'private';
             await insertDoc({ person_id: p.id, kind: 'photo', url: u, label, category: '', is_public: itemPublic, body: '' });
             if (i === mainIdx) mainUrl = u;
           }
           if (mainUrl) {
-            const { error: e2 } = await sb.from('almfrje_persons').update({ photo_url: mainUrl, updated_at: new Date().toISOString() }).eq('id', p.id); if (e2) throw e2;
-            const pp = byId.get(p.id); if (pp) pp.photo_url = mainUrl;
+            const mainPub = vis[mainIdx] !== 'private';   // الشخصية قد تكون «لذريّته فقط»
+            const { error: e2 } = await sb.from('almfrje_persons').update({ photo_url: mainUrl, photo_public: mainPub, updated_at: new Date().toISOString() }).eq('id', p.id); if (e2) throw e2;
+            const pp = byId.get(p.id); if (pp) { pp.photo_url = mainUrl; pp.photo_public = mainPub; }
           }
         });
         showLoading(false);
