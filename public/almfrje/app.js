@@ -1712,18 +1712,24 @@ async function loadDocsCard(p, refresh) {
   const N = galleryPhotos.length + files.length + poemsBy.length + poemsAbout.length;
   const poemCard = (d) => `<div class="poem-card">${d.label ? `<div class="poem-title">${esc(d.label)}${lock(d)}</div>` : `<div class="poem-title">قصيدة${lock(d)}</div>`}${d.body ? `<div class="poem-body">${esc(d.body)}</div>` : ''}${d.url ? `<a href="${esc(d.url)}" target="_blank" rel="noopener" class="poem-file">📎 المرفق</a>` : ''}${canDel ? `<button class="btn sm danger" data-ddel="${d.id}" style="margin-top:6px">حذف</button>` : ''}</div>`;
   // زرّا الخصوصية أمام كل عنصرٍ (وضع الإدارة): «للجميع» أو «لذريته فقط».
-  const visBtns = (id, isPub) => `<button type="button" class="dm-chip ${isPub ? 'on' : ''}" data-vis="${id}" data-pub="1">👁 للجميع</button><button type="button" class="dm-chip ${!isPub ? 'on' : ''}" data-vis="${id}" data-pub="0">🔒 لذريته فقط</button>`;
+  // مربّع اختيارٍ واضح: المفعّل ✅ (أخضر) وغير المفعّل ⬜ — فيُعرف الوضع بنظرة.
+  const opt = (id, pub, cur, label) => `<button type="button" class="dm-opt ${cur ? 'on' : ''}" data-vis="${id}" data-pub="${pub}"><span class="dm-box">${cur ? '✔' : ''}</span>${label}</button>`;
+  const visBtns = (id, isPub) => opt(id, '1', isPub, '👁 تُعرض للجميع') + opt(id, '0', !isPub, '🔒 لذريّته فقط');
   // وضع الإدارة (المدير/صاحب الحساب): لكل صورة/ملف تحكّمٌ أمامه — رئيسية/النشر/حذف.
   const managePhotos = galleryPhotos.map((ph, i) => `<div class="dm-item">
       <img class="dm-thumb" src="${esc(ph.url)}" data-lb="${i}" loading="lazy" decoding="async" alt="">
       <div class="dm-ctrl">
-        ${ph.main ? '<span class="dm-chip on">🌳 الرئيسية الحالية</span>' : `<button type="button" class="dm-chip" data-setmain="${esc(ph.url)}">🌳 اجعلها الرئيسية</button>`}
-        ${ph.main ? '<span class="dm-chip on">👁 تظهر في الشجرة للجميع</span>' : visBtns(ph.id, !ph.hidden)}
-        ${ph.main ? '<button type="button" class="dm-chip danger" data-mainclear="1">🗑 إزالة</button>' : `<button type="button" class="dm-chip danger" data-phdel="${ph.id}">🗑 حذف</button>`}
+        ${ph.main
+          ? '<span class="dm-opt on"><span class="dm-box">✔</span>🌳 الصورة الرئيسية</span>'
+          : `<button type="button" class="dm-opt" data-setmain="${esc(ph.url)}"><span class="dm-box"></span>🌳 اجعلها الرئيسية</button>`}
+        ${ph.main ? '' : visBtns(ph.id, !ph.hidden)}
+        ${ph.main
+          ? '<button type="button" class="dm-opt danger" data-mainclear="1">🗑 إزالة</button>'
+          : `<button type="button" class="dm-opt danger" data-phdel="${ph.id}">🗑 حذف</button>`}
       </div></div>`).join('');
   const manageFiles = files.map(d => `<div class="dm-item dm-file">
       <span class="dm-name">${d.kind === 'pdf' ? '📄' : '📎'} <a href="${esc(d.url)}" target="_blank" rel="noopener">${esc(d.label || 'ملف')}</a></span>
-      <div class="dm-ctrl">${visBtns(d.id, d.is_public !== false)}<button type="button" class="dm-chip danger" data-ddel="${d.id}">🗑 حذف</button></div></div>`).join('');
+      <div class="dm-ctrl">${visBtns(d.id, d.is_public !== false)}<button type="button" class="dm-opt danger" data-ddel="${d.id}">🗑 حذف</button></div></div>`).join('');
   const manageView = `${(galleryPhotos.length || files.length) ? '<p class="muted dm-note">🛈 لكل صورة/ملف: اجعلها الرئيسية، أو انشرها «للجميع» أو اجعلها «لذريته فقط». والإدارة تطّلع على الكل لإدارته عند الحاجة.</p>' : ''}
       ${galleryPhotos.length ? `<div class="dm-list">${managePhotos}</div>` : ''}
       ${files.length ? `<div class="dm-list dm-files">${manageFiles}</div>` : ''}`;

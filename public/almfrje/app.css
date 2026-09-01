@@ -1217,12 +1217,16 @@ ul.hier ul.hier > .hier-li::before {
 .dm-thumb { width: 64px; height: 64px; flex: none; object-fit: cover; border-radius: 10px; cursor: pointer; border: 1px solid var(--line); }
 .dm-name { flex: 1; font-size: .9rem; overflow-wrap: anywhere; }
 .dm-name a { color: var(--brand); text-decoration: none; }
-.dm-ctrl { display: flex; flex-wrap: wrap; gap: 5px; flex: 1; align-content: center; }
-.dm-chip { font: inherit; font-size: .74rem; font-weight: 800; padding: 5px 9px; border-radius: 999px; border: 1px solid var(--line); background: var(--bg); color: var(--text); cursor: pointer; white-space: nowrap; }
-.dm-chip.on { background: var(--brand); color: #fff; border-color: var(--brand); }
-.dm-chip.danger { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 40%, var(--line)); background: color-mix(in srgb, var(--danger) 8%, var(--card)); }
-.dm-chip.danger:active { background: color-mix(in srgb, var(--danger) 20%, var(--card)); }
-.dm-file .dm-ctrl { flex: none; }
+.dm-ctrl { display: flex; flex-direction: column; gap: 6px; flex: 1; align-items: stretch; }
+/* خيارٌ بمربّع اختيارٍ واضح: المفعّل أخضرُ بعلامة ✔، وغير المفعّل بمربّعٍ فارغ */
+.dm-opt { font: inherit; font-size: .82rem; font-weight: 800; padding: 8px 10px; border-radius: 10px; border: 1.5px solid var(--line); background: var(--card); color: var(--text); cursor: pointer; white-space: nowrap; display: flex; align-items: center; gap: 8px; text-align: start; }
+.dm-box { width: 20px; height: 20px; flex: none; border: 2px solid var(--muted); border-radius: 6px; display: inline-flex; align-items: center; justify-content: center; font-size: .8rem; color: #fff; line-height: 1; }
+.dm-opt.on { border-color: #16a34a; background: color-mix(in srgb, #16a34a 12%, var(--card)); color: #15803d; }
+.dm-opt.on .dm-box { background: #16a34a; border-color: #16a34a; }
+.dm-opt.danger { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 40%, var(--line)); background: color-mix(in srgb, var(--danger) 8%, var(--card)); font-weight: 800; justify-content: center; }
+.dm-opt.danger:active { background: color-mix(in srgb, var(--danger) 20%, var(--card)); }
+.dm-opt.danger .dm-box, .dm-opt[data-mainclear] .dm-box { display: none; }
+.dm-file .dm-ctrl { flex: none; min-width: 150px; }
 
 /* ===== معاينة الصورة وتحسينها في نافذة الإضافة ===== */
 .d-preview { margin: 4px 0 8px; }
