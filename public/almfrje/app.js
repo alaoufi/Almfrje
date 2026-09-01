@@ -1700,18 +1700,19 @@ async function loadDocsCard(p, refresh) {
   try { const { data } = await sb.from('almfrje_documents').select('*').eq('person_id', p.id).order('id'); docs = data || []; } catch (e) { }
   if (!document.getElementById('docsCard')) return;   // غادر المستخدم الصفحة أثناء الجلب
   galleryPhotos = [];
-  if (p.photo_url) galleryPhotos.push({ url: p.photo_url, label: p.nickname || p.name });
+  if (p.photo_url) galleryPhotos.push({ url: p.photo_url, label: p.nickname || p.name, main: true });
   docs.filter(d => (d.category || '') === '' && d.kind === 'photo' && d.url !== p.photo_url).forEach(d => galleryPhotos.push({ url: d.url, label: d.label || '', id: d.id, hidden: d.is_public === false }));
   const files = docs.filter(d => (d.category || '') === '' && d.kind !== 'photo');
   const poemsBy = docs.filter(d => d.category === 'poem_by');
   const poemsAbout = docs.filter(d => d.category === 'poem_about');
   const lock = (d) => d.is_public === false ? ' <span class="doc-lock" title="مخفية — لا يراها إلا صاحبها والإدارة وذريّته">🔒</span>' : '';
+  const canDel = canEditPerson(p);   // حذف عناصر المكتبة متاحٌ لمن يملك تعديل الشخص (لا للمدير وحده)
   const N = galleryPhotos.length + files.length + poemsBy.length + poemsAbout.length;
-  const poemCard = (d) => `<div class="poem-card">${d.label ? `<div class="poem-title">${esc(d.label)}${lock(d)}</div>` : `<div class="poem-title">قصيدة${lock(d)}</div>`}${d.body ? `<div class="poem-body">${esc(d.body)}</div>` : ''}${d.url ? `<a href="${esc(d.url)}" target="_blank" rel="noopener" class="poem-file">📎 المرفق</a>` : ''}${canDelete() ? `<button class="btn sm danger" data-ddel="${d.id}" style="margin-top:6px">حذف</button>` : ''}</div>`;
+  const poemCard = (d) => `<div class="poem-card">${d.label ? `<div class="poem-title">${esc(d.label)}${lock(d)}</div>` : `<div class="poem-title">قصيدة${lock(d)}</div>`}${d.body ? `<div class="poem-body">${esc(d.body)}</div>` : ''}${d.url ? `<a href="${esc(d.url)}" target="_blank" rel="noopener" class="poem-file">📎 المرفق</a>` : ''}${canDel ? `<button class="btn sm danger" data-ddel="${d.id}" style="margin-top:6px">حذف</button>` : ''}</div>`;
   box.innerHTML = `<div class="card"><h3>الصور والوثائق ${N ? '(' + N + ')' : ''}</h3>
-      ${galleryPhotos.length ? `<div class="ph-grid">${galleryPhotos.map((ph, i) => `<div class="ph-thumb" data-lb="${i}"><img src="${esc(ph.url)}" loading="lazy" decoding="async" alt="">${ph.hidden ? '<span class="ph-lock">🔒</span>' : ''}${ph.id && canDelete() ? `<button class="ph-del" data-phdel="${ph.id}" title="حذف الصورة">🗑</button>` : ''}</div>`).join('')}</div>
+      ${galleryPhotos.length ? `<div class="ph-grid">${galleryPhotos.map((ph, i) => `<div class="ph-thumb" data-lb="${i}"><img src="${esc(ph.url)}" loading="lazy" decoding="async" alt="">${ph.hidden ? '<span class="ph-lock">🔒</span>' : ''}${ph.main ? '<span class="ph-main" title="الصورة الرئيسية">🌳</span>' : ''}${ph.id && canDel ? `<button class="ph-del" data-phdel="${ph.id}" title="حذف الصورة">🗑</button>` : ''}${ph.main && !ph.id && canDel ? `<button class="ph-del" data-mainclear="1" title="إزالة الصورة الرئيسية">🗑</button>` : ''}</div>`).join('')}</div>
         <button class="btn sm outline" id="phGallery" style="margin-top:8px">🖼️ معرض صوره (${galleryPhotos.length})</button>` : ''}
-      ${files.length ? `<div style="margin-top:8px">${files.map(d => `<div class="row"><span class="k">${d.kind === 'pdf' ? '📄' : '📎'} <a href="${esc(d.url)}" target="_blank" rel="noopener" style="color:var(--brand);text-decoration:none">${esc(d.label || 'ملف')}</a>${lock(d)}</span>${canDelete() ? `<button class="btn sm danger" data-ddel="${d.id}">حذف</button>` : ''}</div>`).join('')}</div>` : ''}
+      ${files.length ? `<div style="margin-top:8px">${files.map(d => `<div class="row"><span class="k">${d.kind === 'pdf' ? '📄' : '📎'} <a href="${esc(d.url)}" target="_blank" rel="noopener" style="color:var(--brand);text-decoration:none">${esc(d.label || 'ملف')}</a>${lock(d)}</span>${canDel ? `<button class="btn sm danger" data-ddel="${d.id}">حذف</button>` : ''}</div>`).join('')}</div>` : ''}
       ${!N ? noItem() : ''}
       ${canEditPerson(p) ? `<button class="btn outline" id="addDoc" style="margin-top:8px">➕ إضافة صورة/وثيقة/قصيدة</button>` : ''}
     </div>
@@ -1725,6 +1726,12 @@ async function loadDocsCard(p, refresh) {
     if (!(await confirm2('حذف هذه الصورة من مكتبة الشخص؟'))) return;
     const ok = await guard(async () => { const { error } = await sb.from('almfrje_documents').delete().eq('id', b.dataset.phdel); if (error) throw error; });
     if (ok) { toast('تم الحذف'); reload(); }
+  }));
+  box.querySelectorAll('[data-mainclear]').forEach(b => b.addEventListener('click', async (e) => {
+    e.stopPropagation();
+    if (!(await confirm2('إزالة الصورة الرئيسية عن هذا الشخص؟ (لن تظهر في الشجرة)'))) return;
+    const ok = await guard(async () => { const { error } = await sb.from('almfrje_persons').update({ photo_url: '', updated_at: new Date().toISOString() }).eq('id', p.id); if (error) throw error; const pp = byId.get(p.id); if (pp) pp.photo_url = ''; });
+    if (ok) { toast('أُزيلت الصورة الرئيسية'); reload(); }
   }));
   box.querySelectorAll('[data-ddel]').forEach(b => b.addEventListener('click', async () => {
     if (!(await confirm2('حذف هذا الملف؟'))) return;

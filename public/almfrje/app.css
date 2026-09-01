@@ -1208,6 +1208,7 @@ ul.hier ul.hier > .hier-li::before {
 .poem-file { display: inline-block; margin-top: 6px; color: var(--brand); text-decoration: none; font-size: .85rem; }
 .doc-lock { color: var(--danger); font-size: .8rem; }
 .ph-lock { position: absolute; top: 4px; inset-inline-end: 4px; font-size: .78rem; background: rgba(0,0,0,.55); border-radius: 6px; padding: 1px 4px; }
+.ph-main { position: absolute; bottom: 4px; inset-inline-end: 4px; font-size: .8rem; background: rgba(0,0,0,.5); border-radius: 6px; padding: 1px 4px; }
 
 /* ===== معاينة الصورة وتحسينها في نافذة الإضافة ===== */
 .d-preview { margin: 4px 0 8px; }
