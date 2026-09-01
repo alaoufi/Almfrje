@@ -1901,7 +1901,7 @@ function screenReorder() {
 }
 // تصغيرٌ وضغطٌ للصور قبل الرفع: صورةٌ بحجم ٤م.ب تصبح ~٢٠٠ك.ب، فيُسرَّع الحفظ كثيراً
 // ويخفّ ثقل التمرير والعرض. غير الصور (PDF…) تعود كما هي، وإن لم يُجدِ الضغط يُبقى الأصل.
-function compressImage(file, maxDim = 1600, quality = 0.85) {
+function compressImage(file, maxDim = 1600, quality = 0.85, enhance = false) {
   return new Promise((resolve) => {
     if (!file || !file.type || !file.type.startsWith('image/')) { resolve(file); return; }
     const img = new Image();
@@ -1911,9 +1911,11 @@ function compressImage(file, maxDim = 1600, quality = 0.85) {
       if (Math.max(w, h) > maxDim) { const s = maxDim / Math.max(w, h); w = Math.round(w * s); h = Math.round(h * s); }
       try {
         const c = document.createElement('canvas'); c.width = w; c.height = h;
-        c.getContext('2d').drawImage(img, 0, 0, w, h);
+        const ctx = c.getContext('2d');
+        if (enhance) { try { ctx.filter = 'contrast(1.12) saturate(1.12) brightness(1.04)'; } catch (e) { /* */ } }
+        ctx.drawImage(img, 0, 0, w, h);
         c.toBlob((blob) => {
-          if (!blob || blob.size >= file.size) { resolve(file); return; }   // لا فائدة → الأصل
+          if (!blob || (!enhance && blob.size >= file.size)) { resolve(file); return; }   // لا فائدة → الأصل
           resolve(new File([blob], (file.name || 'photo').replace(/\.\w+$/, '') + '.jpg', { type: 'image/jpeg' }));
         }, 'image/jpeg', quality);
       } catch (e) { resolve(file); }
@@ -1954,39 +1956,97 @@ const DOC_CATS = [
 function addDocModal(p) {
   openModal('➕ إضافة إلى مكتبة الشخص', `
     ${fSelect('النوع', 'd_cat', DOC_CATS, 'photo')}
-    ${fInput('العنوان / الوصف', 'd_label', '')}
-    <div class="field" id="d_body_wrap" style="display:none"><label>نصّ القصيدة</label><textarea id="d_body" rows="5" placeholder="اكتب أبيات القصيدة هنا…"></textarea></div>
-    <div class="field" id="d_file_wrap"><label>رفع ملف (صورة/PDF) — أو رابطٌ أدناه</label><input id="d_file" type="file" accept="image/*,application/pdf"></div>
-    <div id="d_preview" class="d-preview" style="display:none"></div>
-    ${fInput('رابط مباشر (اختياري)', 'd_url', '')}
-    <label class="perm-chk" id="d_main_wrap"><input type="checkbox" id="d_main"><span>🌳 اجعلها صورته الرئيسية (تظهر في الشجرة)</span></label>
-    <div class="field"><label>مَن يراها؟</label>
+    <!-- وضع الصور: اختَر صورةً أو أكثر دفعةً واحدة، وحدّد الشخصية منها -->
+    <div id="d_photo_wrap">
+      <div class="field"><label>اختر صورةً أو أكثر (يمكن الإضافة على دفعات)</label><input id="d_files" type="file" accept="image/*" multiple></div>
+      <label class="perm-chk" id="d_enh_wrap" style="display:none"><input type="checkbox" id="d_enh"><span>✨ تحسين تلقائي للصور (تباين وإضاءة)</span></label>
+      <div id="d_grid" class="d-add-grid"></div>
+    </div>
+    <!-- وضع الوثيقة/القصيدة: ملفٌ مفرد أو نصّ -->
+    <div id="d_other_wrap" style="display:none">
+      <div class="field" id="d_body_wrap" style="display:none"><label>نصّ القصيدة</label><textarea id="d_body" rows="5" placeholder="اكتب أبيات القصيدة هنا…"></textarea></div>
+      <div class="field"><label>رفع ملف (صورة/PDF) — أو رابطٌ أدناه</label><input id="d_file" type="file" accept="image/*,application/pdf"></div>
+      ${fInput('رابط مباشر (اختياري)', 'd_url', '')}
+    </div>
+    ${fInput('العنوان / الوصف (اختياري)', 'd_label', '')}
+    <div class="field"><label>👁 مَن يراها؟ (تُطبَّق على ما تضيفه الآن)</label>
       <label class="perm-chk"><input type="radio" name="d_vis" value="public" checked><span>👁 عامّة — يراها الجميع</span></label>
       <label class="perm-chk"><input type="radio" name="d_vis" value="private"><span>🔒 مخفية — صاحبها والإدارة وذريّته فقط</span></label>
     </div>
     <button class="btn" id="d_save">حفظ</button>`, () => {
-    // تكييف الحقول حسب النوع: القصائد نصّ + رفع اختياري؛ الصورة تُتيح «الرئيسية»
-    { const cat = document.getElementById('d_cat');
-      const sync = () => {
-        const v = cat.value, isPoem = v === 'poem_by' || v === 'poem_about';
-        const bw = document.getElementById('d_body_wrap'); if (bw) bw.style.display = isPoem ? '' : 'none';
-        const mw = document.getElementById('d_main_wrap'); if (mw) mw.style.display = v === 'photo' ? '' : 'none';
-        const fi = document.getElementById('d_file'); if (fi) fi.accept = v === 'photo' ? 'image/*' : 'image/*,application/pdf';
-      };
-      cat.addEventListener('change', sync); sync(); }
-    // معاينة الصورة عند اختيارها + زرّ «✨ تحسين تلقائي» (معاينة ثم موافقة قبل الرفع)
-    _docEnhanced = null;
-    { const fi = document.getElementById('d_file'); if (fi) fi.addEventListener('change', () => {
-      _docEnhanced = null; const f = fi.files[0]; const pv = document.getElementById('d_preview');
-      if (!f || !f.type.startsWith('image/')) { pv.style.display = 'none'; pv.innerHTML = ''; return; }
-      pv.style.display = ''; pv.innerHTML = `<img id="d_pimg" class="d-pimg" src="${URL.createObjectURL(f)}" alt="">
-        <div class="btn-row" style="margin-top:6px"><button type="button" class="btn sm" id="d_enh">✨ تحسين تلقائي</button><span class="muted" id="d_enh_note" style="align-self:center;font-size:.78rem"></span></div>`;
-      const eb = document.getElementById('d_enh'); if (eb) eb.addEventListener('click', () => enhanceDocImage(f));
+    let picks = [];     // ملفات الصور المختارة (تتراكم على دفعات)
+    let mainIdx = -1;   // مؤشّر الصورة «الشخصية» (الرئيسية) — أو -1
+    const cat = document.getElementById('d_cat');
+    const syncCat = () => {
+      const v = cat.value, isPoem = v === 'poem_by' || v === 'poem_about', isPhoto = v === 'photo';
+      document.getElementById('d_photo_wrap').style.display = isPhoto ? '' : 'none';
+      document.getElementById('d_other_wrap').style.display = isPhoto ? 'none' : '';
+      document.getElementById('d_body_wrap').style.display = isPoem ? '' : 'none';
+    };
+    cat.addEventListener('change', syncCat); syncCat();
+    // شبكة معاينة الصور المتعدّدة: إزالة أيّ صورة، واختيار «الشخصية» منها
+    const grid = document.getElementById('d_grid');
+    const renderGrid = () => {
+      document.getElementById('d_enh_wrap').style.display = picks.length ? '' : 'none';
+      grid.innerHTML = picks.map((f, i) => `<div class="d-add-cell">
+        <img src="${URL.createObjectURL(f)}" alt="" loading="lazy" decoding="async">
+        <button type="button" class="d-add-x" data-rm="${i}" title="إزالة">✕</button>
+        <label class="d-add-main"><input type="radio" name="d_mainpick" ${i === mainIdx ? 'checked' : ''} data-main="${i}"><span>🌳 الشخصية</span></label>
+      </div>`).join('');
+      grid.querySelectorAll('[data-rm]').forEach(b => b.addEventListener('click', () => {
+        const idx = +b.dataset.rm; picks.splice(idx, 1);
+        if (mainIdx === idx) mainIdx = (picks.length ? 0 : -1); else if (mainIdx > idx) mainIdx--;
+        renderGrid();
+      }));
+      grid.querySelectorAll('[data-main]').forEach(r => r.addEventListener('change', () => { mainIdx = +r.dataset.main; }));
+    };
+    { const fi = document.getElementById('d_files'); if (fi) fi.addEventListener('change', () => {
+      const chosen = [...fi.files].filter(f => f.type && f.type.startsWith('image/'));
+      picks = picks.concat(chosen);
+      if (mainIdx < 0 && picks.length) mainIdx = 0;   // الأولى شخصيةٌ افتراضياً (يمكن تغييرها)
+      fi.value = '';   // تفريغ ليتيح إضافة المزيد لاحقاً
+      renderGrid();
     }); }
     document.getElementById('d_save').addEventListener('click', async () => {
       const btn = document.getElementById('d_save');
       if (btn.disabled) return;                          // منع تكرار الحفظ عند الضغط مرتين
-      const cat = val('d_cat'), isPoem = cat === 'poem_by' || cat === 'poem_about';
+      const v = cat.value, isPoem = v === 'poem_by' || v === 'poem_about', isPhoto = v === 'photo';
+      const is_public = (document.querySelector('input[name="d_vis"]:checked') || {}).value !== 'private';
+      const label = val('d_label').trim();
+      const insertDoc = async (rec) => {
+        let { error } = await sb.from('almfrje_documents').insert(rec);
+        if (error && /column|schema cache/i.test(error.message || '')) {   // ترقية المخطط ثم إعادة
+          try { await fetch('/api/almfrje-setup', { method: 'POST' }); await new Promise(r => setTimeout(r, 1500)); } catch (e) { /* */ }
+          ({ error } = await sb.from('almfrje_documents').insert(rec));
+        }
+        if (error) throw error;
+      };
+      // ===== وضع الصور المتعدّدة =====
+      if (isPhoto) {
+        if (!picks.length) { toast('اختر صورةً واحدة على الأقل'); return; }
+        const enhance = !!(document.getElementById('d_enh') && document.getElementById('d_enh').checked);
+        btn.disabled = true; const oldTxt = btn.textContent;
+        showLoading(true);
+        const ok = await guard(async () => {
+          let mainUrl = '';
+          for (let i = 0; i < picks.length; i++) {
+            btn.textContent = `… جارٍ الرفع (${i + 1}/${picks.length})`;
+            const toUp = await compressImage(picks[i], 1600, 0.85, enhance);
+            const u = await uploadFile(toUp, 'docs');
+            await insertDoc({ person_id: p.id, kind: 'photo', url: u, label, category: '', is_public, body: '' });
+            if (i === mainIdx) mainUrl = u;
+          }
+          if (mainUrl) {
+            const { error: e2 } = await sb.from('almfrje_persons').update({ photo_url: mainUrl, updated_at: new Date().toISOString() }).eq('id', p.id); if (e2) throw e2;
+            const pp = byId.get(p.id); if (pp) pp.photo_url = mainUrl;
+          }
+        });
+        showLoading(false);
+        if (ok) { closeModal(); toast('✅ حُفظت ' + picks.length + (picks.length === 1 ? ' صورة' : ' صور')); screenPerson(String(p.id)); }
+        else { btn.disabled = false; btn.textContent = oldTxt; }
+        return;
+      }
+      // ===== وضع الوثيقة / القصيدة (ملفٌ مفرد) =====
       const body = isPoem ? (document.getElementById('d_body').value || '').trim() : '';
       const file = document.getElementById('d_file').files[0];
       let url = val('d_url').trim();
@@ -1994,28 +2054,11 @@ function addDocModal(p) {
       if (!isPoem && !file && !url) { toast('أرفق ملفاً أو ضع رابطاً'); return; }
       btn.disabled = true; const oldTxt = btn.textContent; btn.textContent = '… جارٍ الرفع والحفظ';
       showLoading(true);
-      const is_public = (document.querySelector('input[name="d_vis"]:checked') || {}).value !== 'private';
-      const asMain = cat === 'photo' && document.getElementById('d_main') && document.getElementById('d_main').checked;
       const ok = await guard(async () => {
-        if (file) {
-          // المحسّنة جاهزة؛ وإلا نصغّر الصور تلقائياً قبل الرفع (أسرع حفظاً)، وغير الصور تُرفع كما هي.
-          const toUp = _docEnhanced ? new File([_docEnhanced], ((file.name || 'photo').replace(/\.\w+$/, '') || 'photo') + '.jpg', { type: 'image/jpeg' }) : await compressImage(file);
-          url = await uploadFile(toUp, 'docs');
-        }
+        if (file) { url = await uploadFile(await compressImage(file), 'docs'); }
         url = url || '';
-        const kind = cat === 'photo' ? 'photo' : (file && file.type === 'application/pdf') ? 'pdf' : 'doc';
-        const rec = { person_id: p.id, kind, url, label: val('d_label').trim(), category: isPoem ? cat : '', is_public, body };
-        let { error } = await sb.from('almfrje_documents').insert(rec);
-        // مرونة: إن لم تُطبَّق ترقية المخطط بعد (أعمدة category/is_public/body مفقودة) — رقّها ثم أعد
-        if (error && /column|schema cache/i.test(error.message || '')) {
-          try { await fetch('/api/almfrje-setup', { method: 'POST' }); await new Promise(r => setTimeout(r, 1500)); } catch (e) { /* */ }
-          ({ error } = await sb.from('almfrje_documents').insert(rec));
-        }
-        if (error) throw error;
-        if (asMain && url) {
-          const { error: e2 } = await sb.from('almfrje_persons').update({ photo_url: url, updated_at: new Date().toISOString() }).eq('id', p.id); if (e2) throw e2;
-          const pp = byId.get(p.id); if (pp) pp.photo_url = url;
-        }
+        const kind = (file && file.type === 'application/pdf') ? 'pdf' : 'doc';
+        await insertDoc({ person_id: p.id, kind, url, label, category: isPoem ? v : '', is_public, body });
       });
       showLoading(false);
       if (ok) { closeModal(); toast('✅ تم الحفظ'); screenPerson(String(p.id)); }

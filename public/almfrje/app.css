@@ -1213,6 +1213,15 @@ ul.hier ul.hier > .hier-li::before {
 .d-preview { margin: 4px 0 8px; }
 .d-pimg { max-width: 100%; max-height: 240px; border-radius: 12px; border: 1px solid var(--line); display: block; margin: 0 auto; object-fit: contain; }
 
+/* ===== شبكة إضافة عدّة صور دفعةً واحدة (مع اختيار الشخصية) ===== */
+.d-add-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(94px, 1fr)); gap: 8px; margin: 6px 0 2px; }
+.d-add-cell { position: relative; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: var(--bg); }
+.d-add-cell img { width: 100%; aspect-ratio: 1; object-fit: cover; display: block; }
+.d-add-x { position: absolute; top: 3px; inset-inline-start: 3px; width: 24px; height: 24px; border: none; border-radius: 7px; background: rgba(198,40,40,.92); color: #fff; font-size: .78rem; line-height: 24px; padding: 0; cursor: pointer; }
+.d-add-main { display: flex; align-items: center; justify-content: center; gap: 4px; font-size: .72rem; font-weight: 800; color: var(--text); padding: 4px 2px; background: var(--card); cursor: pointer; }
+.d-add-main input { margin: 0; width: 15px; height: 15px; accent-color: var(--brand); }
+.d-add-main:has(input:checked) { background: color-mix(in srgb, var(--brand) 16%, var(--card)); color: var(--brand); }
+
 /* ===== مشجّرة الصور: شبكةُ صورِ الأشخاص ===== */
 .pt-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 12px; margin-top: 6px; }
 .pt-card { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 10px 6px; border: 1px solid var(--line); border-radius: 14px; background: var(--card); cursor: pointer; text-align: center; transition: transform .08s, box-shadow .12s; }
