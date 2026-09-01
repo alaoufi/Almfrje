@@ -2032,12 +2032,13 @@ function addDocModal(p, refresh) {
       ${fInput('رابط مباشر (اختياري)', 'd_url', '')}
     </div>
     ${fInput('العنوان / الوصف (اختياري)', 'd_label', '')}
-    <div class="field"><label>👁 مَن يراها؟ (تُطبَّق على ما تضيفه الآن)</label>
-      <label class="perm-chk"><input type="radio" name="d_vis" value="public" checked><span>👁 عامّة — يراها الجميع</span></label>
-      <label class="perm-chk"><input type="radio" name="d_vis" value="private"><span>🔒 مخفية — صاحبها والإدارة وذريّته فقط</span></label>
+    <div class="field" id="d_vis_wrap"><label>👁 مَن يراها؟</label>
+      <label class="perm-chk"><input type="radio" name="d_vis" value="public" checked><span>👁 تعرض للجميع</span></label>
+      <label class="perm-chk"><input type="radio" name="d_vis" value="private"><span>🔒 تعرض لذريّته فقط</span></label>
     </div>
     <button class="btn" id="d_save">حفظ</button>`, () => {
     let picks = [];     // ملفات الصور المختارة (تتراكم على دفعات)
+    let vis = [];       // خصوصية كل صورة: 'public' أو 'private' (افتراضي public)
     let mainIdx = -1;   // مؤشّر الصورة «الشخصية» (الرئيسية) — أو -1
     const cat = document.getElementById('d_cat');
     const syncCat = () => {
@@ -2045,27 +2046,42 @@ function addDocModal(p, refresh) {
       document.getElementById('d_photo_wrap').style.display = isPhoto ? '' : 'none';
       document.getElementById('d_other_wrap').style.display = isPhoto ? 'none' : '';
       document.getElementById('d_body_wrap').style.display = isPoem ? '' : 'none';
+      // خصوصية الصور تُضبط لكل صورةٍ في الشبكة؛ الخصوصية المشتركة للوثيقة/القصيدة فقط
+      document.getElementById('d_vis_wrap').style.display = isPhoto ? 'none' : '';
     };
     cat.addEventListener('change', syncCat); syncCat();
-    // شبكة معاينة الصور المتعدّدة: إزالة أيّ صورة، واختيار «الشخصية» منها
+    // شبكة معاينة الصور: لكل صورة نفس خيارات المكتبة — شخصية / للجميع / لذريّته فقط + إزالة
     const grid = document.getElementById('d_grid');
     const renderGrid = () => {
       document.getElementById('d_enh_wrap').style.display = picks.length ? '' : 'none';
-      grid.innerHTML = picks.map((f, i) => `<div class="d-add-cell">
-        <img src="${URL.createObjectURL(f)}" alt="" loading="lazy" decoding="async">
-        <button type="button" class="d-add-x" data-rm="${i}" title="إزالة">✕</button>
-        <label class="d-add-main"><input type="radio" name="d_mainpick" ${i === mainIdx ? 'checked' : ''} data-main="${i}"><span>🌳 الشخصية</span></label>
-      </div>`).join('');
+      grid.innerHTML = picks.map((f, i) => {
+        const pub = vis[i] !== 'private';
+        const isMain = i === mainIdx;
+        return `<div class="d-add-cell">
+        <div class="d-add-top"><img src="${URL.createObjectURL(f)}" alt="" loading="lazy" decoding="async"><button type="button" class="d-add-x" data-rm="${i}" title="إزالة">✕</button></div>
+        <div class="d-add-opts">
+          <button type="button" class="dm-opt sm ${isMain ? 'on' : ''}" data-main="${i}"><span class="dm-box">${isMain ? '✔' : ''}</span>🌳 صورة شخصية</button>
+          <button type="button" class="dm-opt sm ${pub ? 'on' : ''}" data-setvis="${i}" data-pub="1"><span class="dm-box">${pub ? '✔' : ''}</span>👁 تعرض للجميع</button>
+          <button type="button" class="dm-opt sm ${!pub ? 'on' : ''}" data-setvis="${i}" data-pub="0"><span class="dm-box">${!pub ? '✔' : ''}</span>🔒 تعرض لذريّته فقط</button>
+        </div>
+      </div>`;
+      }).join('');
       grid.querySelectorAll('[data-rm]').forEach(b => b.addEventListener('click', () => {
-        const idx = +b.dataset.rm; picks.splice(idx, 1);
+        const idx = +b.dataset.rm; picks.splice(idx, 1); vis.splice(idx, 1);
         if (mainIdx === idx) mainIdx = (picks.length ? 0 : -1); else if (mainIdx > idx) mainIdx--;
         renderGrid();
       }));
-      grid.querySelectorAll('[data-main]').forEach(r => r.addEventListener('change', () => { mainIdx = +r.dataset.main; }));
+      grid.querySelectorAll('[data-main]').forEach(b => b.addEventListener('click', () => { mainIdx = +b.dataset.main; if (vis[mainIdx] === 'private') vis[mainIdx] = 'public'; renderGrid(); }));
+      grid.querySelectorAll('[data-setvis]').forEach(b => b.addEventListener('click', () => {
+        const i = +b.dataset.setvis; const pub = b.dataset.pub === '1';
+        vis[i] = pub ? 'public' : 'private';
+        if (!pub && mainIdx === i) mainIdx = -1;   // «لذريّته فقط» لا تكون شخصيةً (لا تظهر في الشجرة)
+        renderGrid();
+      }));
     };
     { const fi = document.getElementById('d_files'); if (fi) fi.addEventListener('change', () => {
       const chosen = [...fi.files].filter(f => f.type && f.type.startsWith('image/'));
-      picks = picks.concat(chosen);
+      picks = picks.concat(chosen); chosen.forEach(() => vis.push('public'));
       if (mainIdx < 0 && picks.length) mainIdx = 0;   // الأولى شخصيةٌ افتراضياً (يمكن تغييرها)
       fi.value = '';   // تفريغ ليتيح إضافة المزيد لاحقاً
       renderGrid();
@@ -2096,7 +2112,8 @@ function addDocModal(p, refresh) {
             btn.textContent = `… جارٍ الرفع (${i + 1}/${picks.length})`;
             const toUp = await compressImage(picks[i], 1600, 0.85, enhance);
             const u = await uploadFile(toUp, 'docs');
-            await insertDoc({ person_id: p.id, kind: 'photo', url: u, label, category: '', is_public, body: '' });
+            const itemPublic = (i === mainIdx) ? true : (vis[i] !== 'private');   // الشخصية تُعرض للجميع
+            await insertDoc({ person_id: p.id, kind: 'photo', url: u, label, category: '', is_public: itemPublic, body: '' });
             if (i === mainIdx) mainUrl = u;
           }
           if (mainUrl) {
