@@ -8,3 +8,17 @@
   Referrer-Policy: strict-origin-when-cross-origin
   Permissions-Policy: camera=(), microphone=(), geolocation=(self), payment=()
   Strict-Transport-Security: max-age=31536000
+
+# صفحة الدخول (index) لكل تطبيق: لا تُخزَّن على حافة Cloudflare إطلاقاً، فتعكس دائماً
+# آخر إصدارٍ منشور (مؤشّر ‎?v=‎ لملفّات app.js/app.css). بدونها كانت الحافة تُبقي index
+# قديماً فلا يتحدّث مؤشّر الإصدار. (الأصول الثابتة نفسها تبقى بإعادة تحقّق ETag — أسرع.)
+/almfrje/
+  Cache-Control: no-store
+/almfrje/index.html
+  Cache-Control: no-store
+/notes/
+  Cache-Control: no-store
+/notes/index.html
+  Cache-Control: no-store
+/legacy/index.html
+  Cache-Control: no-store
