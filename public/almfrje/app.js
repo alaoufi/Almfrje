@@ -1747,9 +1747,11 @@ function enableReorder(listEl, originalIds, fatherId) {
         try { row.setPointerCapture(e.pointerId); } catch (_) { }
         if (navigator.vibrate) { try { navigator.vibrate(30); } catch (_) { } }
       };
-      // السحب من المقبض «⠿» يبدأ فوراً؛ ومن أي مكان آخر بالضغط المطوّل (احتياط).
+      // السحب من المقبض «⠿» يبدأ فوراً. أمّا الضغط المطوّل على الصفّ فيُفعَّل للفأرة فقط
+      // (سطح المكتب)؛ على اللمس كان يخطف التمرير (يلتقط المؤشّر بعد ٥٥٠ms فتتجمّد الصفحة
+      // ثم ترتدّ) — واللمس يرتّب بالسهمين ▲▼ أصلاً، فلا حاجة للسحب المطوّل عليه.
       if (e.target && e.target.closest && e.target.closest('.reorder-grip')) { e.preventDefault(); activate(); }
-      else { timer = setTimeout(activate, 550); }
+      else if (e.pointerType !== 'touch') { timer = setTimeout(activate, 550); }
     });
     row.addEventListener('pointermove', (e) => {
       if (!active) { if (Math.abs(e.clientY - startY) > 14) clearTimeout(timer); return; }
