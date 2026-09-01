@@ -406,6 +406,8 @@ function canApproveBirth() { return isAdmin() || (isManager() && mgrPerm('approv
 function canAdd() { return canAddBirth(); }
 function canExport() { return isAdmin() || isManager(); }
 function canDelete() { return isAdmin(); }                    // الحذف للمدير فقط
+// إدارة مكتبة صور/ملفات شخصٍ (إضافة/حذف): للمدير أو لصاحب الحساب نفسه (المرتبط بهذا الشخص) حصراً.
+function canManageMedia(p) { return isAdmin() || (!!p && !!myPersonId() && myPersonId() === Number(p.id)); }
 // صلاحيات المشرف الدقيقة: المدير مفتوح؛ المشرف بلا صلاحيات محدّدة = الكل مفعّل (توافق رجعي).
 const MGR_PERMS = [['add_birth', 'إضافة مولود'], ['approve_birth', 'تأكيد إضافة مولود'], ['reorder', 'تعديل ترتيب الأبناء'], ['edit_profile', 'تعديل الملف الشخصي (الجوال/الحالة/الحالة الوظيفية/المدينة…)']];
 function mgrPerm(k) {
@@ -1706,7 +1708,7 @@ async function loadDocsCard(p, refresh) {
   const poemsBy = docs.filter(d => d.category === 'poem_by');
   const poemsAbout = docs.filter(d => d.category === 'poem_about');
   const lock = (d) => d.is_public === false ? ' <span class="doc-lock" title="مخفية — لا يراها إلا صاحبها والإدارة وذريّته">🔒</span>' : '';
-  const canDel = canEditPerson(p);   // حذف عناصر المكتبة متاحٌ لمن يملك تعديل الشخص (لا للمدير وحده)
+  const canDel = canManageMedia(p);   // إضافة/حذف عناصر المكتبة: المدير أو صاحب الحساب نفسه
   const N = galleryPhotos.length + files.length + poemsBy.length + poemsAbout.length;
   const poemCard = (d) => `<div class="poem-card">${d.label ? `<div class="poem-title">${esc(d.label)}${lock(d)}</div>` : `<div class="poem-title">قصيدة${lock(d)}</div>`}${d.body ? `<div class="poem-body">${esc(d.body)}</div>` : ''}${d.url ? `<a href="${esc(d.url)}" target="_blank" rel="noopener" class="poem-file">📎 المرفق</a>` : ''}${canDel ? `<button class="btn sm danger" data-ddel="${d.id}" style="margin-top:6px">حذف</button>` : ''}</div>`;
   box.innerHTML = `<div class="card"><h3>الصور والوثائق ${N ? '(' + N + ')' : ''}</h3>
@@ -1714,7 +1716,7 @@ async function loadDocsCard(p, refresh) {
         <button class="btn sm outline" id="phGallery" style="margin-top:8px">🖼️ معرض صوره (${galleryPhotos.length})</button>` : ''}
       ${files.length ? `<div style="margin-top:8px">${files.map(d => `<div class="row"><span class="k">${d.kind === 'pdf' ? '📄' : '📎'} <a href="${esc(d.url)}" target="_blank" rel="noopener" style="color:var(--brand);text-decoration:none">${esc(d.label || 'ملف')}</a>${lock(d)}</span>${canDel ? `<button class="btn sm danger" data-ddel="${d.id}">حذف</button>` : ''}</div>`).join('')}</div>` : ''}
       ${!N ? noItem() : ''}
-      ${canEditPerson(p) ? `<button class="btn outline" id="addDoc" style="margin-top:8px">➕ إضافة صورة/وثيقة/قصيدة</button>` : ''}
+      ${canManageMedia(p) ? `<button class="btn outline" id="addDoc" style="margin-top:8px">➕ إضافة صورة/وثيقة/قصيدة</button>` : ''}
     </div>
     ${poemsBy.length ? `<div class="card"><h3>📜 قصائد له (${poemsBy.length})</h3>${poemsBy.map(poemCard).join('')}</div>` : ''}
     ${poemsAbout.length ? `<div class="card"><h3>📜 قصائد قيلت فيه (${poemsAbout.length})</h3>${poemsAbout.map(poemCard).join('')}</div>` : ''}`;
