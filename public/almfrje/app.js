@@ -626,11 +626,18 @@ function computeCounts() {
     childCount.set(p.id, (kids.get(p.id) || []).length);
     if (p.branch_id != null) branchCountMap.set(p.branch_id, (branchCountMap.get(p.branch_id) || 0) + 1);
   });
-  const byGenDesc = [...C.persons].sort((a, b) => b.generation - a.generation);
-  for (const p of byGenDesc) {
-    let s = 0; for (const c of (kids.get(p.id) || [])) s += 1 + (descCount.get(c.id) || 0);
-    descCount.set(p.id, s);
-  }
+  // إجمالي الذرية عبر مرورٍ عميقٍ محفوظ (لا يعتمد على رقم «الجيل» فلا يختلّ إن كان مسجّلاً خطأً)،
+  // مع حماية من الحلقات النادرة في البيانات. العمق = عدد الأجيال (آمنٌ للاستدعاء العودي).
+  const seenDesc = new Set();
+  const dfsDesc = (id) => {
+    const m = descCount.get(id); if (m !== undefined) return m;
+    if (seenDesc.has(id)) return 0;   // حلقةٌ في البيانات — لا تُحسب مرّتين
+    seenDesc.add(id);
+    let s = 0; for (const c of (kids.get(id) || [])) s += 1 + dfsDesc(c.id);
+    seenDesc.delete(id);
+    descCount.set(id, s); return s;
+  };
+  C.persons.forEach(p => dfsDesc(p.id));
 }
 const childrenOf = (id) => (kids.get(id) || []);
 const branchName = (bid) => bid && branchById.get(bid) ? branchById.get(bid).name : 'الجذع';
@@ -1699,6 +1706,7 @@ async function screenPerson(arg) {
       <div class="stat a"><div class="n">${grand.length}</div><div class="l">الأحفاد</div></div>
       <div class="stat g"><div class="n">${descCount.get(id) || 0}</div><div class="l">إجمالي الذرية</div></div>
     </div>
+    <p class="muted" style="font-size:.78rem;text-align:center;margin:-4px 0 10px">«إجمالي الذرية» يشمل كل الأجيال (الأبناء والأحفاد وأبناءهم فأكثر) — لا الأبناء والأحفاد وحدهم.</p>
     <div class="card"><h3>الأبناء (${cs.length})</h3>${cs.length > 1 && canReorder(p) ? '<div class="reorder-hint"><b>↕️ ترتيب الأبناء</b> — رتّب بالسهمين ▲▼ لكل ابن. يبقى ضمن إخوته فقط ولا يتجاوز الأب.</div>' : ''}<div id="childList" class="${cs.length > 1 && canReorder(p) ? 'reorder-list' : ''}">${cs.length ? cs.map(c => `<div class="row child-row"${cs.length > 1 && canReorder(p) ? ` data-reorder-id="${c.id}"` : ''}>${cs.length > 1 && canReorder(p) ? `<span class="reorder-arrows"><button class="reorder-up" data-up="${c.id}" aria-label="تحريك لأعلى">▲</button><button class="reorder-down" data-down="${c.id}" aria-label="تحريك لأسفل">▼</button></span>` : ''}<span class="k"><a href="#/person/${c.id}" style="color:var(--brand);text-decoration:none">${esc(c.name)}</a>${nickSuffix(c)}</span><span class="v">${descCount.get(c.id) || 0} ذرية</span></div>`).join('') : noItem()}</div></div>
     ${showDocs ? '<div id="docsCard"><div class="card"><h3>الصور والوثائق</h3><div class="muted" style="padding:8px 2px">… جارٍ التحميل</div></div></div>' : ''}
     <div class="btn-row no-print">
