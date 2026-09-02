@@ -1,6 +1,9 @@
 // مخطط المفارجة (الأنساب) — جداول/دوال/سياسات ببادئة almfrje_ على قاعدة alaoufi.me.
 // مصدر واحد مشترك بين /api/migrate و /api/almfrje-setup (تفادياً للتكرار).
 // كل الأوامر IF NOT EXISTS / OR REPLACE فيمكن تنفيذها مراراً بأمان.
+// إصدار المخطّط: يُرفع مع كل تعديلٍ بنيوي — يربط به كاشُ /api/almfrje-setup فيُعاد
+// تشغيل الترقية عند تغيّره (وإلا بقي كاشٌ قديمٌ يتخطّى الأعمدة الجديدة).
+export const ALMFRJE_SCHEMA_VERSION = '2026-08-24-1';
 export const ALMFRJE_SCHEMA_SQL = `
       CREATE EXTENSION IF NOT EXISTS pg_trgm;
 

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { Pool } from 'pg';
-import { ALMFRJE_SCHEMA_SQL } from '@/lib/almfrje-schema';
+import { ALMFRJE_SCHEMA_SQL, ALMFRJE_SCHEMA_VERSION } from '@/lib/almfrje-schema';
 import { almfrjeEnv } from '@/lib/almfrje-env';
 
 export const dynamic = 'force-dynamic';
@@ -31,7 +31,7 @@ async function isAdminCaller(request: NextRequest): Promise<boolean> {
 
 // نُنفّذ مرة واحدة لكل دورة حياة للدالة (cold start) ونُخزّن النتيجة عشان ما نكرّر
 // نداء Management API مع كل فتح للصفحة.
-let _done: { ok: boolean; at: number } | null = null;
+let _done: { ok: boolean; at: number; ver: string } | null = null;
 
 // إنشاء مجلّد التخزين العام «almfrje» + سياسات الوصول (قراءة عامة، كتابة للمصادَقين).
 // idempotent: ON CONFLICT DO NOTHING + DROP/CREATE POLICY.
@@ -102,8 +102,9 @@ async function handle() {
   if (!m) return NextResponse.json({ ok: false, reason: 'تعذّر استخراج project ref' }, { status: 200 });
   const ref = m[1];
 
-  // إن سبق إعداد المخطط بنجاح في هذه الدورة، اكتفِ بذلك (المخطط ثقيل نسبياً).
-  if (_done && _done.ok) return NextResponse.json({ ok: true, cached: true });
+  // إن سبق إعداد هذا الإصدار من المخطط بنجاح في هذه الدورة، اكتفِ بذلك (المخطط ثقيل نسبياً).
+  // مربوطٌ بالإصدار: تغيّرُ المخطط (عمودٌ جديد) يبطل الكاش فتُعاد الترقية.
+  if (_done && _done.ok && _done.ver === ALMFRJE_SCHEMA_VERSION) return NextResponse.json({ ok: true, cached: true });
 
   // ١) القناة الأولى: Management API بمفتاح PAT
   let patError: unknown = null;
@@ -112,7 +113,7 @@ async function handle() {
     const res = await runSql(pat, ref, ALMFRJE_SCHEMA_SQL);
     if (res.ok) {
       try { await runSql(pat, ref, "NOTIFY pgrst, 'reload schema';"); } catch { /* best-effort */ }
-      _done = { ok: true, at: Date.now() };
+      _done = { ok: true, at: Date.now(), ver: ALMFRJE_SCHEMA_VERSION };
       return NextResponse.json({ ok: true, via: 'pat' });
     }
     patError = res.data;
@@ -125,7 +126,7 @@ async function handle() {
     if (r2.ok) {
       await runSqlPg(conn, STORAGE_SQL).catch?.(() => { /* */ });
       await runSqlPg(conn, "NOTIFY pgrst, 'reload schema';");
-      _done = { ok: true, at: Date.now() };
+      _done = { ok: true, at: Date.now(), ver: ALMFRJE_SCHEMA_VERSION };
       return NextResponse.json({ ok: true, via: 'pg' });
     }
     return NextResponse.json({ ok: false, via: 'pg', error: r2.error, patError }, { status: 200 });
