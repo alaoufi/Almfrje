@@ -1345,7 +1345,9 @@ function openLens(id) {
   const kids = childCount.get(id) || 0, desc = descCount.get(id) || 0;
   const father = p.father_id ? byId.get(p.father_id) : null;
   openModal(p.name, `
-    <div class="ql-sub">${father ? 'بن ' + esc(father.name) + ' • ' : ''}${esc(branchName(p.branch_id))} • جيل ${p.generation}${statusTag(p)}</div>
+    <div class="ql-head"><span class="ql-av">${avatar(p, true)}</span>
+      <div class="ql-sub">${father ? 'بن ' + esc(father.name) + ' • ' : ''}${esc(branchName(p.branch_id))} • جيل ${p.generation}${statusTag(p)}</div>
+    </div>
     <div class="ql-stats"><div class="ql-stat"><div class="n">${kids}</div><div class="l">الأبناء</div></div><div class="ql-stat"><div class="n">${desc}</div><div class="l">الذرية</div></div></div>
     <div class="ql-tools">
       <button class="btn sm" data-ql="lineage">🧬 مسار النسب</button>
@@ -1720,7 +1722,7 @@ async function screenPerson(arg) {
       <div class="stat g"><div class="n">${descCount.get(id) || 0}</div><div class="l">إجمالي الذرية</div></div>
     </div>
     <p class="muted" style="font-size:.78rem;text-align:center;margin:-4px 0 10px">«إجمالي الذرية» يشمل كل الأجيال (الأبناء والأحفاد وأبناءهم فأكثر) — لا الأبناء والأحفاد وحدهم.</p>
-    <div class="card"><h3>الأبناء (${cs.length})</h3>${cs.length > 1 && canReorder(p) ? '<div class="reorder-hint"><b>↕️ ترتيب الأبناء</b> — رتّب بالسهمين ▲▼ لكل ابن. يبقى ضمن إخوته فقط ولا يتجاوز الأب.</div>' : ''}<div id="childList" class="${cs.length > 1 && canReorder(p) ? 'reorder-list' : ''}">${cs.length ? cs.map(c => `<div class="row child-row"${cs.length > 1 && canReorder(p) ? ` data-reorder-id="${c.id}"` : ''}>${cs.length > 1 && canReorder(p) ? `<span class="reorder-arrows"><button class="reorder-up" data-up="${c.id}" aria-label="تحريك لأعلى">▲</button><button class="reorder-down" data-down="${c.id}" aria-label="تحريك لأسفل">▼</button></span>` : ''}<span class="k"><a href="#/person/${c.id}" style="color:var(--brand);text-decoration:none">${esc(c.name)}</a>${nickSuffix(c)}</span><span class="v">${descCount.get(c.id) || 0} ذرية</span></div>`).join('') : noItem()}</div></div>
+    <div class="card"><h3>الأبناء (${cs.length})</h3>${cs.length > 1 && canReorder(p) ? '<div class="reorder-hint"><b>↕️ ترتيب الأبناء</b> — رتّب بالسهمين ▲▼ لكل ابن. يبقى ضمن إخوته فقط ولا يتجاوز الأب.</div>' : ''}<div id="childList" class="${cs.length > 1 && canReorder(p) ? 'reorder-list' : ''}">${cs.length ? cs.map(c => `<div class="row child-row"${cs.length > 1 && canReorder(p) ? ` data-reorder-id="${c.id}"` : ''}>${cs.length > 1 && canReorder(p) ? `<span class="reorder-arrows"><button class="reorder-up" data-up="${c.id}" aria-label="تحريك لأعلى">▲</button><button class="reorder-down" data-down="${c.id}" aria-label="تحريك لأسفل">▼</button></span>` : ''}<span class="k"><span class="ro-av">${avatar(c)}</span><a href="#/person/${c.id}" style="color:var(--brand);text-decoration:none">${esc(c.name)}</a>${nickSuffix(c)}</span><span class="v">${descCount.get(c.id) || 0} ذرية</span></div>`).join('') : noItem()}</div></div>
     ${showDocs ? '<div id="docsCard"><div class="card"><h3>الصور والوثائق</h3><div class="muted" style="padding:8px 2px">… جارٍ التحميل</div></div></div>' : ''}
     <div class="btn-row no-print">
       <button class="btn" id="toolsP">🧭 أدوات النسب</button>
