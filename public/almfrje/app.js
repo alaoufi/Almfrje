@@ -1234,6 +1234,7 @@ function lineagePathModal(id) {
     const isSelf = i === 0; const isRoot = i === path.length - 1 && !p.father_id;
     return `<div class="lp-row${isSelf ? ' lp-self' : ''}" data-lpid="${p.id}" title="عرض الشجرة من هنا">
       <span class="lp-ico">${isRoot ? '🌳' : (isSelf ? '◀' : '•')}</span>
+      <span class="lp-av">${avatar(p)}</span>
       <span class="lp-name ${nameCls(p)}">${esc(p.name)}</span>
       <span class="lp-gen">جيل ${p.generation}</span>
     </div>`;
@@ -2018,7 +2019,7 @@ function screenReorder() {
         <div id="childList" class="${canOrder ? 'reorder-list' : ''}">
           ${list.length ? list.map(c => {
             const kc = childCount.get(c.id) || 0;
-            return `<div class="row child-row"${canOrder ? ` data-reorder-id="${c.id}"` : ''}>${canOrder ? `<span class="reorder-arrows"><button class="reorder-up" data-up="${c.id}" aria-label="أعلى">▲</button><button class="reorder-down" data-down="${c.id}" aria-label="أسفل">▼</button></span>` : ''}<span class="k"><a href="#" data-rointo="${c.id}" style="color:var(--brand);text-decoration:none">${esc(c.name)}</a>${nickSuffix(c)}</span><span class="v">${kc ? kc + ' ابن ›' : (descCount.get(c.id) || 0) + ' ذرية'}</span></div>`;
+            return `<div class="row child-row"${canOrder ? ` data-reorder-id="${c.id}"` : ''}>${canOrder ? `<span class="reorder-arrows"><button class="reorder-up" data-up="${c.id}" aria-label="أعلى">▲</button><button class="reorder-down" data-down="${c.id}" aria-label="أسفل">▼</button></span>` : ''}<span class="k"><span class="ro-av">${avatar(c)}</span><a href="#" data-rointo="${c.id}" style="color:var(--brand);text-decoration:none">${esc(c.name)}</a>${nickSuffix(c)}</span><span class="v">${kc ? kc + ' ابن ›' : (descCount.get(c.id) || 0) + ' ذرية'}</span></div>`;
           }).join('') : '<div class="muted" style="padding:6px">لا أبناء.</div>'}
         </div>
       </div>`;
@@ -2534,6 +2535,7 @@ function pickPerson(title, onPick, filterFn, startAt) {
           ${list.length ? list.map(c => {
             const kc = childCount.get(c.id) || 0;
             return `<div class="anc-row">
+              <span class="anc-av" data-ppinto="${c.id}">${avatar(c)}</span>
               <span class="anc-name" data-ppinto="${c.id}"><b>${esc(c.name)}</b>${nickSuffix(c)} <span class="muted" style="font-size:.78rem;font-weight:400">(جيل ${c.generation}${kc ? ' • ' + kc + ' ابن' : ''})</span></span>
               ${canPick(c) ? `<button class="btn sm" data-pppick="${c.id}">اختيار</button>` : ''}
             </div>`;
