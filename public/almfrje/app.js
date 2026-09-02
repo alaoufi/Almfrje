@@ -3359,7 +3359,9 @@ function screenStats() {
     const t = genTot[g] || 0, a = genAlive[g] || 0, no = genNoIssue[g] || 0, dw = t - a - no;
     genRows.push(`<div class="row"><span class="k">الجيل ${g}</span><span class="v">${t} فرد • <span style="color:var(--c-alive)">${a} حيّ</span> • <span style="color:var(--c-dead)">${dw} متوفّى</span> • <span style="color:var(--c-noissue)">${no} لم يعقب</span></span></div>`);
   }
-  const branchSizes = C.branches.map(b => ({ b, n: branchCount(b.id) })).sort((x, y) => y.n - x.n);
+  // الفروع القائمة فقط (أنجب مؤسّسها) — مطابقةً للرئيسية والتصميم المعلن؛ الفارغة لا تُعدّ ولا تُعرض.
+  const liveBranches = liveBranchCount();
+  const branchSizes = C.branches.map(b => ({ b, n: branchCount(b.id) })).filter(x => x.n > 1).sort((x, y) => y.n - x.n);
   const vb = visitStats.byBranch || {}, vc = visitStats.byCity || {};
   const vbRows = Object.keys(vb).length ? Object.entries(vb).sort((a, b) => b[1] - a[1]).map(([bid, n]) => row('🗂️ ' + esc(branchName(Number(bid))), n)).join('') : '<div class="muted" style="font-size:.85rem;padding:4px 0">لا زيارات مسجّلة بعد.</div>';
   const vcRows = Object.keys(vc).length ? Object.entries(vc).sort((a, b) => b[1] - a[1]).map(([c, n]) => row('📍 ' + esc(c), n)).join('') : '<div class="muted" style="font-size:.85rem;padding:4px 0">لا مناطق مسجّلة بعد.</div>';
@@ -3370,7 +3372,7 @@ function screenStats() {
   const topCities = Object.entries(cityFreq).sort((a, b) => b[1] - a[1]).slice(0, 10);
   view().innerHTML = `
     <div class="card"><h3>📊 إحصاءات عامة</h3>
-      ${row('إجمالي الأفراد', total)}${row('إجمالي الفروع', C.branches.length)}${row('عدد الأجيال', mg)}
+      ${row('إجمالي الأفراد', total)}${row('الفروع القائمة', liveBranches)}${row('عدد الأجيال', mg)}
       <div class="stat3">
         <div class="s3 s3-alive"><div class="s3-n">${alive}</div><div class="s3-l">أحياء</div></div>
         <div class="s3 s3-dead"><div class="s3-n">${deadWithIssue}</div><div class="s3-l">متوفّون (لهم ذرية)</div></div>
