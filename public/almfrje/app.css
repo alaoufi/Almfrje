@@ -862,6 +862,8 @@ ul.hier ul.hier > .hier-li::before {
 .rel-chip { display: inline-block; background: var(--bg); border: 1px solid var(--line); border-radius: 999px; padding: 4px 11px; font-weight: 700; font-size: .9rem; cursor: pointer; }
 .rel-chip:active { background: var(--brand-l); }
 .rel-chip.strong { border-color: var(--brand); }
+.rel-chip.has-av { display: inline-flex; align-items: center; gap: 6px; padding-inline-start: 4px; }
+.rel-chip.has-av .avatar { width: 22px; height: 22px; font-size: .7rem; border-width: 1px; }
 .rel-chip.n-died { color: var(--c-dead); } .rel-chip.n-noissue { color: var(--c-noissue); }
 .rel-more { display: inline-block; background: color-mix(in srgb, var(--brand) 12%, transparent); color: var(--brand); border-radius: 999px; padding: 4px 11px; font-weight: 800; font-size: .85rem; cursor: pointer; }
 

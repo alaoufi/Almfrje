@@ -1276,7 +1276,7 @@ function descendantsMiniMap(id) {
   const lvl = kidsArr.length ? kidsArr.slice(0, 30).map(c => {
     const gk = childrenOf(c.id);
     const sub = gk.length ? `<div class="mini-sub">${gk.slice(0, 12).map(g => `<span class="rel-chip ${nameCls(g)}" data-lensid="${g.id}">${esc(g.name)}</span>`).join('')}${gk.length > 12 ? `<span class="rel-more" data-descfull="${c.id}">+${gk.length - 12}</span>` : ''}</div>` : '';
-    return `<div class="mini-node"><span class="rel-chip strong ${nameCls(c)}" data-lensid="${c.id}">${esc(c.name)}${(childCount.get(c.id) || 0) ? ` <b>(${childCount.get(c.id)})</b>` : ''}</span>${sub}</div>`;
+    return `<div class="mini-node"><span class="rel-chip strong has-av ${nameCls(c)}" data-lensid="${c.id}"><span class="chip-av">${avatar(c)}</span>${esc(c.name)}${(childCount.get(c.id) || 0) ? ` <b>(${childCount.get(c.id)})</b>` : ''}</span>${sub}</div>`;
   }).join('') + (kidsArr.length > 30 ? `<div class="rel-more" data-descfull="${id}">+${kidsArr.length - 30} المزيد</div>` : '') : '<div class="muted" style="padding:6px">لا توجد ذرية مسجلة</div>';
   openModal('خريطة الذرية', `
     <div class="mini-head"><b>${esc(p.name)}</b> <span class="muted" style="font-weight:400">${esc(ancestryShort(p.id, 3))}</span><div class="muted" style="font-size:.8rem">الفرع: ${esc(branchName(p.branch_id))}${noIssue ? ' • <span class="n-noissue">لم يعقب</span>' : ''}</div></div>
@@ -1313,13 +1313,13 @@ function getImmediateRelatives(id) {
 function relativesModal(id) {
   const r = getImmediateRelatives(id);
   if (!r) { toast('الشخص غير موجود'); return; }
-  const chips = (arr) => arr.length ? arr.map(x => `<span class="rel-chip ${nameCls(x)}" data-lensid="${x.id}">${esc(x.name)}</span>`).join('') : '<span class="muted" style="font-size:.82rem">—</span>';
+  const chips = (arr) => arr.length ? arr.map(x => `<span class="rel-chip has-av ${nameCls(x)}" data-lensid="${x.id}"><span class="chip-av">${avatar(x)}</span>${esc(x.name)}</span>`).join('') : '<span class="muted" style="font-size:.82rem">—</span>';
   const sec = (t, arr, openable) => `<div class="rel-sec"><div class="rel-sec-h">${t} ${arr.length ? `<span class="muted">(${arr.length})</span>` : ''}</div><div class="rel-chips">${chips(arr)}</div></div>`;
   const incomplete = !r.father && r.p.father_id;
   openModal('أقرباء ' + r.p.name, `
     ${incomplete ? '<div class="lp-warn">⚠️ بيانات النسب غير مكتملة</div>' : ''}
-    ${r.father ? `<div class="rel-sec"><div class="rel-sec-h">الأب</div><div class="rel-chips"><span class="rel-chip strong ${nameCls(r.father)}" data-lensid="${r.father.id}">${esc(r.father.name)}</span></div></div>` : ''}
-    <div class="rel-sec rel-self"><div class="rel-sec-h">هو</div><div class="rel-chips"><span class="rel-chip strong" style="background:var(--brand);color:#fff">${esc(r.p.name)}</span></div></div>
+    ${r.father ? `<div class="rel-sec"><div class="rel-sec-h">الأب</div><div class="rel-chips"><span class="rel-chip strong has-av ${nameCls(r.father)}" data-lensid="${r.father.id}"><span class="chip-av">${avatar(r.father)}</span>${esc(r.father.name)}</span></div></div>` : ''}
+    <div class="rel-sec rel-self"><div class="rel-sec-h">هو</div><div class="rel-chips"><span class="rel-chip strong has-av" style="background:var(--brand);color:#fff"><span class="chip-av">${avatar(r.p)}</span>${esc(r.p.name)}</span></div></div>
     ${sec('الإخوة', r.siblings)}
     ${sec('الأبناء', r.children)}
     ${sec('الأعمام', r.uncles)}
