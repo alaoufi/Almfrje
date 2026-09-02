@@ -61,8 +61,6 @@ export const ALMFRJE_SCHEMA_SQL = `
       ALTER TABLE public.almfrje_persons ADD COLUMN IF NOT EXISTS work text default '';
       ALTER TABLE public.almfrje_persons ADD COLUMN IF NOT EXISTS birthplace text default '';
       ALTER TABLE public.almfrje_persons ADD COLUMN IF NOT EXISTS nickname text default '';
-      -- خصوصية الصورة الرئيسية (صورة الشجرة): true = تُعرض للجميع، false = لذريّته والإدارة فقط
-      ALTER TABLE public.almfrje_persons ADD COLUMN IF NOT EXISTS photo_public boolean not null default true;
       -- تتبّع آخر من عدّل كل حقل على حدة: { "city": {"by":"...","at":"..."}, ... }
       ALTER TABLE public.almfrje_persons ADD COLUMN IF NOT EXISTS field_audit jsonb not null default '{}'::jsonb;
       -- اجعل المعرّفات قابلةً للإدخال الصريح (لاستعادة النسخ الاحتياطية مع حفظ العلاقات)
@@ -476,7 +474,7 @@ export const ALMFRJE_SCHEMA_SQL = `
       -- منظور منقّى للأشخاص بلا بيانات حسّاسة (جوال/بريد/ملاحظات) — للزائر/المطّلع.
       CREATE OR REPLACE VIEW public.almfrje_persons_pub AS
         SELECT id, name, father_id, branch_id, generation, sex, status,
-               birth, death, city, photo_url, photo_public, nickname, work, sort,
+               birth, death, city, photo_url, nickname, work, sort,
                created_at, created_by_name, updated_by_name, updated_at, field_audit
           FROM public.almfrje_persons;
       GRANT SELECT ON public.almfrje_persons_pub TO authenticated;

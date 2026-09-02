@@ -455,8 +455,8 @@ async function fetchAll(table, cols = '*', pageSize = 1000) {
 // أعمدة البدء (خفيفة): كل ما تحتاجه الشجرة والقوائم والبحث والتصدير — و«الباقي عند الطلب»:
 //   • notes (نصّ قد يطول) يُجلب عند فتح الملف/التعديل فقط (لا يظهر في القوائم).
 //   • field_audit (jsonb) يبقى للمدير (يحتاجه المحرّر الجماعي)، ويُسقَط لمنظور الزائر (لا يستخدمه).
-const PERSONS_FULL_COLS = 'id,name,father_id,branch_id,generation,sex,status,birth,death,phone,email,city,photo_url,photo_public,sort,created_at,created_by,created_by_name,updated_by_name,updated_at,work,birthplace,nickname,field_audit';
-const PERSONS_PUB_COLS = 'id,name,father_id,branch_id,generation,sex,status,birth,death,city,photo_url,photo_public,nickname,work,sort,created_at,created_by_name,updated_by_name,updated_at';
+const PERSONS_FULL_COLS = 'id,name,father_id,branch_id,generation,sex,status,birth,death,phone,email,city,photo_url,sort,created_at,created_by,created_by_name,updated_by_name,updated_at,work,birthplace,nickname,field_audit';
+const PERSONS_PUB_COLS = 'id,name,father_id,branch_id,generation,sex,status,birth,death,city,photo_url,nickname,work,sort,created_at,created_by_name,updated_by_name,updated_at';
 // مرونةٌ ضد عمودٍ حديث (photo_public) لم تُطبَّق ترقيته بعد: إن فشل الاستعلام بسببه
 // نرقّ المخطط بالخلفية ونعيد المحاولة بلا العمود — فلا ينكسر التحميل قبل دخول المدير.
 async function fetchPersonsCols(table, cols) {
@@ -852,7 +852,7 @@ function adminTabBar(active) {
 function avatar(p, lg) {
   const cls = 'avatar' + (lg ? ' lg' : '');
   const fallback = p && p.sex === 'female' ? '👩' : '👤';
-  if (p && p.photo_url && !hideForGuest('media') && canSeeMainPhoto(p)) {
+  if (p && p.photo_url && !hideForGuest('media')) {
     // عند فشل تحميل الصورة (رابط معطّل/مجلّد غير عام) استبدلها بالأيقونة بدل إطار فارغ.
     return `<img class="${cls}" src="${esc(p.photo_url)}" alt="" loading="lazy" decoding="async" onerror="this.outerHTML='<div class=\\'${cls}\\'>${fallback}</div>'">`;
   }
@@ -1758,8 +1758,11 @@ async function loadDocsCard(p, refresh) {
   const opt = (id, pub, cur, label, isMain) => `<button type="button" class="dm-opt ${cur ? 'on' : ''}" data-vis="${id}" data-pub="${pub}"${isMain ? ' data-ismain="1"' : ''}><span class="dm-box">${cur ? '✔' : ''}</span>${label}</button>`;
   const visBtns = (id, isPub, isMain) => opt(id, '1', isPub, '👁 تُعرض للجميع', isMain) + opt(id, '0', !isPub, '🔒 لذريّته فقط', isMain);
   // وضع الإدارة (المدير/صاحب الحساب): لكل صورة/ملف تحكّمٌ أمامه — رئيسية/النشر/حذف.
-  const pMainPub = p.photo_public !== false;   // خصوصية الصورة الرئيسية (صورة الشجرة)
-  const personVis = `<button type="button" class="dm-opt ${pMainPub ? 'on' : ''}" data-visperson data-pub="1"><span class="dm-box">${pMainPub ? '✔' : ''}</span>👁 تُعرض للجميع</button><button type="button" class="dm-opt ${!pMainPub ? 'on' : ''}" data-visperson data-pub="0"><span class="dm-box">${!pMainPub ? '✔' : ''}</span>🔒 تُعرض لذريّته فقط</button>`;
+  // الصورة الرئيسية عامّةٌ في الشجرة؛ واختيار «لذريّته فقط» يحوّلها لصورةٍ خاصّة في المعرض
+  // ويُزيلها من الشجرة (يراها ذريّته والإدارة عبر RLS القائم) — بلا حاجة لأي عمودٍ جديد.
+  const mainPh = galleryPhotos.find(x => x.main) || {};
+  const personVis = `<button type="button" class="dm-opt on" data-mainpub="1"><span class="dm-box">✔</span>👁 تُعرض للجميع</button>`
+    + `<button type="button" class="dm-opt" data-mainpub="0" data-murl="${esc(mainPh.url || '')}"${mainPh.id ? ` data-mid="${mainPh.id}"` : ''}><span class="dm-box"></span>🔒 تُعرض لذريّته فقط</button>`;
   const managePhotos = galleryPhotos.map((ph, i) => `<div class="dm-item">
       <img class="dm-thumb" src="${esc(ph.url)}" data-lb="${i}" loading="lazy" decoding="async" alt="">
       <div class="dm-ctrl">
@@ -1810,22 +1813,29 @@ async function loadDocsCard(p, refresh) {
     const ok = await guard(async () => { const { error } = await sb.from('almfrje_documents').delete().eq('id', b.dataset.ddel); if (error) throw error; });
     if (ok) { toast('تم الحذف'); reload(); }
   }));
-  // «اجعلها الرئيسية»: تُضبط صورة الشخص (photo_url) على هذه الصورة
+  // «اجعلها الرئيسية»: تُضبط صورة الشجرة على هذه الصورة، وتصبح عامّةً للجميع.
   box.querySelectorAll('[data-setmain]').forEach(b => b.addEventListener('click', async (e) => {
     e.stopPropagation();
     const u = b.dataset.setmain;
-    const ok = await guard(() => setupThenRetry(async () => {
-      const { error } = await sb.from('almfrje_persons').update({ photo_url: u, photo_public: true, updated_at: new Date().toISOString() }).eq('id', p.id); if (error) throw error; const pp = byId.get(p.id); if (pp) { pp.photo_url = u; pp.photo_public = true; }
-      if (b.dataset.mainid) await sb.from('almfrje_documents').update({ is_public: true }).eq('id', b.dataset.mainid);   // الرئيسية تظهر للجميع في الشجرة افتراضياً
-    }));
+    const ok = await guard(async () => {
+      const { error } = await sb.from('almfrje_persons').update({ photo_url: u, updated_at: new Date().toISOString() }).eq('id', p.id); if (error) throw error; const pp = byId.get(p.id); if (pp) pp.photo_url = u;
+      if (b.dataset.mainid) await sb.from('almfrje_documents').update({ is_public: true }).eq('id', b.dataset.mainid);   // الرئيسية تظهر للجميع في الشجرة
+    });
     if (ok) { toast('صارت الصورة الرئيسية'); reload(); }
   }));
-  // خصوصية الصورة الرئيسية (صورة الشجرة): «للجميع» أو «لذريّته فقط» — تُحفظ على الشخص نفسه.
-  box.querySelectorAll('[data-visperson]').forEach(b => b.addEventListener('click', async (e) => {
+  // خصوصية الصورة الرئيسية: «لذريّته فقط» تحوّلها لصورةٍ خاصّة في المعرض وتُزيلها من الشجرة (بلا عمودٍ جديد).
+  box.querySelectorAll('[data-mainpub]').forEach(b => b.addEventListener('click', async (e) => {
     e.stopPropagation();
-    const pub = b.dataset.pub === '1';
-    const ok = await guard(() => setupThenRetry(async () => { const { error } = await sb.from('almfrje_persons').update({ photo_public: pub, updated_at: new Date().toISOString() }).eq('id', p.id); if (error) throw error; const pp = byId.get(p.id); if (pp) pp.photo_public = pub; }));
-    if (ok) { toast(pub ? 'تُعرض للجميع في الشجرة' : 'تُعرض لذريّته فقط'); reload(); }
+    if (b.dataset.mainpub === '1') return;   // «للجميع» هو الوضع الحالي للرئيسية — لا تغيير
+    if (!(await confirm2('جعل الصورة الرئيسية «لذريّته فقط»؟ ستُزال من الشجرة، ويراها ذريّته والإدارة في معرضه.'))) return;
+    const url = b.dataset.murl;
+    const ok = await guard(async () => {
+      if (b.dataset.mid) { const { error } = await sb.from('almfrje_documents').update({ is_public: false }).eq('id', b.dataset.mid); if (error) throw error; }
+      else if (url) { const { error } = await sb.from('almfrje_documents').insert({ person_id: p.id, kind: 'photo', url, label: '', category: '', is_public: false, body: '' }); if (error) throw error; }
+      const { error: e2 } = await sb.from('almfrje_persons').update({ photo_url: '', updated_at: new Date().toISOString() }).eq('id', p.id); if (e2) throw e2;
+      const pp = byId.get(p.id); if (pp) pp.photo_url = '';
+    });
+    if (ok) { toast('صارت لذريّته فقط وأُزيلت من الشجرة'); reload(); }
   }));
   // تغيير خصوصية عنصرٍ: «للجميع» (is_public=true) أو «لذريته فقط» (is_public=false).
   // جعل الرئيسية «لذريّته فقط» يُلغي كونها رئيسية (لأنها لن تظهر للجميع في الشجرة).
@@ -2160,12 +2170,12 @@ function addDocModal(p, refresh) {
             const u = await uploadFile(toUp, 'docs');
             const itemPublic = vis[i] !== 'private';
             await insertDoc({ person_id: p.id, kind: 'photo', url: u, label, category: '', is_public: itemPublic, body: '' });
-            if (i === mainIdx) mainUrl = u;
+            // الشخصية تُعرض في الشجرة للجميع؛ فإن اختِيرت «لذريّته فقط» تبقى صورةً خاصّةً بالمعرض ولا تصير صورة الشجرة.
+            if (i === mainIdx && vis[i] !== 'private') mainUrl = u;
           }
           if (mainUrl) {
-            const mainPub = vis[mainIdx] !== 'private';   // الشخصية قد تكون «لذريّته فقط»
-            const { error: e2 } = await sb.from('almfrje_persons').update({ photo_url: mainUrl, photo_public: mainPub, updated_at: new Date().toISOString() }).eq('id', p.id); if (e2) throw e2;
-            const pp = byId.get(p.id); if (pp) { pp.photo_url = mainUrl; pp.photo_public = mainPub; }
+            const { error: e2 } = await sb.from('almfrje_persons').update({ photo_url: mainUrl, updated_at: new Date().toISOString() }).eq('id', p.id); if (e2) throw e2;
+            const pp = byId.get(p.id); if (pp) pp.photo_url = mainUrl;
           }
         });
         showLoading(false);
