@@ -2391,7 +2391,7 @@ function exportDescendantsText(rootId) {
 
 /* ===== الشجرة التفاعلية ===== */
 const treeOpen = new Set();
-let treePhotos = false;   // مشجّرة مصوّرة: إظهار صورة كل شخص مع اسمه في العرض التفاعلي
+let treePhotos = false;   // شاشة «مشجّرة الصور» تُفعّله لإظهار صورة كل شخص؛ الشجرة العادية تُطفئه
 let galleryPhotos = [];   // صور الشخص المفتوح (للمعرض/مشجّرة الصور) — تُملأ في شاشة الملف
 /* ===== (7) وضع تتبّع الفرع ===== */
 const TRACK_KEY = 'almfrje_tracked_branch';
@@ -2421,6 +2421,7 @@ function bindTrackingBar() {
   view().querySelectorAll('.track-bar [data-lensid]').forEach(el => el.addEventListener('click', () => openLens(parseInt(el.dataset.lensid, 10))));
 }
 function screenTree(arg) {
+  treePhotos = false;   // الشجرة العادية بلا صور (عرض الصور صار في «مشجّرة الصور» المستقلّة)
   const rs = roots();
   let rootId = parseInt(arg, 10);
   // افتراض المشرف: فرعه عند فتح الشجرة بلا تحديد، مع تفعيل التتبّع.
@@ -2436,8 +2437,7 @@ function screenTree(arg) {
       <div class="field"><label>اذهب لشخص</label><button class="btn outline" id="t_pick" style="margin-top:0">🔍 اختر شخصاً</button></div>
     </div>
     <div class="btn-row"><button class="btn sm outline" id="t_expand">توسيع المستوى الأول</button><button class="btn sm outline" id="t_collapse">طيّ الكل</button>
-      <button class="btn sm ${treePhotos ? '' : 'outline'}" id="t_photos">🖼️ مشجّرة مصوّرة</button>
-      <button class="btn sm outline" data-go="#/photostree">🖼️ مشجّرة الصور</button>
+      <button class="btn sm outline" data-go="#/photostree/${rootId}">🖼️ مشجّرة الصور</button>
       <button class="btn sm outline" data-go="#/hierarchy/${rootId}">عرض هرمي</button></div>
     </div>
     <div class="card tree" id="treeBox"></div>
@@ -2461,44 +2461,41 @@ function screenTree(arg) {
   document.getElementById('t_pick').addEventListener('click', () => pickPerson('اختر شخصاً للشجرة', (p) => p && setHash('#/tree/' + p.id)));
   document.getElementById('t_expand').addEventListener('click', () => { childrenOf(rootId).forEach(c => treeOpen.add(c.id)); renderTree(rootId); });
   document.getElementById('t_collapse').addEventListener('click', () => { treeOpen.clear(); treeOpen.add(rootId); renderTree(rootId); });
-  { const tp = document.getElementById('t_photos'); if (tp) tp.addEventListener('click', () => { treePhotos = !treePhotos; tp.classList.toggle('outline', !treePhotos); renderTree(rootId); }); }
 }
-// مشجّرة الصور: كلُّ من أُضيفت له صورة — رئيسية أو في معرض صوره — بأسمائهم؛ اضغط لفتح ملفه.
-async function screenPhotosTree() {
+// مشجّرة الصور: بأسلوب الشجرة الهرمي نفسه (آباء ثم أبناء) لكن مع إظهار صورة كل فرد.
+function screenPhotosTree(arg) {
   if (hideForGuest('media')) { view().innerHTML = noPerm(); return; }
-  view().innerHTML = `<div class="card"><h3>🖼️ مشجّرة الصور</h3>
-    <p class="muted" style="font-size:.82rem;margin-top:-2px">كل من أُضيفت له صورة — اضغط الصورة لفتح ملفه.</p>
-    <div class="field"><input id="pt_q" type="text" placeholder="🔍 ابحث بالاسم…"></div>
-    <div id="ptGrid"><div class="muted" style="padding:8px 2px">… جارٍ التحميل</div></div></div>`;
-  // صورةٌ تمثيليةٌ لكل شخص: الرئيسية إن وُجدت، وإلا أوّل صورةٍ في معرضه (تحترم الخصوصية عبر RLS).
-  const photoBy = new Map();
-  try {
-    const { data } = await sb.from('almfrje_documents').select('person_id,url,kind').eq('kind', 'photo').order('id');
-    (data || []).forEach(d => { if (d.url && !photoBy.has(d.person_id)) photoBy.set(d.person_id, d.url); });
-  } catch (e) { }
-  const withPhoto = C.persons
-    .map(p => ({ p, url: (p.photo_url && String(p.photo_url).trim()) ? p.photo_url : photoBy.get(p.id) }))
-    .filter(x => x.url);
-  // ترتيبٌ بتسلسل النسب (الآباء ثم الأبناء): مرورٌ عميقٌ من الجذور بترتيب الأبناء المحفوظ.
-  const orderMap = new Map();
-  { let k = 0; const seen = new Set();
-    const walk = (id) => { if (seen.has(id)) return; seen.add(id); orderMap.set(id, k++); childrenOf(id).forEach(c => walk(c.id)); };
-    roots().forEach(r => walk(r.id));
-    C.persons.forEach(p => { if (!orderMap.has(p.id)) orderMap.set(p.id, k++); });   // أي شخصٍ خارج الشجرة يلحق آخراً
-  }
-  withPhoto.sort((a, b) => (orderMap.get(a.p.id) - orderMap.get(b.p.id)));
-  const grid = document.getElementById('ptGrid'); if (!grid) return;
-  const hd = view().querySelector('h3'); if (hd) hd.textContent = `🖼️ مشجّرة الصور (${withPhoto.length})`;
-  const render = () => {
-    const q = normalizeAr((document.getElementById('pt_q') || { value: '' }).value.trim());
-    const hits = q ? withPhoto.filter(x => (x.p._n || normalizeAr(x.p.name)).includes(q) || normalizeAr(lineageShort(x.p.id, 4)).includes(q)) : withPhoto;
-    grid.innerHTML = hits.length
-      ? `<div class="pt-grid">${hits.slice(0, 300).map(x => `<div class="pt-card" data-go="#/person/${x.p.id}"><img class="avatar lg" src="${esc(x.url)}" loading="lazy" decoding="async" alt="" onerror="this.outerHTML='<div class=\\'avatar lg\\'>👤</div>'"><div class="pt-name">${esc(x.p.name)}</div><div class="pt-sub muted">${esc(lineageShort(x.p.id, 3))}</div></div>`).join('')}${hits.length > 300 ? '<div class="muted" style="grid-column:1/-1;padding:8px">عُرضت أول ٣٠٠ — ضيّق بالبحث</div>' : ''}</div>`
-      : '<div class="center-empty">لا صور بعد — أضِف صورةً لأي شخص من ملفه.</div>';
-    bindGo(grid);
-  };
-  render();
-  { const q = document.getElementById('pt_q'); if (q) q.addEventListener('input', debounce(render, 200)); }
+  treePhotos = true;   // هذه الشاشة شجرةٌ بالصور دائماً (بلا زرّ تبديل)
+  const rs = roots();
+  let rootId = parseInt(arg, 10);
+  if (!rootId || !byId.has(rootId)) rootId = rs.length ? rs[0].id : 0;
+  if (!rootId) { view().innerHTML = '<div class="center-empty">لا توجد بيانات بعد.</div>'; return; }
+  const rootOpts = rs.map(r => ({ k: String(r.id), ar: r.name }));
+  view().innerHTML = `
+    <div class="card no-print tree-ctl">
+      <p class="muted" style="font-size:.85rem;margin:2px 0 10px;line-height:1.7">🖼️ <b>يُعرض هنا من أُضيفت له صورة</b> — بأسلوب الشجرة (آباء ثم أبناء). اضغط الاسم لفتح ملفه.</p>
+      <div class="grid2">
+        ${rootOpts.length > 1 ? fSelect('ابدأ من', 'pt_root', rootOpts, rootId) : ''}
+        <div class="field"><label>اذهب لشخص</label><button class="btn outline" id="pt_pick" style="margin-top:0">🔍 اختر شخصاً</button></div>
+      </div>
+      <div class="btn-row"><button class="btn sm outline" id="pt_expand">توسيع المستوى الأول</button><button class="btn sm outline" id="pt_collapse">طيّ الكل</button></div>
+    </div>
+    <div class="card tree" id="treeBox"></div>
+    ${legendHtml()}`;
+  treeOpen.add(rootId);
+  renderTree(rootId);
+  const treeBox = document.getElementById('treeBox');
+  treeBox.addEventListener('click', (e) => {
+    const tog = e.target.closest('[data-tog]');
+    if (tog && treeBox.contains(tog)) { e.stopPropagation(); const id = parseInt(tog.dataset.tog, 10); treeOpen.has(id) ? treeOpen.delete(id) : treeOpen.add(id); renderTree(rootId); return; }
+    const op = e.target.closest('[data-open]');
+    if (op && treeBox.contains(op)) openLens(parseInt(op.dataset.open, 10));
+  });
+  bindGo();
+  const sel = document.getElementById('pt_root'); if (sel) sel.addEventListener('change', () => setHash('#/photostree/' + sel.value));
+  document.getElementById('pt_pick').addEventListener('click', () => pickPerson('اختر شخصاً', (p) => p && setHash('#/photostree/' + p.id)));
+  document.getElementById('pt_expand').addEventListener('click', () => { childrenOf(rootId).forEach(c => treeOpen.add(c.id)); renderTree(rootId); });
+  document.getElementById('pt_collapse').addEventListener('click', () => { treeOpen.clear(); treeOpen.add(rootId); renderTree(rootId); });
 }
 // رسمٌ خفيف: يكتفي بتحديث HTML؛ النقر يُدار بتفويضٍ واحد على الحاوية (لا إعادة ربط لكل عقدة).
 function renderTree(rootId) {
@@ -5011,8 +5008,7 @@ const GUIDE = [
   { sec: '🖼️ مكتبة الصور والوثائق', items: [
     { t: 'مكتبة الشخص', fn: 'أرشيفُ صورٍ ووثائق وقصائد لكل فرد.', brief: 'تظهر داخل ملف الشخص بطاقة «الصور والوثائق» بأقسامها.', det: 'خمسة أقسام: صورة رئيسية (تظهر في الشجرة وأعلى الملف) • معرض صور • وثائق وملفات PDF • قصائد له • قصائد قيلت فيه. تُعرض الصور في شبكةٍ تُفتح بعارضٍ متنقّل (تكبير وتنقّل بين الصور)، والقصائد في بطاقاتٍ نصّية، والملفات كروابط تُفتح مباشرة. الإضافة متاحة لمن له صلاحية تعديل الشخص (المدير/المشرف ضمن فرعه)، والعرض متاح للجميع عدا العناصر المخفيّة. ولا يُسمح بتكرار حفظ نفس العنصر.' },
     { t: 'خصوصية كل عنصر (عامّ/مخفي)', fn: 'التحكّم بمن يرى كل صورة أو وثيقة على حدة.', brief: 'عند الإضافة تختار: 👁 عامّة يراها الجميع، أو 🔒 مخفية.', det: 'العنصر المخفيّ لا يراه إلا صاحبه والإدارة وذرّيته، ويظهر لهم بعلامة قفلٍ 🔒 تمييزاً له. أمّا العامّ فيراه كل من يتصفّح الموقع. يُطبَّق ذلك على الصور والوثائق والقصائد جميعاً.' },
-    { t: 'مشجّرة الصور', fn: 'عرض كل من أُضيفت له صورة في شبكةٍ مصوّرة.', brief: 'من شريط أدوات الشجرة زر «🖼️ مشجّرة الصور».', det: 'شبكةٌ تعرض صورة كل شخص أُضيفت له صورة (رئيسية أو في معرض صوره) مع اسمه وسلسلة نسبه، قابلة للبحث بالاسم، والضغط على الصورة يفتح ملفه الكامل. لا تظهر فيها العناصر المخفيّة إلا لمن يملك رؤيتها.' },
-    { t: 'المشجّرة المصوّرة', fn: 'إظهار صورة كل فرد بجانب اسمه في الشجرة التفاعلية.', brief: 'زر «🖼️ مشجّرة مصوّرة» في شريط أدوات الشجرة.', det: 'يبدّل عرض الشجرة ليُظهر صورةً صغيرة لكل فرد (أو أيقونةً لمن بلا صورة) قبل اسمه، فيتحوّل التصفّح إلى شكلٍ مصوّر.' },
+    { t: 'مشجّرة الصور', fn: 'الشجرة الهرمية نفسها لكن بإظهار صورة كل فرد.', brief: 'من شريط أدوات الشجرة زر «🖼️ مشجّرة الصور».', det: 'تُعرض بأسلوب الشجرة الهرمي (آباء ثم أبناء) مع إظهار صورة كل فرد (أو أيقونةً لمن بلا صورة) قبل اسمه، قابلة للتوسيع والطيّ واختيار الجذر، والضغط على الاسم يفتح العدسة السريعة. أسفلها عبارة «يُعرض هنا من أُضيفت له صورة».' },
     { t: 'تحسين الصورة قبل الحفظ', fn: 'تجويد الصورة تلقائياً بضغطة زر.', brief: 'عند اختيار صورةٍ يظهر زر «✨ تحسين تلقائي» مع معاينة.', det: 'يحسّن التباين والتشبّع والسطوع، وتُعرض النتيجة قبل الحفظ مع إمكانية الرجوع للأصل — فلا يُحفظ إلا ما توافق عليه.' },
   ]},
   { sec: '📊 الإحصائيات والتقارير', items: [
@@ -5095,7 +5091,7 @@ function bindGuideToc() {
 }
 function screenGuide() {
   const secs = GUIDE.filter(g => g.role !== 'admin');
-  const hi = ['🖼️ مكتبة صور ووثائق وقصائد لكل فرد — بخصوصيةٍ لكل عنصر (عامّ/مخفي)', '🖼️ «مشجّرة الصور» تعرض الجميع بصورهم، و«مشجّرة مصوّرة» داخل الشجرة', '✨ تحسينٌ تلقائي للصورة مع معاينةٍ قبل الحفظ', '📤 مشاركة الموقع بضغطة من أعلى الشاشة', '🔎 اختيار أي شخص ببحثٍ أو تصفّحٍ هرمي (جيلاً بعد جيل)'];
+  const hi = ['🖼️ مكتبة صور ووثائق وقصائد لكل فرد — بخصوصيةٍ لكل عنصر (عامّ/مخفي)', '🖼️ «مشجّرة الصور»: الشجرة الهرمية نفسها بإظهار صور الأفراد', '✨ تحسينٌ تلقائي للصورة مع معاينةٍ قبل الحفظ', '📤 مشاركة الموقع بضغطة من أعلى الشاشة', '🔎 اختيار أي شخص ببحثٍ أو تصفّحٍ هرمي (جيلاً بعد جيل)'];
   if (isAdmin() || isManager()) hi.push('↕️ ترتيب الأبناء بالأسهم (ضمن الأب فقط)', '🔐 صلاحيات دقيقة لكل مشرف داخل فروعه');
   if (isAdmin()) hi.push('☁️ نسخ احتياطية سحابية تلقائية واستعادة من داخل التطبيق', '🎁 تهنئة الإدارة بعنوانٍ قابل للتخصيص');
   view().innerHTML = guideHtml(secs, 'دليل الزوّار', 'دليل استخدام الموقع', 'شرح مفصّل لكل ما يُعرض للزائر في الموقع — يتحدّث مع تطوير الموقع.', hi);
@@ -5128,7 +5124,7 @@ const FAQ = [
   { q: 'هل تظهر بياناتي الخاصة (جوالي) للزوّار؟', a: 'لا. الزائر يتصفّح ويبحث فقط، ولا يرى الجوال ولا الملاحظات الخاصة.' },
   { q: 'كيف أضيف صورة أو وثيقة أو قصيدة لشخص؟', a: 'من ملف الشخص، في بطاقة «الصور والوثائق» اضغط «➕ إضافة صورة/وثيقة/قصيدة»، ثم اختر القسم (صورة/وثيقة/قصيدة له/قصيدة قيلت فيه)، وارفع الملف أو ضع رابطاً (أو اكتب نصّ القصيدة)، وحدّد من يراها (عامّة/مخفية). الإضافة متاحة لمن له صلاحية تعديل هذا الشخص.' },
   { q: 'ما الفرق بين الصورة «العامّة» و«المخفية»؟', a: 'العامّة يراها كل من يتصفّح الموقع. المخفية (🔒) لا يراها إلا صاحبها والإدارة وذرّيته فقط. تختار ذلك لحظة الإضافة، وينطبق على الصور والوثائق والقصائد.' },
-  { q: 'ما هي «مشجّرة الصور»؟', a: 'شبكةٌ تعرض كل من أُضيفت له صورة (رئيسية أو في معرض صوره) بصورته واسمه، تفتحها من شريط أدوات الشجرة بزر «🖼️ مشجّرة الصور»، والضغط على أي صورة يفتح ملف صاحبها.' },
+  { q: 'ما هي «مشجّرة الصور»؟', a: 'هي الشجرة الهرمية نفسها (آباء ثم أبناء) لكن بإظهار صورة كل فرد قبل اسمه، تفتحها من شريط أدوات الشجرة بزر «🖼️ مشجّرة الصور»، والضغط على الاسم يفتح ملفه.' },
   { q: 'كيف أحسّن جودة الصورة قبل رفعها؟', a: 'بعد اختيار الصورة يظهر زر «✨ تحسين تلقائي» مع معاينة؛ يحسّن التباين والإضاءة، ويمكنك الرجوع للأصل قبل الحفظ، فلا يُحفظ إلا ما توافق عليه.' },
   { role: 'admin', q: 'كيف أضيف مشرفاً جديداً؟', a: 'لوحة التحكم ← الأعضاء ← «🛡️ إضافة مسؤول»: اكتب الاسم فيُنتقى من الشجرة (لا بدّ أن يكون حيّاً)، ثم أدخل رقم الجوال والرقم السري، واختر الدور (مشرف عام/مشرف فرع)، وحدّد الفروع والصلاحيات، ثم «إنشاء الحساب وتفعيله». ويدخل المشرف بجوّاله ورقمه السري.' },
   { role: 'admin', q: 'ما الفرق بين «مشرف عام» و«مشرف فرع»؟', a: 'المشرف العام على كل الفروع (أو فروعٍ تحدّدها له)، ومشرف الفرع على فروعه المحدّدة فقط. ولكلٍّ منهما صلاحيات دقيقة داخل نطاقه (إضافة مولود/تأكيده/ترتيب الأبناء/تعديل الملف).' },
