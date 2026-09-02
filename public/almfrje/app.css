@@ -752,7 +752,9 @@ ul.hier ul.hier > .hier-li::before {
 .stat-tag { font-size: .72rem; font-weight: 600; margin-inline-start: 4px; white-space: nowrap; }
 /* إعادة ترتيب الأبناء (سحب وإفلات بضغط مطوّل) */
 .reorder-hint { font-size: .8rem; color: var(--muted); background: var(--bg); border: 1px dashed var(--line); border-radius: 8px; padding: 6px 9px; margin-bottom: 8px; }
-.reorder-list [data-reorder-id] { touch-action: none; user-select: none; -webkit-user-select: none; align-items: center; gap: 8px; }
+/* pan-y: يسمح بتمرير الصفحة الرأسي باللمس فوق صفوف الأبناء (كان none فيجمّد التمرير مع
+   كثرة الأبناء). السحب لإعادة الترتيب على اللمس معطّلٌ أصلاً (بالفأرة فقط)، والأسهم ▲▼ للّمس. */
+.reorder-list [data-reorder-id] { touch-action: pan-y; user-select: none; -webkit-user-select: none; align-items: center; gap: 8px; }
 .reorder-grip { color: var(--brand); cursor: grab; font-size: 1.3rem; flex: none; padding: 4px 8px; touch-action: none; }
 .reorder-grip:active { cursor: grabbing; }
 .row.reorder-grab { background: var(--brand-l); border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,.22); }
