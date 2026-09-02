@@ -1720,6 +1720,18 @@ async function screenPerson(arg) {
     enableReorder(childList, cs.map(c => c.id), id);             // وسحبٌ مطوّل اختياري
   }
 }
+// إصلاحٌ ذاتي: إن فشلت عمليةٌ بسبب عمودٍ حديثٍ لم تُطبَّق ترقيته (photo_public) — نشغّل
+// /api/almfrje-setup بتوكن المدير (الاحتياطي بلا توكن يُرفض 403) ثم نعيد المحاولة مرّة.
+async function setupThenRetry(fn) {
+  try { return await fn(); }
+  catch (e) {
+    const msg = (e && e.message) || String(e);
+    if (!/photo_public|column|schema cache|does not exist|PGRST/i.test(msg)) throw e;
+    try { const { data: { session } } = await sb.auth.getSession(); await fetch('/api/almfrje-setup', { method: 'POST', headers: session ? { Authorization: 'Bearer ' + session.access_token } : {} }); } catch (_) { /* */ }
+    await new Promise(r => setTimeout(r, 2000));
+    return await fn();
+  }
+}
 // مكتبة الشخص: تُجلب الصور/الوثائق/القصائد بعد ظهور الملف وتُملأ حاوية docsCard — فلا تؤخّر الأزرار.
 // refresh: دالّةٌ تُستدعى بعد إضافة/حذف عنصر (لتُعيد رسم الشاشة الحالية — الملف أو التعديل).
 async function loadDocsCard(p, refresh) {
@@ -1802,17 +1814,17 @@ async function loadDocsCard(p, refresh) {
   box.querySelectorAll('[data-setmain]').forEach(b => b.addEventListener('click', async (e) => {
     e.stopPropagation();
     const u = b.dataset.setmain;
-    const ok = await guard(async () => {
+    const ok = await guard(() => setupThenRetry(async () => {
       const { error } = await sb.from('almfrje_persons').update({ photo_url: u, photo_public: true, updated_at: new Date().toISOString() }).eq('id', p.id); if (error) throw error; const pp = byId.get(p.id); if (pp) { pp.photo_url = u; pp.photo_public = true; }
       if (b.dataset.mainid) await sb.from('almfrje_documents').update({ is_public: true }).eq('id', b.dataset.mainid);   // الرئيسية تظهر للجميع في الشجرة افتراضياً
-    });
+    }));
     if (ok) { toast('صارت الصورة الرئيسية'); reload(); }
   }));
   // خصوصية الصورة الرئيسية (صورة الشجرة): «للجميع» أو «لذريّته فقط» — تُحفظ على الشخص نفسه.
   box.querySelectorAll('[data-visperson]').forEach(b => b.addEventListener('click', async (e) => {
     e.stopPropagation();
     const pub = b.dataset.pub === '1';
-    const ok = await guard(async () => { const { error } = await sb.from('almfrje_persons').update({ photo_public: pub, updated_at: new Date().toISOString() }).eq('id', p.id); if (error) throw error; const pp = byId.get(p.id); if (pp) pp.photo_public = pub; });
+    const ok = await guard(() => setupThenRetry(async () => { const { error } = await sb.from('almfrje_persons').update({ photo_public: pub, updated_at: new Date().toISOString() }).eq('id', p.id); if (error) throw error; const pp = byId.get(p.id); if (pp) pp.photo_public = pub; }));
     if (ok) { toast(pub ? 'تُعرض للجميع في الشجرة' : 'تُعرض لذريّته فقط'); reload(); }
   }));
   // تغيير خصوصية عنصرٍ: «للجميع» (is_public=true) أو «لذريته فقط» (is_public=false).
@@ -2457,6 +2469,14 @@ async function screenPhotosTree() {
   const withPhoto = C.persons
     .map(p => ({ p, url: (p.photo_url && String(p.photo_url).trim()) ? p.photo_url : photoBy.get(p.id) }))
     .filter(x => x.url);
+  // ترتيبٌ بتسلسل النسب (الآباء ثم الأبناء): مرورٌ عميقٌ من الجذور بترتيب الأبناء المحفوظ.
+  const orderMap = new Map();
+  { let k = 0; const seen = new Set();
+    const walk = (id) => { if (seen.has(id)) return; seen.add(id); orderMap.set(id, k++); childrenOf(id).forEach(c => walk(c.id)); };
+    roots().forEach(r => walk(r.id));
+    C.persons.forEach(p => { if (!orderMap.has(p.id)) orderMap.set(p.id, k++); });   // أي شخصٍ خارج الشجرة يلحق آخراً
+  }
+  withPhoto.sort((a, b) => (orderMap.get(a.p.id) - orderMap.get(b.p.id)));
   const grid = document.getElementById('ptGrid'); if (!grid) return;
   const hd = view().querySelector('h3'); if (hd) hd.textContent = `🖼️ مشجّرة الصور (${withPhoto.length})`;
   const render = () => {
