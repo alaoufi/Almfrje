@@ -2430,7 +2430,7 @@ function bindTrackingBar() {
   view().querySelectorAll('.track-bar [data-lensid]').forEach(el => el.addEventListener('click', () => openLens(parseInt(el.dataset.lensid, 10))));
 }
 function screenTree(arg) {
-  treePhotos = false;   // الشجرة العادية بلا صور (عرض الصور صار في «مشجّرة الصور» المستقلّة)
+  treePhotos = true;   // الصور أساسية في أي مشجّرة: يظهر أفاتار كل شخص (صورته أو أيقونة) بجانب اسمه
   const rs = roots();
   let rootId = parseInt(arg, 10);
   // افتراض المشرف: فرعه عند فتح الشجرة بلا تحديد، مع تفعيل التتبّع.
