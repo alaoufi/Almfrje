@@ -1752,11 +1752,12 @@ async function loadDocsCard(p, refresh) {
   const lock = (d) => d.is_public === false ? ' <span class="doc-lock" title="مخفية — لا يراها إلا صاحبها والإدارة وذريّته">🔒</span>' : '';
   const canDel = canManageMedia(p);   // إضافة/حذف عناصر المكتبة: المدير أو صاحب الحساب نفسه
   const N = galleryPhotos.length + files.length + poemsBy.length + poemsAbout.length;
-  const poemCard = (d) => `<div class="poem-card">${d.label ? `<div class="poem-title">${esc(d.label)}${lock(d)}</div>` : `<div class="poem-title">قصيدة${lock(d)}</div>`}${d.body ? `<div class="poem-body">${esc(d.body)}</div>` : ''}${d.url ? `<a href="${esc(d.url)}" target="_blank" rel="noopener" class="poem-file">📎 المرفق</a>` : ''}${canDel ? `<button class="btn sm danger" data-ddel="${d.id}" style="margin-top:6px">حذف</button>` : ''}</div>`;
   // زرّا الخصوصية أمام كل عنصرٍ (وضع الإدارة): «للجميع» أو «لذريته فقط».
   // مربّع اختيارٍ واضح: المفعّل ✔ (أخضر) وغير المفعّل ⬜ — فيُعرف الوضع بنظرة.
   const opt = (id, pub, cur, label, isMain) => `<button type="button" class="dm-opt ${cur ? 'on' : ''}" data-vis="${id}" data-pub="${pub}"${isMain ? ' data-ismain="1"' : ''}><span class="dm-box">${cur ? '✔' : ''}</span>${label}</button>`;
   const visBtns = (id, isPub, isMain) => opt(id, '1', isPub, '👁 تُعرض للجميع', isMain) + opt(id, '0', !isPub, '🔒 لذريّته فقط', isMain);
+  // بطاقة قصيدة: العنوان + النصّ + مرفقٌ اختياري (PDF/صورة)، مع خصوصيةٍ وحذفٍ للإدارة.
+  const poemCard = (d) => `<div class="poem-card">${d.label ? `<div class="poem-title">${esc(d.label)}${lock(d)}</div>` : `<div class="poem-title">قصيدة${lock(d)}</div>`}${d.body ? `<div class="poem-body">${esc(d.body)}</div>` : ''}${d.url ? `<a href="${esc(d.url)}" target="_blank" rel="noopener" class="poem-file">📎 المرفق (PDF/صورة)</a>` : ''}${canDel ? `<div class="dm-ctrl" style="margin-top:8px">${visBtns(d.id, d.is_public !== false, false)}<button type="button" class="dm-opt danger" data-ddel="${d.id}">🗑 حذف</button></div>` : ''}</div>`;
   // وضع الإدارة (المدير/صاحب الحساب): لكل صورة/ملف تحكّمٌ أمامه — رئيسية/النشر/حذف.
   // الصورة الرئيسية عامّةٌ في الشجرة؛ واختيار «لذريّته فقط» يحوّلها لصورةٍ خاصّة في المعرض
   // ويُزيلها من الشجرة (يراها ذريّته والإدارة عبر RLS القائم) — بلا حاجة لأي عمودٍ جديد.
@@ -1788,8 +1789,8 @@ async function loadDocsCard(p, refresh) {
       ${!N ? noItem() : ''}
       ${canManageMedia(p) ? `<button class="btn outline" id="addDoc" style="margin-top:10px">➕ إضافة صورة/وثيقة/قصيدة</button>` : ''}
     </div>
-    ${poemsBy.length ? `<div class="card"><h3>📜 قصائد له (${poemsBy.length})</h3>${poemsBy.map(poemCard).join('')}</div>` : ''}
-    ${poemsAbout.length ? `<div class="card"><h3>📜 قصائد قيلت فيه (${poemsAbout.length})</h3>${poemsAbout.map(poemCard).join('')}</div>` : ''}`;
+    ${poemsBy.length ? `<div class="card"><h3>📜 ديوانه الشعري (${poemsBy.length})</h3>${poemsBy.map(poemCard).join('')}</div>` : ''}
+    ${poemsAbout.length ? `<div class="card"><h3>📜 ما قيل فيه من قصائد (${poemsAbout.length})</h3>${poemsAbout.map(poemCard).join('')}</div>` : ''}`;
   const ad = document.getElementById('addDoc'); if (ad) ad.addEventListener('click', () => addDocModal(p, reload));
   box.querySelectorAll('[data-lb]').forEach(t => t.addEventListener('click', () => openLightbox(galleryPhotos, parseInt(t.dataset.lb, 10))));
   { const pg = document.getElementById('phGallery'); if (pg) pg.addEventListener('click', () => openLightbox(galleryPhotos, 0)); }
@@ -2069,8 +2070,8 @@ function enhanceDocImage(file) {
 }
 const DOC_CATS = [
   { k: 'photo', ar: '🖼️ صورة (للمعرض)' },
-  { k: 'doc', ar: '📄 وثيقة / PDF' },
-  { k: 'poem_by', ar: '📜 قصيدة له' },
+  { k: 'doc', ar: '📄 وثيقة / كتاب PDF' },
+  { k: 'poem_by', ar: '📜 قصيدة من ديوانه (له)' },
   { k: 'poem_about', ar: '📜 قصيدة قيلت فيه' },
 ];
 function addDocModal(p, refresh) {
