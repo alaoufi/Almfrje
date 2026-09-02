@@ -1502,11 +1502,20 @@ function screenRadial(arg) {
     return `<path d="M${a.x.toFixed(1)} ${a.y.toFixed(1)} Q ${mx.toFixed(1)} ${my.toFixed(1)} ${b.x.toFixed(1)} ${b.y.toFixed(1)}" class="rad-link"/>`;
   }).join('');
   const RAD = (d) => d === 0 ? 30 : d === 1 ? 21 : d === 2 ? 15 : 11;
+  const showMedia = !hideForGuest('media');   // الصور داخل العقد (تُخفى عن الزائر إن مُنع من الوسائط)
+  const clipDefs = [];
   const circles = lay.nodes.map(n => {
     if (n.more) return `<g class="rad-g rad-more" data-radmore="${n.parentId}"><circle cx="${n.x.toFixed(1)}" cy="${n.y.toFixed(1)}" r="15"/><text x="${n.x.toFixed(1)}" y="${(n.y + 4).toFixed(1)}" text-anchor="middle">+${n.n}</text></g>`;
     const r = RAD(n.depth);
     const nm = n.p.name.length > 12 ? n.p.name.slice(0, 12) + '…' : n.p.name;
-    const circle = `<circle cx="${n.x.toFixed(1)}" cy="${n.y.toFixed(1)}" r="${r}" class="rad-c d${Math.min(n.depth, 3)} ${nameCls(n.p)}"/>`;
+    const cx = n.x.toFixed(1), cy = n.y.toFixed(1);
+    // العقدة: دائرةٌ ملوّنة حسب الحالة، وفوقها صورة الفرد (إن وُجدت) مقصوصةٌ دائرياً مع إطارٍ أبيض.
+    let circle = `<circle cx="${cx}" cy="${cy}" r="${r}" class="rad-c d${Math.min(n.depth, 3)} ${nameCls(n.p)}"/>`;
+    if (n.p.photo_url && showMedia) {
+      const cid = 'radclip' + n.p.id;
+      clipDefs.push(`<clipPath id="${cid}"><circle cx="${cx}" cy="${cy}" r="${r}"/></clipPath>`);
+      circle += `<image href="${esc(n.p.photo_url)}" x="${(n.x - r).toFixed(1)}" y="${(n.y - r).toFixed(1)}" width="${(r * 2).toFixed(1)}" height="${(r * 2).toFixed(1)}" preserveAspectRatio="xMidYMid slice" clip-path="url(#${cid})" class="rad-img"/><circle cx="${cx}" cy="${cy}" r="${r}" class="rad-imgring"/>`;
+    }
     let label;
     if (n.depth === 0) {
       label = `<text x="${n.x.toFixed(1)}" y="${(n.y + 5).toFixed(1)}" text-anchor="middle" class="rad-t rad-t0">${esc(nm)}</text>`;
@@ -1534,7 +1543,7 @@ function screenRadial(arg) {
       </div>
       <p class="muted" style="font-size:.78rem;margin:6px 0 0">ضغطة على الاسم تفتح أدواته، و<b>ضغطة مطوّلة تجعله المركز</b>. ${big ? 'وتُجمَّع الفروع الكبيرة في «+عدد».' : ''}</p>
     </div>
-    <div class="rad-wrap"><svg class="rad-svg" viewBox="${ox.toFixed(0)} ${oy.toFixed(0)} ${vbW.toFixed(0)} ${vbH.toFixed(0)}" style="width:${(vbW * radZoom).toFixed(0)}px;height:${(vbH * radZoom).toFixed(0)}px"><g class="rad-guides">${guides.join('')}</g>${lines}${circles}</svg></div>`;
+    <div class="rad-wrap"><svg class="rad-svg" viewBox="${ox.toFixed(0)} ${oy.toFixed(0)} ${vbW.toFixed(0)} ${vbH.toFixed(0)}" style="width:${(vbW * radZoom).toFixed(0)}px;height:${(vbH * radZoom).toFixed(0)}px"><defs>${clipDefs.join('')}</defs><g class="rad-guides">${guides.join('')}</g>${lines}${circles}</svg></div>`;
   { const up = document.getElementById('rad_up'); if (up && parent) up.addEventListener('click', () => setHash('#/radial/' + parent.id)); }
   document.getElementById('rad_pick').addEventListener('click', () => pickPerson('اختر مركز الشجرة الدائرية', p => p && setHash('#/radial/' + p.id)));
   document.getElementById('rad_inc').addEventListener('click', () => { radGens = Math.min(6, radGens + 1); screenRadial(String(radRoot.id)); });
@@ -4979,7 +4988,7 @@ const GUIDE = [
     { t: 'خريطة الذرية', fn: 'تلخيص ذرية أي شخص بسرعة.', brief: 'من العدسة → «خريطة الذرية».', det: 'بطاقة بإحصائيات (الأبناء/الأحفاد/إجمالي الذرية/الأجيال/الأحياء/المتوفّون) وأول مستويين من الذرية، مع روابط لفهرس الذرية والعرض الكامل وطباعة مختصر الذرية.' },
     { t: 'أقربائي', fn: 'عرض الأقرباء المباشرين فقط.', brief: 'من العدسة → «أقربائي».', det: 'يعرض الأب والإخوة والأبناء والأعمام وأبناء العم كأسماء قابلة للضغط — عرضٌ مختصر مناسب للجوال.' },
     { t: 'خط الأجيال', fn: 'عرض الأفراد مقسّمين حسب الجيل.', brief: 'المزيد → «خط الأجيال».', det: 'كل جيل في قسمٍ مع عدد أفراده، مع فلترة (الفرع/الأحياء/المتوفّون/لم يعقب) وبحث، وزر «ابدأ من شخص» لعرض الأجيال تحته فقط.' },
-    { t: 'الشجرة الدائرية', fn: 'عرض بصري دائري للمشجّرة.', brief: 'المزيد → «الشجرة الدائرية».', det: 'المركز في الوسط والأجيال حلقاتٌ حوله (٣ افتراضياً، حتى ٦) بتسميات شعاعية واضحة. ضغطة قصيرة على أي اسم تفتح العدسة، و«ضغطة مطوّلة تجعله المركز». ولتغيير المركز أيضاً: زر «⬆ المركز: الأب»، أو «⌖ تغيير المركز»، أو «🔆 اجعله مركز الدائرية» من العدسة. مع تكبير، وتجميع الفروع الكبيرة في «+عدد» يفتح فهرس الذرية.' },
+    { t: 'الشجرة الدائرية', fn: 'عرض بصري دائري للمشجّرة مع صور الأفراد.', brief: 'المزيد → «الشجرة الدائرية».', det: 'المركز في الوسط والأجيال حلقاتٌ حوله (٣ افتراضياً، حتى ٦) بتسميات شعاعية واضحة، وتظهر صورة كل فرد داخل دائرته (أو لونٌ حسب حالته لمن بلا صورة). ضغطة قصيرة على أي عقدة تفتح العدسة، و«ضغطة مطوّلة تجعله المركز». ولتغيير المركز أيضاً: زر «⬆ المركز: الأب»، أو «⌖ تغيير المركز»، أو «🔆 اجعله مركز الدائرية» من العدسة. مع تكبير، وتجميع الفروع الكبيرة في «+عدد» يفتح فهرس الذرية.' },
     { t: 'حاسبة صلة القرابة', fn: 'معرفة صلة القرابة بين أيّ شخصين.', brief: 'المزيد → «حاسبة صلة القرابة»، أو من العدسة → «صلة قرابته بشخص».', det: 'اختر شخصين فيُحسب تلقائياً: الجدّ المشترك الأقرب بينهما، ونوع الصلة (أخوان، عمّ وابن أخ، ابنا عمّ بدرجاتها، أو نسب مباشر أب/جدّ)، ومسار نسب كلٍّ منهما حتى الجدّ المشترك مع إبرازه. يعتمد الحساب على سلسلة الآباء المسجّلة. أزرار: «↕️ تبديل» لقلب الترتيب، و«مسح»، و«📋 نسخ النتيجة». والضغط على أي اسمٍ يفتح العدسة السريعة. واختيار الشخص (هنا وفي كل مواضع اختيار الجدّ) يجمع طريقتين: البحث بالاسم، أو التصفّح الهرمي جيلاً بعد جيل بمسار تنقّل (القمة/للأعلى) للوصول لأي جدٍّ بسهولة.' },
     { t: 'نسخة مختصرة للطباعة', fn: 'مشجّرة نظيفة للطباعة أو PDF.', brief: 'المزيد → «نسخة مختصرة للطباعة».', det: 'اختر الفرع/الجدّ وعدد الأجيال وما يظهر (الحالة/المدينة/عدد الأبناء/الأحياء فقط)، ونمط الطباعة: «فهرس مرقّم مضغوط» (كل فرد في سطر — أقل صفحات) أو «مشجّرة متدرّجة». تُولَّد صفحة A4 نظيفة بأعمدة تلقائية تملأ الصفحة، للطباعة أو حفظ PDF.' },
     { t: 'تتبّع الفرع', fn: 'تركيز الشجرة على فرعٍ واحد.', brief: 'شاشة الفرع → «تتبّع هذا الفرع».', det: 'تركّز الشجرة على الفرع وتعرض شريطاً بـ«تتصفّح فرع: …» مع «تحديثات هذا الفرع» (عدد الأفراد والأجيال وآخر الإضافات). مشرف الفرع يبدأ على فرعه تلقائياً، والزائر يُقترح عليه «عرض فرعي فقط».' },

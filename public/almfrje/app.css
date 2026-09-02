@@ -899,6 +899,8 @@ ul.hier ul.hier > .hier-li::before {
 .rad-c.d0 { fill: var(--brand-d); stroke-width: 3; } .rad-c.d1 { fill: var(--brand); } .rad-c.d2 { fill: var(--accent); } .rad-c.d3 { fill: #6b7fd1; }
 .rad-c.n-died { fill: var(--c-dead); } .rad-c.n-noissue { fill: var(--c-noissue); }
 /* تسمية المركز داخل الدائرة بيضاء؛ التسميات الشعاعية بلون النص مع هالة بيضاء لوضوحها */
+.rad-img { pointer-events: none; }
+.rad-imgring { fill: none; stroke: #fff; stroke-width: 2.5; pointer-events: none; }
 .rad-t { pointer-events: none; font-weight: 800; }
 .rad-t0 { fill: #fff; font-size: 13px; }
 .rad-lbl { fill: var(--text); font-size: 12px; paint-order: stroke; stroke: var(--card); stroke-width: 3px; stroke-linejoin: round; }
