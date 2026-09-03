@@ -2942,36 +2942,38 @@ async function screenPersonEdit(arg) {
   // زرّ العين لإظهار/إخفاء الرقم السري (حين يوجد حقل كلمة المرور)
   if (peShowPw) view().querySelectorAll('.eye').forEach(b => b.addEventListener('click', () => { const inp = document.getElementById(b.dataset.eye); if (!inp) return; const show = inp.type === 'password'; inp.type = show ? 'text' : 'password'; b.textContent = show ? '🙈' : '👁'; }));
   document.getElementById('saveBtn').addEventListener('click', async () => {
-    // كلمة المرور (فارغ = تجاهُل): إن كان للشخص حساب غيّرها، وإلا أنشئ له حساب دخول — قبل حفظ البيانات
+    // كلمة المرور (فارغ = تجاهُل): إن كان للشخص حساب غيّرها، وإلا أنشئ له حساب دخول.
+    // مهم: خطوة الحساب «أفضل جهد» ولا تُلغي حفظ بيانات الشخص أبداً — فلا تضيع التعديلات
+    // إن تعذّر إنشاء الحساب (مثلاً الجوال له حساب بالفعل)؛ تُحفظ البيانات وتظهر رسالةٌ واضحة.
     if (peShowPw) {
       const pin = (val('pe_pin') || '').trim();
       if (pin) {
         if (!PIN_RE.test(pin)) { toast('كلمة المرور ٤ خانات على الأقل (حروف أو أرقام)'); return; }
+        const phone = normPhone(val('p_phone'));
+        if (phone.length < 7) { toast('أدخل رقم الجوال أولاً لتعيين كلمة المرور'); return; }
         const { data: { session } } = await sb.auth.getSession();
         const tok = (session && session.access_token) || '';
-        const phone = normPhone(val('p_phone'));
         // الحساب المرتبط: بالشخص أولاً، وإلا بالجوال نفسه — فلا يُعتبر جواله «مكرراً» عند تعديله
-        const acct = peMem || (phone.length >= 7 ? (C.members || []).find(mm => normPhone(mm.phone || '') === phone) : null);
-        if (acct) {
-          // حساب موجود (له أو بجواله) → غيّر كلمة مروره (لا إنشاء جديد)
-          const okPin = await guard(async () => {
+        const acct = peMem || ((C.members || []).find(mm => normPhone(mm.phone || '') === phone) || null);
+        try {
+          if (acct) {
+            // حساب موجود (له أو بجواله) → غيّر كلمة مروره (لا إنشاء جديد)
             const r = await fetch('/api/almfrje-admin', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + tok }, body: JSON.stringify({ user_id: acct.user_id, pin }) });
             const j = await r.json().catch(() => ({}));
             if (!r.ok || !j.ok) throw new Error(j.error || ('فشل تغيير كلمة المرور (' + r.status + ')'));
-          });
-          if (!okPin) return;
-          toast('تم تغيير كلمة المرور ✓');
-        } else {
-          // لا حساب له ولا بجواله: أنشئ حساب دخول (عضو) بالجوال وكلمة المرور
-          if (phone.length < 7) { toast('أدخل رقم الجوال أولاً لإنشاء الحساب'); return; }
-          const full_name = (val('p_name').trim() || p.name) + (editFather ? ' ' + editFather.name : '');
-          const okNew = await guard(async () => {
+            toast('تم تغيير كلمة المرور ✓');
+          } else {
+            // لا حساب له ولا بجواله: أنشئ حساب دخول (عضو) بالجوال وكلمة المرور
+            const full_name = (val('p_name').trim() || p.name) + (editFather ? ' ' + editFather.name : '');
             const r = await fetch('/api/almfrje-create-user', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + tok }, body: JSON.stringify({ full_name, username: '', phone, pin, role: 'viewer', branch_ids: [], perms: {}, person_id: id }) });
             const j = await r.json().catch(() => ({}));
-            if (!r.ok || !j.ok) throw new Error(j.error || ('تعذّر إنشاء الحساب (' + r.status + ')'));
-          });
-          if (!okNew) return;
-          toast('تم إنشاء حساب دخول للعضو ✓');
+            if (r.status === 409) { toast('📱 هذا الجوال له حسابٌ بالفعل — حُفظت بيانات الشخص. لتعيين كلمة المرور: المزيد ← الأعضاء ← «توليد كلمة مرور».'); }
+            else if (!r.ok || !j.ok) { throw new Error(j.error || ('تعذّر إنشاء الحساب (' + r.status + ')')); }
+            else { toast('تم إنشاء حساب دخول للعضو ✓'); }
+          }
+        } catch (e) {
+          // لا نُوقف الحفظ — البيانات أهم من خطوة الحساب
+          toast('تعذّر ضبط حساب الدخول: ' + ((e && e.message) || '') + ' — حُفظت بيانات الشخص.');
         }
       }
     }
