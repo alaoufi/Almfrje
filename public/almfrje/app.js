@@ -92,7 +92,7 @@ const HINTS = {
   home: ['الصفحة الرئيسية', 'هنا تجد ملخّص الشجرة: عدد الأفراد والفروع والأجيال، وآخر الإضافات.\n\nالأزرار في الأسفل تنقلك بين الأقسام:\n🏠 الرئيسية • 🔍 البحث • 🌳 الشجرة • 🗂️ الفروع • ☰ المزيد.'],
   nav: ['شريط التنقّل', 'الأزرار في أسفل الشاشة:\n🏠 الرئيسية: الملخّص.\n🔍 البحث: ابحث عن أي شخص.\n🌳 الشجرة: تصفّح الأنساب.\n🗂️ الفروع: قائمة الفروع.\n☰ المزيد: بقية الأدوات.'],
   stats_box: ['الإحصائيات', 'أرقام سريعة: إجمالي الأفراد المسجّلين، عدد الفروع، عدد الأجيال، وآخر إضافة.'],
-  recent: ['آخر الإضافات', 'أحدث الأسماء المُضافة. اضغط أي اسم لرؤية أبيه وجدّه وتاريخ إضافته.\n\nللمدير: زر «🙈 إخفاء / 👁 إظهار» يتحكم بظهور البطاقة للجميع، وزر «↺ تصفير» يبدأ العدّ من جديد دون حذف أي بيانات.'],
+  recent: ['آخر الإضافات', 'أحدث الأسماء المُضافة. اضغط أي اسم لرؤية أبيه وجدّه وتاريخ إضافته.\n\nللمدير: زر «🙈 إخفاء» على البطاقة يُخفيها عن الجميع (بما في ذلك الإدارة)، وتُعاد من التحكم ← ⚙️ الإعدادات. وزر «↺ تصفير» يبدأ العدّ من جديد دون حذف أي بيانات.'],
   // ——— البحث ———
   search: ['البحث', 'اكتب اسماً في الأعلى للبحث الفوري، أو استخدم «بحث متقدّم» لتضييق النتائج بالأب أو الجد أو الفرع.\n\nكل الحقول اختيارية — املأ ما تعرفه فقط.'],
   search_name: ['الاسم', 'اكتب جزءاً من اسم الشخص.\nمثال: تكتب «محمد» فتظهر كل من يحمل هذا الاسم.\nلا يهم التشكيل أو «ال» التعريف.'],
@@ -1100,9 +1100,8 @@ function screenHome() {
     <div class="online-home" id="onlineHome">${onlineHomeHtml()}</div>
     ${visitStatsCardHtml()}
     ${branchGroupsHtml()}
-    ${(recentShow || isAdmin()) ? `<div class="card"><div class="recent-head"><h3 style="margin:0">آخر الإضافات${sinceMs ? ` (${newCount})` : ''} ${hintBtn('recent')}</h3>${isAdmin() ? `<button class="btn sm outline" id="recentToggle">${recentShow ? '🙈 إخفاء' : '👁 إظهار'}</button>` : ''}</div>
-      ${!recentShow ? '<div class="muted" style="padding:6px">البطاقة مخفية عن الجميع — أنت وحدك تراها الآن (اضغط «إظهار» لإعادتها).</div>'
-        : (recent.length ? recent.map(p => `<div class="row click" data-recent="${p.id}"><span class="k">${esc(p.name)}</span><span class="v">${p.created_at ? fmtDate(p.created_at) : esc(branchName(p.branch_id))}</span></div>`).join('') : '<div class="muted" style="padding:6px">لا إضافات جديدة.</div>')}</div>` : ''}
+    ${recentShow ? `<div class="card"><div class="recent-head"><h3 style="margin:0">آخر الإضافات${sinceMs ? ` (${newCount})` : ''} ${hintBtn('recent')}</h3>${isAdmin() ? `<button class="btn sm outline" id="recentToggle">🙈 إخفاء</button>` : ''}</div>
+      ${recent.length ? recent.map(p => `<div class="row click" data-recent="${p.id}"><span class="k">${esc(p.name)}</span><span class="v">${p.created_at ? fmtDate(p.created_at) : esc(branchName(p.branch_id))}</span></div>`).join('') : '<div class="muted" style="padding:6px">لا إضافات جديدة.</div>'}</div>` : ''}
     ${sitePowered ? `<div style="text-align:center;margin:10px 0 0;font-size:.74rem;opacity:.75">${esc(sitePowered)}</div>` : ''}`;
   const q = document.getElementById('q');
   q.addEventListener('input', debounce(() => instantSearch(q.value, document.getElementById('qr')), 130));
@@ -2489,7 +2488,7 @@ function trackingBarHtml() {
     <div class="track-head"><span>🎯 تتصفّح فرع: <b>${esc(branchName(bid))}</b></span><button class="btn sm outline" id="track_cancel" style="margin:0">إلغاء التتبع</button></div>
     <div class="track-up"><div class="track-up-h">تحديثات هذا الفرع</div>
       <div class="track-stats"><span>الأفراد <b>${ppl.length}</b></span><span>الأجيال <b>${gens}</b></span></div>
-      ${recent.length ? `<div class="track-recent"><span class="track-lbl">آخر الإضافات:</span>${recent.map(p => `<span class="rel-chip" data-lensid="${p.id}">${esc(p.name)}</span>`).join('')}</div>` : ''}
+      ${recentShow && recent.length ? `<div class="track-recent"><span class="track-lbl">آخر الإضافات:</span>${recent.map(p => `<span class="rel-chip" data-lensid="${p.id}">${esc(p.name)}</span>`).join('')}</div>` : ''}
     </div></div>`;
 }
 function bindTrackingBar() {
@@ -5023,7 +5022,7 @@ const GUIDE = [
     { t: 'الإحصائيات (المربّعات الأربعة)', fn: 'أرقام سريعة عن الشجرة.', brief: 'إجمالي الأفراد، الفروع، الأجيال، الزوّار — وتحتها زر «📈 التقرير الإحصائي الكامل».', det: 'إجمالي الأفراد = كل الأسماء المسجّلة في الشجرة. الفروع = الفروع القائمة فقط (التي أنجب مؤسّسها). الأجيال = أطول سلسلة نسبٍ من الجذر إلى الأحدث. الزوّار = إجمالي كل من دخل الموقع (زائر/مشرف/مدير). وللتفصيل الكامل يفتح الزر أسفلها «التقرير الإحصائي الكامل» (انظر قسم الإحصائيات والتقارير).' },
     { t: 'المتواجدون الآن', fn: 'معرفة من يتصفّح الموقع حالياً.', brief: 'عدد المتواجدين الآن، وأمام كل فرع عدد متواجديه بخط صغير.', det: 'يُحتسب النشِطون خلال آخر ثلاث دقائق، ويُنسب كلٌّ لفرعه. يتحدّث تلقائياً.' },
     { t: 'بطاقة «ملاحظتك تهمنا»', fn: 'قناة تواصل لتصحيح الأخطاء أو طلب إضافة مولود.', brief: 'بطاقة بالرئيسية فيها زر «أرسل ملاحظة للإدارة» — عنوانها ونصّها يحدّدهما المدير من التحكم ← النصوص.', det: 'الملاحظات تظهر للمدير، وللمشرف ما يخصّ فرعه (مع شارة رقمية على تبويب «المزيد» عند وجود طلبات معلّقة ضمن صلاحياته).' },
-    { t: 'آخر الإضافات', fn: 'عرض أحدث الأسماء المُضافة.', brief: 'قائمة بأحدث المضافين، الضغط على الاسم يعرض أباه وجدّه وتاريخ إضافته.', det: 'المدير يظهرها أو يخفيها عن الجميع بزرٍّ أعلى البطاقة (تبقى ظاهرة له مع ملاحظة). ويصفّرها من التحكم ← النصوص ← إحصائيات الزيارات دون حذف بيانات.' },
+    { t: 'آخر الإضافات', fn: 'عرض أحدث الأسماء المُضافة.', brief: 'قائمة بأحدث المضافين، الضغط على الاسم يعرض أباه وجدّه وتاريخ إضافته.', det: 'المدير يخفيها عن الجميع بزرّ «🙈 إخفاء» أعلى البطاقة، وعند إخفائها لا تظهر لأحدٍ إطلاقاً — بما في ذلك الإدارة — وتُعاد من التحكم ← ⚙️ الإعدادات. ويصفّرها من الإعدادات دون حذف بيانات.' },
     { t: 'قائمة الفروع', fn: 'تصفّح الفروع وأعدادها.', brief: 'الفروع مجمّعة تحت أصولها مع عدد أفراد كل فرع.', det: 'تُعرض الفروع القائمة فقط؛ الضغط على فرع يفتح صفحته.' },
   ]},
   { sec: '🔍 البحث', items: [
@@ -5438,7 +5437,7 @@ function screenSettings() {
           <label class="perm-chk"><input type="checkbox" id="guestVerifyChk" ${guestGens > 0 ? 'checked' : ''}><span>اشتراط التحقّق بالاسم قبل دخول الزائر</span></label>
         </div></div>` : ''}</div>
     <div class="card"><div class="li-title">🕘 بطاقة «آخر الإضافات» في الرئيسية</div>
-      <div class="li-sub">${recentShow ? 'ظاهرة للجميع حالياً.' : 'مخفية عن الجميع حالياً (يراها المدير وحده بملاحظة).'} والتصفير يبدأ عدّ الإضافات من جديد دون حذف أي بيانات.</div>
+      <div class="li-sub">${recentShow ? 'ظاهرة للجميع حالياً.' : 'مخفية عن الجميع حالياً — بما في ذلك الإدارة. تُعاد من هنا.'} والتصفير يبدأ عدّ الإضافات من جديد دون حذف أي بيانات.</div>
       <button class="btn sm ${recentShow ? 'outline' : ''}" id="recent_toggle" style="margin-top:6px">${recentShow ? '🙈 إخفاء «آخر الإضافات» عن الجميع' : '👁 إظهار «آخر الإضافات» للجميع'}</button>
       <button class="btn sm outline" id="recent_reset" style="margin-top:6px">↺ تصفير «آخر الإضافات»</button></div>
 <div class="card"><h3>📊 إحصائيات الزيارات</h3>
