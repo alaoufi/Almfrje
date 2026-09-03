@@ -518,6 +518,7 @@ async function loadAll() {
   C.branches = br.error ? [] : (br.data || []);
   C.members = mr.error ? [] : (mr.data || []);
   buildIndex();
+  probeThumbs();   // فحص دعم الصور المصغّرة مبكراً (قبل فتح المشجّرات) — يسرّع تحميل الصور
   // عدّاد صندوق الوارد لا يعطّل الدخول — يُجلب بالخلفية ويُحدّث شاراته وتنبيهه حال وصوله
   refreshInboxCount();
 }
@@ -855,13 +856,38 @@ function adminTabBar(active) {
   return `<div class="admin-tabs"><button class="admin-tab" data-go="#/control" title="لوحة التحكم">⌂</button>${ADMIN_TABS.map(([k, label, href]) => `<button class="admin-tab${k === active ? ' active' : ''}" data-go="${href}">${label}</button>`).join('')}</div>`;
 }
 
+/* ===== الصور المصغّرة (تسريع العرض) =====
+   المشجّرات تعرض عشرات/مئات الصور بحجمٍ صغير (30–56px)، وتحميل الصورة الأصلية
+   (~200ك.ب لكلٍّ) يُبطئ الجوال كثيراً. نطلب نسخةً مصغّرة من تحويل صور Supabase
+   بدل الأصل. وإن كان التحويل غير مفعّلٍ في المشروع يعود العرض للأصل تلقائياً بلا كسر. */
+const _OBJ_PUB = '/storage/v1/object/public/';
+const _RENDER = '/storage/v1/render/image/public/';
+let _thumbsOk = false, _thumbProbed = false;
+function thumbUrl(url, size) {
+  if (!_thumbsOk || !url || url.indexOf(_OBJ_PUB) < 0) return url;
+  return url.replace(_OBJ_PUB, _RENDER) + (url.indexOf('?') < 0 ? '?' : '&') + 'width=' + size + '&height=' + size + '&resize=cover&quality=60';
+}
+// فحصٌ لمرّةٍ واحدة: هل يدعم المشروع تحويل الصور؟ نجرّب أوّل صورةٍ متاحة (16px).
+function probeThumbs() {
+  if (_thumbProbed) return; _thumbProbed = true;
+  try {
+    const s = (C.persons || []).find(p => p && p.photo_url && p.photo_url.indexOf(_OBJ_PUB) >= 0);
+    if (!s) { _thumbProbed = false; return; }   // لا صورة بعد — نعيد المحاولة لاحقاً
+    const test = s.photo_url.replace(_OBJ_PUB, _RENDER) + (s.photo_url.indexOf('?') < 0 ? '?' : '&') + 'width=16&height=16&quality=40';
+    const img = new Image();
+    img.onload = () => { _thumbsOk = img.naturalWidth > 0; };
+    img.onerror = () => { _thumbsOk = false; };
+    img.src = test;
+  } catch (e) { /* */ }
+}
 /* ===== بطاقات ومكوّنات مشتركة ===== */
 function avatar(p, lg) {
   const cls = 'avatar' + (lg ? ' lg' : '');
   const fallback = p && p.sex === 'female' ? '👩' : '👤';
   if (p && p.photo_url && !hideForGuest('media')) {
-    // عند فشل تحميل الصورة (رابط معطّل/مجلّد غير عام) استبدلها بالأيقونة بدل إطار فارغ.
-    return `<img class="${cls}" src="${esc(p.photo_url)}" alt="" loading="lazy" decoding="async" onerror="this.outerHTML='<div class=\\'${cls}\\'>${fallback}</div>'">`;
+    const full = esc(p.photo_url), src = esc(thumbUrl(p.photo_url, lg ? 220 : 96));
+    // فشل التصغير → نجرّب الأصل مرّة، ثم الأيقونة (لا إطار فارغ). وإن كان التصغير مُطفأً فالمصدر = الأصل أصلاً.
+    return `<img class="${cls}" src="${src}" data-full="${full}" alt="" loading="lazy" decoding="async" onerror="if(this.dataset.full&&this.src!==this.dataset.full){this.src=this.dataset.full;}else{this.outerHTML='<div class=\\'${cls}\\'>${fallback}</div>';}">`;
   }
   return `<div class="${cls}">${fallback}</div>`;
 }
@@ -1517,7 +1543,7 @@ function screenRadial(arg) {
     if (n.p.photo_url && showMedia) {
       const cid = 'radclip' + n.p.id;
       clipDefs.push(`<clipPath id="${cid}"><circle cx="${cx}" cy="${cy}" r="${r}"/></clipPath>`);
-      circle += `<image href="${esc(n.p.photo_url)}" x="${(n.x - r).toFixed(1)}" y="${(n.y - r).toFixed(1)}" width="${(r * 2).toFixed(1)}" height="${(r * 2).toFixed(1)}" preserveAspectRatio="xMidYMid slice" clip-path="url(#${cid})" class="rad-img"/><circle cx="${cx}" cy="${cy}" r="${r}" class="rad-imgring"/>`;
+      circle += `<image href="${esc(thumbUrl(n.p.photo_url, 96))}" x="${(n.x - r).toFixed(1)}" y="${(n.y - r).toFixed(1)}" width="${(r * 2).toFixed(1)}" height="${(r * 2).toFixed(1)}" preserveAspectRatio="xMidYMid slice" clip-path="url(#${cid})" class="rad-img"/><circle cx="${cx}" cy="${cy}" r="${r}" class="rad-imgring"/>`;
     }
     let label;
     if (n.depth === 0) {
