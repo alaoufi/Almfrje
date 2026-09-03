@@ -518,6 +518,7 @@ async function loadAll() {
   C.branches = br.error ? [] : (br.data || []);
   C.members = mr.error ? [] : (mr.data || []);
   buildIndex();
+  saveCache();     // حدّث النسخة المحليّة (فتحٌ لحظيّ في المرّات القادمة)
   probeThumbs();   // فحص دعم الصور المصغّرة مبكراً (قبل فتح المشجّرات) — يسرّع تحميل الصور
   // عدّاد صندوق الوارد لا يعطّل الدخول — يُجلب بالخلفية ويُحدّث شاراته وتنبيهه حال وصوله
   refreshInboxCount();
@@ -880,6 +881,31 @@ function probeThumbs() {
     img.src = test;
   } catch (e) { /* */ }
 }
+/* ===== تخزينٌ مؤقّت للبيانات (تسريع الفتح) =====
+   الفتح كان ينتظر جلب آلاف الأفراد من الشبكة في كل مرّة. الآن نعرض نسخةً محفوظة
+   محليّاً فوراً (فتحٌ لحظيّ) ثم نحدّثها بالخلفية. لا تُحفظ الحقول الحسّاسة
+   (الجوال/البريد/الملاحظات) على الجهاز، وتُفصل نسخة الزائر عن نسخة الإدارة. */
+const _PCACHE = 'almfrje_pcache_v1';
+const _cacheScope = () => (isAdmin() || isManager()) ? 'full' : 'pub';
+function saveCache() {
+  try {
+    const slim = (C.persons || []).map(p => ({ id: p.id, name: p.name, father_id: p.father_id, branch_id: p.branch_id, generation: p.generation, sex: p.sex, status: p.status, photo_url: p.photo_url, nickname: p.nickname, work: p.work, sort: p.sort }));
+    localStorage.setItem(_PCACHE, JSON.stringify({ t: Date.now(), scope: _cacheScope(), persons: slim, branches: C.branches || [] }));
+  } catch (e) { /* تجاوز الحصّة/غيره — تجاهل */ }
+}
+function hydrateFromCache() {
+  try {
+    const raw = localStorage.getItem(_PCACHE); if (!raw) return false;
+    const d = JSON.parse(raw);
+    if (!d || !Array.isArray(d.persons) || !d.persons.length) return false;
+    if (d.scope !== _cacheScope()) return false;                      // لا نخلط منظور الزائر بالإدارة
+    if (Date.now() - (d.t || 0) > 7 * 24 * 3600 * 1000) return false; // قديمٌ جداً
+    C.persons = d.persons; C.branches = d.branches || []; C.members = [];
+    buildIndex();
+    return true;
+  } catch (e) { return false; }
+}
+function clearCache() { try { localStorage.removeItem(_PCACHE); } catch (e) { /* */ } }
 /* ===== بطاقات ومكوّنات مشتركة ===== */
 function avatar(p, lg) {
   const cls = 'avatar' + (lg ? ' lg' : '');
@@ -6684,7 +6710,7 @@ function bumpGuestTs() { try { sessionStorage.setItem('almfrje_guest_ts', String
 function guestSessionFresh() {
   try { const ts = parseInt(sessionStorage.getItem('almfrje_guest_ts') || '0', 10); return !!ts && (Date.now() - ts) < GUEST_IDLE_MS; } catch (e) { return false; }
 }
-async function endGuestSession() { stopPresence(); try { sessionStorage.removeItem('almfrje_guest_ts'); } catch (e) { /* */ } _authUid = null; me = null; meResolved = false; try { await sb.auth.signOut(); } catch (e) { /* */ } }
+async function endGuestSession() { stopPresence(); try { sessionStorage.removeItem('almfrje_guest_ts'); } catch (e) { /* */ } clearCache(); _authUid = null; me = null; meResolved = false; try { await sb.auth.signOut(); } catch (e) { /* */ } }
 async function browseAsGuest(msgEl) {
   // لا نُصفّر علامة الترحيب هنا: قد تُستدعى تلقائياً عند تحديث الصفحة/تجديد الجلسة،
   // فالتصفير يقتصر على الدخول اليدوي الفعلي (كتابة الاسم / زر التصفّح / دخول المسؤول).
@@ -7015,13 +7041,27 @@ async function enterApp(session) {
   if (!me.is_active) { showLoading(false); renderPending(); return; }
   // الزائر حساب مشترك تلقائي — لا يحتاج زرّ خروج (يبقى للمسؤول/المشرف).
   document.getElementById('signoutBtn').classList.toggle('hidden', isGuestUser() && guestGens <= 0);
+  const greet = () => { try { let fn = ''; try { fn = (sessionStorage.getItem('almfrje_guest_name') || '').trim().split(/\s+/)[0] || ''; } catch (e) { /* */ } showGreeting(fn); } catch (e) { /* */ } };
+  // فتحٌ لحظيّ: إن وُجدت نسخةٌ محليّة اعرضها فوراً ثم حدّث البيانات بالخلفية (stale-while-revalidate).
+  if (hydrateFromCache()) {
+    greet();
+    showLoading(false);
+    if (!location.hash || isAdminLoginUrl()) location.hash = '#/home';
+    render();
+    startPresence();
+    probeThumbs();
+    loadAll().then(() => {
+      // لا تُعِد الرسم إن كان المستخدم يكتب أو داخل شاشة تحرير (يمسح ما بيده) — البيانات تُحدَّث صامتةً وتظهر عند التنقّل.
+      const ae = document.activeElement, typing = ae && /^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName || '');
+      const editing = /#\/(person-edit|bulk|texts|aboutedit|settings|profile)/.test(location.hash || '');
+      if (!typing && !editing) { try { render(); } catch (e) { /* */ } }
+    }).catch(() => { /* أبقِ النسخة المحليّة */ });
+    setTimeout(() => { try { showPendingApprovals(); } catch (e) { /* */ } }, 900);
+    return;
+  }
   // البيانات (أشخاص/فروع/أعضاء) بالتوازي؛ الإعدادات جُلبت آنفاً بالتوازي مع جلب العضو.
   try { await loadAll(); } catch (e) { toast('خطأ تحميل: ' + e.message); }
-  try {   // التحية تعتمد على الإعدادات (جهزت الآن مع loadAll)
-    let fn = '';
-    try { fn = (sessionStorage.getItem('almfrje_guest_name') || '').trim().split(/\s+/)[0] || ''; } catch (e) { /* */ }
-    showGreeting(fn);
-  } catch (e) { /* تجاهل */ }
+  greet();   // التحية تعتمد على الإعدادات (جهزت الآن مع loadAll)
   showLoading(false);
   // الزائر دخل عبر رابط الإدارة سهواً؟ حوّله للرئيسية بدل بقائه على #login
   if (!location.hash || isAdminLoginUrl()) location.hash = '#/home';
@@ -7091,6 +7131,7 @@ async function init() {
   document.getElementById('signoutBtn').addEventListener('click', async () => {
     stopPresence();
     try { sessionStorage.removeItem('almfrje_guest_ts'); } catch (e) { /* */ }
+    clearCache();   // لا تُبقِ نسخةً محليّة بعد الخروج
     location.hash = '#/home';
     await sb.auth.signOut();
   });
