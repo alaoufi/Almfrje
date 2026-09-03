@@ -8,3 +8,17 @@
   Referrer-Policy: strict-origin-when-cross-origin
   Permissions-Policy: camera=(), microphone=(), geolocation=(self), payment=()
   Strict-Transport-Security: max-age=31536000
+
+# أصولٌ مبصومة بالإصدار (?v=... أو رقمٌ في الاسم): تتغيّر روابطها عند كل نشر،
+# فتُخزَّن في المتصفّح طويلاً بلا إعادة تحقّق — يُلغي تأخّر «الصفحة الأولى» في كل زيارة.
+# (index.html لا يُخزَّن — تضبطه next.config بـ no-cache — فيلتقط الإصدار الجديد دائماً.)
+/almfrje/app.js
+  Cache-Control: public, max-age=31536000, immutable
+/almfrje/app.css
+  Cache-Control: public, max-age=31536000, immutable
+/almfrje/vendor-supabase-2.112.3.js
+  Cache-Control: public, max-age=31536000, immutable
+/almfrje/icon.svg
+  Cache-Control: public, max-age=604800
+/almfrje/manifest.webmanifest
+  Cache-Control: public, max-age=604800
