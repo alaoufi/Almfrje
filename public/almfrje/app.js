@@ -2901,6 +2901,8 @@ async function screenPersonEdit(arg) {
   document.getElementById('screenTitle').textContent = 'تعديل: ' + p.name;
   // للمدير: حساب دخول الشخص إن وُجد (لتغيير كلمته)، وإلا يُتاح إنشاء حساب له إن كان حيّاً
   const peMem = isAdmin() ? (C.members || []).find(mm => Number(mm.person_id) === id) : null;
+  // الحساب المرتبط بالشخص (بالربط أولاً، وإلا بمطابقة الجوال) — لفتح إدارته مباشرةً
+  const peAcct = isAdmin() ? (peMem || ((C.members || []).find(mm => p.phone && normPhone(mm.phone || '') === normPhone(p.phone)) || null)) : null;
   const peShowPw = isAdmin();   // حقل كلمة المرور يظهر للمدير دائماً: تغيير كلمة الحساب أو إنشاء حساب دخول
   view().innerHTML = `
     <div class="card"><h3>البيانات الأساسية</h3>
@@ -2918,9 +2920,10 @@ async function screenPersonEdit(arg) {
         <div class="field"><label>الجوال</label><input id="p_phone" type="tel" inputmode="tel" value="${esc(p.phone || '')}" placeholder="اختياري"></div>
       </div>
       ${peShowPw ? `${pinField(peMem ? '🔑 كلمة مرور حساب العضو — رقم سري جديد (اتركه فارغاً لإبقاء القديمة)' : '🔑 كلمة مرور دخول العضو (اكتبها لإنشاء حساب دخول له)', 'pe_pin')}
-      <div class="muted" style="font-size:.75rem;margin:-6px 0 8px">${peMem
-        ? 'لهذا الشخص حساب دخول' + (peMem.phone ? ' (📱 ' + esc(peMem.phone) + ')' : '') + (peMem.is_active ? '' : ' • موقوف') + ' — يُحفظ الرقم الجديد مع «حفظ التعديل».'
-        : 'لا حساب دخول له بعد. اكتب كلمة مرور (٤ خانات فأكثر (حروف أو أرقام)) وتأكّد من رقم الجوال أعلاه — يُنشأ له حساب دخول عند «حفظ التعديل». اتركها فارغة إن لم ترد إنشاء حساب.'}</div>` : ''}
+      <div class="muted" style="font-size:.75rem;margin:-6px 0 8px">${peAcct
+        ? 'لهذا الشخص حساب دخول' + (peAcct.phone ? ' (📱 ' + esc(peAcct.phone) + ')' : '') + (peAcct.is_active ? '' : ' • موقوف') + (peMem ? '' : ' — مرتبطٌ بجوّاله') + ' — يُحفظ الرقم الجديد مع «حفظ التعديل».'
+        : 'لا حساب دخول له بعد. اكتب كلمة مرور (٤ خانات فأكثر (حروف أو أرقام)) وتأكّد من رقم الجوال أعلاه — يُنشأ له حساب دخول عند «حفظ التعديل». اتركها فارغة إن لم ترد إنشاء حساب.'}</div>
+      ${peAcct ? `<button type="button" class="btn sm outline" id="pe_openacct" style="margin:-2px 0 8px">🛡️ افتح إدارة الحساب (دور • فروع • تفعيل • كلمة المرور)</button>` : ''}` : ''}
       <div class="field" id="p_death_wrap" style="${(p.status === 'dead') ? '' : 'display:none'}"><label>سنة الوفاة</label><input id="p_death" type="text" value="${esc(p.death || '')}" placeholder="إن وُجدت"></div>
       ${fInput('البريد الإلكتروني', 'p_email', p.email, 'email', 'placeholder="اختياري"')}
     </div>
@@ -2941,6 +2944,7 @@ async function screenPersonEdit(arg) {
   if (!hideForGuest('media')) loadDocsCard(p, () => screenPersonEdit(arg));
   // زرّ العين لإظهار/إخفاء الرقم السري (حين يوجد حقل كلمة المرور)
   if (peShowPw) view().querySelectorAll('.eye').forEach(b => b.addEventListener('click', () => { const inp = document.getElementById(b.dataset.eye); if (!inp) return; const show = inp.type === 'password'; inp.type = show ? 'text' : 'password'; b.textContent = show ? '🙈' : '👁'; }));
+  { const oa = document.getElementById('pe_openacct'); if (oa && peAcct) oa.addEventListener('click', () => openMemberAdmin(peAcct.user_id)); }
   document.getElementById('saveBtn').addEventListener('click', async () => {
     // كلمة المرور (فارغ = تجاهُل): إن كان للشخص حساب غيّرها، وإلا أنشئ له حساب دخول.
     // مهم: خطوة الحساب «أفضل جهد» ولا تُلغي حفظ بيانات الشخص أبداً — فلا تضيع التعديلات
@@ -6343,6 +6347,15 @@ function screenMembers() {
   bindMemberRows();
 }
 // صف عضو: اسم فقط (مطويّ)، أو اسم + بطاقة كاملة (مفتوح)
+// فتح إدارة حساب عضوٍ محدّد مباشرةً (من ملف الشخص): يفتح كشف الأعضاء وبطاقة العضو موسّعةً
+function openMemberAdmin(uid) {
+  if (!isAdmin()) { toast('إدارة الحسابات لمدير النظام'); return; }
+  if (!(C.members || []).some(m => m.user_id === uid)) { toast('لم يُعثر على الحساب في الكشوف — حدّث الصفحة'); return; }
+  expandedMember = uid; memTab = 'all';
+  setHash('#/members');
+  // مرّر لبطاقة العضو المفتوحة بعد رسم الشاشة
+  setTimeout(() => { const el = view().querySelector('.mitem.open'); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' }); }, 150);
+}
 function memberRow(m) {
   const open = expandedMember === m.user_id;
   const sub = `${arOf(ROLES, m.role)}${m.is_active ? '' : ' • موقوف'}`;
