@@ -366,6 +366,7 @@ Add these exact headings and meanings to `GUIDE`/`FAQ`, using the actual navigat
 
 - `تنزيل تطبيق Android`: open `التنزيلات`, download the signed APK, allow installation from the current browser only when Android asks, install, then disable that allowance if desired. Updates install over the prior copy only when the signature matches and `versionCode` is newer.
 - `إشعارات الرسائل`: permission is requested only after pressing `تفعيل إشعارات الرسائل`; denying it never prevents reading or sending messages.
+- `التنبيهات التعريفية`: password advice appears once per account after acknowledgement; automatic site-install advice appears once per browser profile and stays hidden in installed mode. Password changes remain available in the profile and manual installation remains available in More. Follow Task 8 of the member-actions plan for server persistence, retries, and legacy dismissals; do not reset these markers during the APK/PWA update.
 - `المراسلات الفردية`: every conversation is between exactly two active linked members; there are no groups, admins cannot read normal conversation content, and only the reported message snapshot becomes visible to moderation.
 - `الحظر والإبلاغ`: blocking stops new messages in both directions without erasing history; reporting sends the selected message snapshot and reason, not the full conversation.
 - `تعديل بيانات الأسرة المباشرة`: a linked member may edit only self, father, and direct children; may add only own direct child and reorder only own direct children; no approval is needed and every change is audited.

@@ -1,5 +1,7 @@
 # Almfrje Member Actions, Alerts, Visits, and Desktop Layout Implementation Plan
 
+Updated 2026-09-05 to match the approved specification in commit `0148d37`: three home statistics cards, one visits section, and one-time password/install notices. This supersedes the earlier four-card layout.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** فرض صلاحيات الإجراءات الدقيقة، وتمكين تعديل الدرجة الأولى والتراجع، وتصحيح الزيارات القادمة، وإظهار التنبيهات والتخطيط المكتبي المكثف من دون المساس بالماضي.
@@ -591,11 +593,11 @@ git commit -m "fix: count future Almfrje visits once per session"
 - [ ] **Step 1: Write failing source and DOM contract tests**
 
 ```js
-test('desktop home has four stats and a two-column quick row', () => {
+test('desktop home has three stats and a two-column quick row', () => {
   const js = read('../public/almfrje/app.js');
   const css = read('../public/almfrje/app.css');
   assert.match(js, /class="home-quick-row"/);
-  assert.match(css, /@media \(min-width:\s*760px\)[\s\S]*\.stats[\s\S]*repeat\(4,/);
+  assert.match(css, /@media \(min-width:\s*760px\)[\s\S]*\.stats[\s\S]*repeat\(3,/);
   assert.match(css, /\.home-quick-row[\s\S]*repeat\(2,/);
 });
 
@@ -618,10 +620,10 @@ Fetch the summary after authenticated shell render. Show only nonzero categories
 
 - [ ] **Step 4: Add the desktop grid wrappers and CSS**
 
-Change home markup to:
+Remove the entire upper `#visitsTotal` card. Keep the existing individuals, branches, and generations cards and the lower `visitStatsCardHtml()` section. Wrap the report and online controls as follows; preserve their existing dynamic content and event handlers:
 
 ```html
-<div class="stats">…four stat cards…</div>
+<!-- Existing .stats contains only individuals, branches, and generations. -->
 <div class="home-quick-row">
   <button class="btn outline home-stats-link" data-go="#/stats">📈 التقرير الإحصائي الكامل</button>
   <div class="online-home" id="onlineHome">…</div>
@@ -635,7 +637,7 @@ Add:
 .home-quick-row { display: grid; grid-template-columns: 1fr; gap: 10px; margin-bottom: 12px; }
 .home-quick-row .online-home, .home-stats-link { margin: 0; min-height: 52px; }
 @media (min-width:760px) {
-  .stats { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .stats { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .stat { padding: 11px 8px; }
   .stat .n { font-size: 1.55rem; }
   .home-quick-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -654,7 +656,9 @@ Run: `node --no-warnings --experimental-strip-types --test test/almfrje-home-lay
 
 Expected: PASS.
 
-Use a local production build and inspect widths 390, 760, 1024, and 1366 px in light/dark mode. Expected: 390 has 2x2 stats and stacked quick items; 760+ has one row of four stats and one row of two quick items; no horizontal scroll at 150% zoom.
+Use a local production build and inspect widths 390, 760, 1024, and 1366 px in light/dark mode. Expected: 390 has three cards arranged in two columns and stacked quick items; 760+ has one row of three stats and one row of two quick items; no horizontal scroll at 150% zoom. Confirm that visits appear only in the lower section.
+
+Replace the obsolete `#visitsTotal` update in `updateOnlineDom()` with an update of the lower `.vstats-total` from `visitStats.total`. Keep the settings total synchronized from the same state. Apply accepted visit responses through this update path without reloading the tree or closing the expanded visits section. In a browser fixture, render total 1308, deliver an accepted response with total 1309, and verify the lower total becomes 1309 immediately and the upper visitor card is absent. This is a display regression test; do not alter historical database totals. When refreshed branch/city data is available, render it from the same response snapshot rather than mixing older breakdowns with new values.
 
 - [ ] **Step 6: Commit**
 
@@ -663,7 +667,43 @@ git add public/almfrje/app.js public/almfrje/app.css test/almfrje-home-layout.te
 git commit -m "feat: show action alerts and compact desktop home"
 ```
 
-### Task 8: Run the full pre-deployment gate
+### Task 8: Show password advice once per account and installation advice once per browser
+
+**Files:**
+- Modify: `lib/almfrje-schema.ts`
+- Modify: `almfrje-app/schema.sql`
+- Create: `app/api/almfrje-notice-seen/route.ts`
+- Modify: `public/almfrje/app.js`
+- Test: `test/almfrje-notice-seen.test.mjs`
+
+- [ ] **Step 1: Add account-backed acknowledgement**
+
+Add `password_notice_seen_at timestamptz` using `ADD COLUMN IF NOT EXISTS` in both schema sources and increment their schema revision consistently. Include it in the authenticated caller's own membership payload. Implement POST `/api/almfrje-notice-seen` using `requireAlmfrjeMember`: derive the account ID exclusively from the verified session, reject client-supplied account IDs and arbitrary update fields, and conditionally set the timestamp only when NULL. Return `{ ok: true }` with `Cache-Control: private, no-store`. Repeated acknowledgements are harmless. Do not grant general membership-update rights or use this cosmetic flag for authorization.
+
+- [ ] **Step 2: Record actual password-notice display and preserve prior dismissals**
+
+Show advice only for an eligible account whose server timestamp and local seen marker are absent. After inserting the visible notice, immediately mark the current account seen in memory and local storage, then send the acknowledgement in the background. Honor the existing `almfrje_pwok_<user_id>` marker and migrate it by acknowledging without redisplaying advice. Retry pending acknowledgements on the next authenticated initialization; a failed request must not make the notice repeat on the same browser. Keep keys account-specific and clear in-memory account state on logout. A successful password change also acknowledges the notice. Keep password change accessible from the profile page.
+
+The account-wide guarantee applies after successful server acknowledgement. If two devices first open the account simultaneously before either acknowledgement commits, both may display the advice once; this cosmetic race must not block login or create an authentication dependency.
+
+- [ ] **Step 3: Record installation advice on display**
+
+Add `almfrje_install_prompt_seen_v1`, with an in-memory fallback. Honor the existing `almfrje_install_done` marker so previous dismissals do not reappear after upgrading. Set the new seen marker immediately after the automatic bar is attached, not only on a click. Recheck seen/installed state in delayed iOS callbacks and `beforeinstallprompt` handlers to prevent duplicate automatic bars. Suppress automatic advice in standalone mode; `appinstalled` removes any existing bar and records installed state. Preserve manual installation from More and retain the deferred browser event for that action. Keep the APK downloads link independent of this flag. Browser-storage clearing can reset a browser-local marker; do not introduce device fingerprinting.
+
+- [ ] **Step 4: Verify behavior and authorization**
+
+Exercise the endpoint with an authenticated account, an unauthenticated caller, and a forged other-account ID; verify only the authenticated caller's timestamp can change and repeat calls preserve its original value. Use two browser contexts for the same account: display and acknowledge on the first, then verify suppression on the second. Check refresh, navigation, logout/account switching, legacy markers, failed acknowledgement and retry, and successful password change. Verify installation advice once on display, standalone suppression, delayed callbacks, blocked local storage within one session, and the manual More action after dismissal.
+
+Run `node --check public/almfrje/app.js`, the focused notice tests, and `npm test`. Record the real database/browser results; source pattern checks alone do not prove account isolation or cross-device persistence.
+
+- [ ] **Step 5: Commit the verified implementation**
+
+```bash
+git add lib/almfrje-schema.ts almfrje-app/schema.sql app/api/almfrje-notice-seen/route.ts public/almfrje/app.js test/almfrje-notice-seen.test.mjs
+git commit -m "fix: show account and installation advice once"
+```
+
+### Task 9: Run the full pre-deployment gate
 
 **Files:**
 - Modify: `ALMFRJE_DEV_GUIDE.md`
@@ -671,7 +711,7 @@ git commit -m "feat: show action alerts and compact desktop home"
 
 - [ ] **Step 1: Update technical documentation**
 
-Document `approve_members`, member first-degree rules, action-summary endpoint, audit/revert RPCs, visit event idempotency, and the desktop breakpoint. Do not update other project guides.
+Document `approve_members`, member first-degree rules, action-summary endpoint, audit/revert RPCs, visit event idempotency, three-card desktop layout, the single lower visits total, and one-time notice persistence including acknowledgement retry and legacy-marker migration. Update the in-app guides through the dependent Android/downloads plan. Do not update other project guides.
 
 - [ ] **Step 2: Run all local validation**
 
