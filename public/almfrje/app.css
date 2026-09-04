@@ -88,6 +88,18 @@ main { padding: 14px; max-width: 820px; margin: 0 auto; }
 .stat.a .n { color: var(--accent); } .stat.g .n { color: var(--gold); } .stat.d .n { color: var(--danger); } .stat.k .n { color: var(--ok); }
 @media (max-width:520px){ .stats { grid-template-columns: 1fr 1fr; } }
 
+.home-quick-row { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; margin-bottom: 12px; }
+.home-quick-row .online-home, .home-quick-row .home-stats-link { margin: 0; min-width: 0; }
+.home-quick-row .oh-title { margin-bottom: 0; }
+@media (min-width:760px) {
+  .home-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 10px 0; }
+  .home-stats .stat { padding: 10px 8px; }
+  .home-stats .n { font-size: 1.55rem; }
+  .home-quick-row { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .home-quick-row .online-home, .home-quick-row .home-stats-link { display: flex; align-items: center; justify-content: center; padding: 8px 10px; min-height: 46px; }
+  .home-quick-row .home-stats-link, .home-quick-row .oh-title { font-size: .86rem; }
+}
+
 /* مربّع «المتواجدون الآن» (الرئيسية) — عريض يحتوي المتواجدين حسب الفروع */
 .online-home:empty { display: none; }
 .online-home { display: block; width: 100%; box-sizing: border-box; margin: 0 0 12px; padding: 13px 15px; border-radius: 16px; background: linear-gradient(160deg, rgba(28,139,77,.12), var(--card) 70%); box-shadow: 0 14px 30px -20px rgba(28,139,77,.6), 0 2px 0 rgba(28,139,77,.18), inset 0 1px 0 rgba(255,255,255,.45); border: 1px solid rgba(28,139,77,.4); }

@@ -1090,14 +1090,15 @@ function screenHome() {
       <div id="fbMyReplies"></div>
     </div>
     <div class="search"><input id="q" placeholder="ابحث بالاسم أو اللقب…"></div><div id="qr"></div>
-    <div class="stats">
+    <div class="stats home-stats">
       <div class="stat"><div class="n">${total}</div><div class="l">إجمالي الأفراد</div></div>
       <div class="stat a"><div class="n">${liveBranchCount()}</div><div class="l">الفروع</div></div>
       <div class="stat g"><div class="n">${maxGen()}</div><div class="l">الأجيال</div></div>
-      <div class="stat k"><div class="n" id="visitsTotal">${visitStats.total || 0}</div><div class="l">الزوّار</div></div>
     </div>
-    <button class="btn outline" data-go="#/stats" style="margin:0 0 12px">📈 التقرير الإحصائي الكامل</button>
-    <div class="online-home" id="onlineHome">${onlineHomeHtml()}</div>
+    <div class="home-quick-row">
+      <button class="btn outline home-stats-link" data-go="#/stats">📈 التقرير الإحصائي الكامل</button>
+      <div class="online-home" id="onlineHome">${onlineHomeHtml()}</div>
+    </div>
     ${visitStatsCardHtml()}
     ${branchGroupsHtml()}
     ${recentShow ? `<div class="card"><div class="recent-head"><h3 style="margin:0">آخر الإضافات${sinceMs ? ` (${newCount})` : ''} ${hintBtn('recent')}</h3>${isAdmin() ? `<button class="btn sm outline" id="recentToggle">🙈 إخفاء</button>` : ''}</div>
@@ -1105,7 +1106,7 @@ function screenHome() {
     ${sitePowered ? `<div style="text-align:center;margin:10px 0 0;font-size:.74rem;opacity:.75">${esc(sitePowered)}</div>` : ''}`;
   const q = document.getElementById('q');
   q.addEventListener('input', debounce(() => instantSearch(q.value, document.getElementById('qr')), 130));
-  const pwGo = document.getElementById('pwGo'); if (pwGo) pwGo.addEventListener('click', () => setHash('#/profile'));
+  const pwGo = document.getElementById('pwGo'); if (pwGo) { markPwChanged(); pwGo.addEventListener('click', () => setHash('#/profile')); }
   const pwSkip = document.getElementById('pwSkip'); if (pwSkip) pwSkip.addEventListener('click', () => { markPwChanged(); screenHome(); });
   view().querySelectorAll('[data-recent]').forEach(el => el.addEventListener('click', () => recentInfoModal(parseInt(el.dataset.recent, 10))));
   // إظهار/إخفاء بطاقة «آخر الإضافات» (للمدير) — الإعداد يسري على الجميع
@@ -6706,10 +6707,47 @@ const normPhone = (s) => {
 };
 const phoneToEmail = (p) => `${p}@almfrje.app`;
 const pinToPass = (pin) => `${pin}@Almfrje`;
-// تتبّع نصح تغيير كلمة المرور لأول دخول (لكل مستخدم على هذا الجهاز).
+// نصيحة لمرة واحدة للحساب؛ بيانات Auth تحفظ المشاهدة عبر الأجهزة، والمحلي احتياط للفشل.
 const pwKey = () => 'almfrje_pwok_' + (me && me.user_id || '');
-function pwChanged() { try { return localStorage.getItem(pwKey()) === '1'; } catch (e) { return true; } }
-function markPwChanged() { try { localStorage.setItem(pwKey(), '1'); } catch (e) { } }
+const pwNoticeSeen = new Set();
+const pwNoticeSynced = new Set();
+const pwNoticePending = new Set();
+function pwChanged() {
+  if (!me || !me.is_active || pwNoticeSeen.has(me.user_id)) return true;
+  try { return localStorage.getItem(pwKey()) === '1'; } catch (e) { return false; }
+}
+async function syncPwNotice(uid) {
+  if (!uid || pwNoticeSynced.has(uid) || pwNoticePending.has(uid)) return;
+  pwNoticePending.add(uid);
+  try {
+    const { data, error } = await sb.auth.getUser();
+    if (error || !data.user || data.user.id !== uid || !me || me.user_id !== uid) return;
+    if (!data.user.user_metadata?.password_notice_seen_at) {
+      const { error: updateError } = await sb.auth.updateUser({ data: { password_notice_seen_at: new Date().toISOString() } });
+      if (updateError) return;
+    }
+    pwNoticeSynced.add(uid);
+  } catch (_) { /* Retry on the next authenticated initialization. */ }
+  finally { pwNoticePending.delete(uid); }
+}
+function markPwChanged() {
+  if (!me || !me.is_active || isGuestUser()) return;
+  pwNoticeSeen.add(me.user_id);
+  try { localStorage.setItem(pwKey(), '1'); } catch (_) { /* Memory prevents repeat display in this session. */ }
+  void syncPwNotice(me.user_id);
+}
+function restorePwNotice(account) {
+  if (!me || !me.is_active || isGuestUser()) return;
+  if (account && account.id === me.user_id && account.user_metadata?.password_notice_seen_at) {
+    pwNoticeSeen.add(me.user_id); pwNoticeSynced.add(me.user_id);
+    try { localStorage.setItem(pwKey(), '1'); } catch (_) { /* */ }
+  } else if (pwChanged()) {
+    void syncPwNotice(me.user_id);
+  } else if (!account || account.id !== me.user_id) {
+    // Suppress advice if the account-wide state could not be verified.
+    pwNoticeSeen.add(me.user_id);
+  }
+}
 const PIN_RE = /^.{4,}$/;   // كلمة مرور حرّة: ٤ خانات حدّاً أدنى (حروف/أرقام/رموز)
 function pinField(label, id) {
   return `<div class="field pw"><label>${label}</label>
@@ -6982,7 +7020,7 @@ function showOnlinePeople() {
   openModal('🟢 المتواجدون الآن (' + list.length + ')', body);
 }
 function updateOnlineDom() {
-  const tl = document.getElementById('visitsTotal'); if (tl) tl.textContent = visitStats.total || 0;
+  document.querySelectorAll('.vstats-total').forEach(el => { el.textContent = visitStats.total || 0; });
   // الرئيسية: المتواجدون الآن حسب الفرع (يظهر الموجود فقط)
   const oh = document.getElementById('onlineHome'); if (oh) { oh.innerHTML = onlineHomeHtml(); const ohn = document.getElementById('ohNames'); if (ohn) ohn.addEventListener('click', showOnlinePeople); }
   // شارة المتواجدين أمام كل فرع في قائمة الفروع بالرئيسية
@@ -7026,6 +7064,7 @@ async function enterApp(session) {
   // الإعدادات وجلب العضو بالتوازي (كانا متسلسلَين في init ثم هنا فيبطّئان الإقلاع رحلةً كاملة).
   const settingsP = loadSettings().catch(() => { /* أفضل جهد — يبقى بالافتراضات */ });
   const memP = sb.from('almfrje_members').select('*').eq('user_id', session.user.id).maybeSingle();
+  const noticeP = session.user.email === GUEST_EMAIL ? Promise.resolve(null) : sb.auth.getUser().catch(() => null);
   await settingsP;   // تلزم لفحوص جلسة الزائر والتحية
   // فحوص جلسة الزائر (نُقلت من init لتُطبَّق على كل مسارات الدخول بما فيها onAuthStateChange).
   const guestSess = session.user.email === GUEST_EMAIL;
@@ -7071,6 +7110,11 @@ async function enterApp(session) {
   }
   meResolved = true;   // تحدّد الدور نهائياً الآن — يجوز عرض الحالة الصحيحة
   if (!me.is_active) { showLoading(false); renderPending(); return; }
+  if (!isGuestUser()) {
+    const notice = await noticeP;
+    const account = notice && !notice.error && notice.data && notice.data.user;
+    restorePwNotice(account);
+  }
   // الزائر حساب مشترك تلقائي — لا يحتاج زرّ خروج (يبقى للمسؤول/المشرف).
   document.getElementById('signoutBtn').classList.toggle('hidden', isGuestUser() && guestGens <= 0);
   const greet = () => { try { let fn = ''; try { fn = (sessionStorage.getItem('almfrje_guest_name') || '').trim().split(/\s+/)[0] || ''; } catch (e) { /* */ } showGreeting(fn); } catch (e) { /* */ } };
@@ -7208,21 +7252,27 @@ async function init() {
 
 /* ===== إضافة اختصار الموقع إلى شاشة الجهاز (مجرّد اختصار للمتصفّح لا تثبيت تطبيق) ===== */
 let _deferredInstall = null;
+let _installPromptSeen = false;
 // قد يتيح أندرويد/كروم حدثاً مؤجّلاً لإضافة الاختصار؛ نلتقطه إن وُجد كي لا نفوّته.
 window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); _deferredInstall = e; maybeShowInstall(); });
 window.addEventListener('appinstalled', () => { markInstallDone(); const b = document.getElementById('installBar'); if (b) b.remove(); });
 function alreadyInstalled() {
   return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
 }
-function installDismissed() { try { return localStorage.getItem('almfrje_install_done') === '1'; } catch (e) { return true; } }
+function installDismissed() {
+  if (_installPromptSeen) return true;
+  try { return localStorage.getItem('almfrje_install_done') === '1' || localStorage.getItem('almfrje_install_prompt_seen_v1') === '1'; } catch (e) { return false; }
+}
 function markInstallDone() { try { localStorage.setItem('almfrje_install_done', '1'); } catch (e) { } }
 function showInstallBar(html, onAction) {
-  if (document.getElementById('installBar')) return;
+  if (document.getElementById('installBar') || alreadyInstalled() || installDismissed()) return;
   const bar = document.createElement('div'); bar.id = 'installBar'; bar.className = 'install-bar';
   bar.innerHTML = `<div class="install-txt">${html}</div><div class="install-actions">
     ${onAction ? '<button class="btn sm" id="install_go">📌 أضِف الاختصار</button>' : ''}
     <button class="btn sm outline" id="install_x">لاحقاً</button></div>`;
   document.body.appendChild(bar);
+  _installPromptSeen = true;
+  try { localStorage.setItem('almfrje_install_prompt_seen_v1', '1'); } catch (_) { /* Session fallback is already set. */ }
   const x = document.getElementById('install_x'); x.addEventListener('click', () => { markInstallDone(); bar.remove(); });
   const go = document.getElementById('install_go'); if (go && onAction) go.addEventListener('click', async () => { markInstallDone(); bar.remove(); await onAction(); });
 }
