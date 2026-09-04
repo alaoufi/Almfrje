@@ -6126,7 +6126,7 @@ async function screenMembersForManager() {
   const unreg = C.persons.filter(pp => pp.status !== 'dead' && pp.branch_id != null && mineB.has(Number(pp.branch_id)) && !linkedPids.has(pp.id));
   const shown = memTab === 'staff' ? staff : memTab === 'reg' ? regd : scoped;
   const tabBtn = (k, t) => `<button class="btn sm ${memTab === k ? '' : 'outline'}" data-memtab="${k}" style="margin:0 0 8px 6px">${t}</button>`;
-  const row = (r) => { const pp = r.person_id && byId.get(Number(r.person_id)); return `<div class="row"><span class="k">${esc(r.full_name || '—')} <span class="muted" style="font-size:.72rem">${arOf(ROLES, r.role)}${r.is_active ? '' : ' • موقوف'}${pp && pp.branch_id ? ' • ' + esc(branchName(pp.branch_id)) : ''}</span></span></div>`; };
+  const row = (r) => { const pp = r.person_id && byId.get(Number(r.person_id)); return `<div class="row"><span class="k">${esc(memberDisplayName(r))} <span class="muted" style="font-size:.72rem">${arOf(ROLES, r.role)}${r.is_active ? '' : ' • موقوف'}${pp && pp.branch_id ? ' • ' + esc(branchName(pp.branch_id)) : ''}</span></span></div>`; };
   view().innerHTML = `
     <div class="card"><h3>كشوف أعضاء ${allMine ? 'كل الفروع' : 'فروعك'}</h3>
       <p class="muted" style="font-size:.82rem;margin-top:-2px">عرضٌ للمتابعة ضمن نطاق إشرافك — بلا أرقام (خصوصية الأعضاء محفوظة) وبلا أدوات إدارة.</p>
@@ -6347,6 +6347,15 @@ function screenMembers() {
   bindMemberRows();
 }
 // صف عضو: اسم فقط (مطويّ)، أو اسم + بطاقة كاملة (مفتوح)
+// اسمٌ موحّد للعرض في كشوف الأعضاء — مقياسٌ ثابت: من الشجرة (٣ مقاطع: هو + أبوه + جدّه)
+// إن كان مرتبطاً بشخص، وإلا أوّل ٣ كلماتٍ من الاسم المُدخل (بعد إزالة «بن») — فيتوحّد الطول.
+function memberDisplayName(m) {
+  const pid = m && m.person_id ? Number(m.person_id) : 0;
+  const pp = pid ? byId.get(pid) : null;
+  if (pp) return lineage(pp.id).slice(0, 3).map(x => x.name).join(' ');
+  const toks = String((m && m.full_name) || '—').replace(/\s+بن\s+/g, ' ').trim().split(/\s+/).filter(Boolean);
+  return toks.slice(0, 3).join(' ') || '—';
+}
 // فتح إدارة حساب عضوٍ محدّد مباشرةً (من ملف الشخص): يفتح كشف الأعضاء وبطاقة العضو موسّعةً
 function openMemberAdmin(uid) {
   if (!isAdmin()) { toast('إدارة الحسابات لمدير النظام'); return; }
@@ -6362,7 +6371,7 @@ function memberRow(m) {
   const hay = normalizeAr([m.full_name, m.username, m.phone, arOf(ROLES, m.role)].filter(Boolean).join(' ')) + ' ' + normPhone(m.phone || '');
   return `<div class="mitem ${open ? 'open' : ''}" data-msearch="${esc(hay)}">
     <div class="mitem-head" data-mhead="${m.user_id}">
-      <span class="mitem-name">${esc(m.full_name || '—')} ${m.user_id === me.user_id ? '<span class="badge">أنت</span>' : ''}</span>
+      <span class="mitem-name" title="${esc(m.full_name || '')}">${esc(memberDisplayName(m))} ${m.user_id === me.user_id ? '<span class="badge">أنت</span>' : ''}</span>
       <span class="mitem-sub">${esc(sub)}</span>
       <span class="mitem-arrow">${open ? '▴' : '▾'}</span>
     </div>
@@ -6432,6 +6441,7 @@ function bindMemberCard(m) {
   });
   const tg = q(`[data-toggle="${m.user_id}"]`); if (tg) tg.addEventListener('click', async () => { const ok = await guard(async () => { await updMember(m.user_id, { is_active: !m.is_active }); }); if (ok) { await loadAll(); screenMembers(); } });
   const sv = q(`[data-save="${m.user_id}"]`); if (sv) sv.addEventListener('click', async () => {
+    if (!isAdmin()) { toast('تعديل الصلاحيات لمدير النظام فقط'); return; }   // حارسٌ إضافي (الشاشة أصلاً للمدير)
     const role = q(`[data-role="${m.user_id}"]`).value;
     const isSup = role === 'branch_manager' || role === 'general_manager';
     const branch_ids = [];
@@ -6439,6 +6449,14 @@ function bindMemberCard(m) {
     const perms = {};
     if (isSup) view().querySelectorAll(`input[data-mperm][data-uid="${m.user_id}"]`).forEach(cb => { perms[cb.dataset.mperm] = cb.checked; });
     if (role === 'branch_manager' && !branch_ids.length) { toast('اختر فرعاً واحداً على الأقل لمشرف الفرع'); return; }
+    // الترقية إلى دورٍ إداري ليست بمجرّد تبديل القائمة: تأكيدٌ صريح + كتابة كلمة «ترقية».
+    const elevating = role !== m.role && (role === 'admin' || role === 'general_manager' || role === 'branch_manager');
+    if (elevating) {
+      const roleAr = arOf(ROLES, role), warn = role === 'admin' ? '\n\n⚠️ «مدير النظام» صلاحيةٌ كاملةٌ على كل شيء — امنحها بحذرٍ شديد.' : '';
+      if (!(await confirm2('ترقية «' + memberDisplayName(m) + '» من «' + arOf(ROLES, m.role) + '» إلى «' + roleAr + '»؟\n\nسيحصل على صلاحياتٍ إدارية ضمن نطاقه. الترقية مسؤولية — تأكّد أنّها مقصودة.' + warn, { title: '🛡️ تأكيد ترقية الصلاحية', okText: 'متابعة', danger: true }))) return;
+      const typed = await uiPrompt('للتأكيد النهائي اكتب كلمة: ترقية', { title: 'تأكيد نهائي للترقية', placeholder: 'ترقية', okText: 'ترقية' });
+      if ((typed || '').trim() !== 'ترقية') { toast('أُلغيت الترقية'); return; }
+    }
     const ok = await guard(async () => { await updMember(m.user_id, {
       role,
       branch_ids: isSup ? branch_ids : [],
