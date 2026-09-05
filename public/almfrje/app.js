@@ -7082,10 +7082,18 @@ async function enterApp(session) {
   // المدير: شغّل ترقية المخطّط بتوكنه (idempotent) فتُطبَّق تحديثات البنية الجديدة تلقائياً (مثل دور «مشرف عام»).
   if (me.role === 'admin' && me.is_active) {
     try {
-      // ترقية القاعدة تلقائياً بتوكن المدير — تُنفَّذ بصمت. لا يُظهَر تحذيرٌ للمدير عند
-      // تعذّرها؛ فالموقع يعمل عبر الاحتياطي الثابت، والترقية تكميلية لا حرجة.
+      // ترقية القاعدة تلقائياً بتوكن المدير. فشل ترقية الصلاحيات ليس تكميلياً؛
+      // نعرض سبباً آمناً للإدارة من دون طباعة تفاصيل الخادم أو أي مفاتيح.
       fetch('/api/almfrje-setup', { method: 'POST', headers: { Authorization: 'Bearer ' + session.access_token } })
-        .catch(() => { /* */ });
+        .then(async r => {
+          const out = await r.json().catch(() => ({}));
+          if (!r.ok || !out.ok) {
+            const reason = String(out.reason || out.via || ('HTTP ' + r.status)).slice(0, 180);
+            console.warn('[almfrje-schema] ' + reason);
+            toast('⚠️ تعذّر تحديث حماية الصلاحيات — أبلغ مسؤول الاستضافة');
+          }
+        })
+        .catch(() => { console.warn('[almfrje-schema] request failed'); });
     } catch (e) { /* تجاهل */ }
   }
   // تبنٍّ تلقائي لصلاحية المدير لأول مستخدم (يعالج فخّ «بانتظار التفعيل»).

@@ -33,7 +33,7 @@ test('browser gate also blocks legacy unverified accounts and promises no immedi
   const html = fs.readFileSync(new URL('../public/almfrje/index.html', import.meta.url), 'utf8');
   assert.match(source, /function memberCanUseApp\(m\)/);
   assert.doesNotMatch(source, /تم تسجيلك — تصفّح الآن/);
-  assert.match(html, /app\.js\?v=20260905b/);
+  assert.match(html, /app\.js\?v=20260905c/);
 });
 
 test('new self-registration is inactive and has no administrative permissions', () => {
