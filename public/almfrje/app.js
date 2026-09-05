@@ -212,6 +212,7 @@ function normalizeAr(s) {
 /* ===== الحالة العامة ===== */
 let sb = null;
 let me = null;
+function memberCanUseApp(m) { return !!(m && m.is_active && !(m.perms && m.perms.unverified === true)); }
 let meResolved = false;   // هل تحدّد دور المستخدم نهائياً؟ (يمنع وميض «يحتاج تفعيل» أثناء التحميل)
 let _authUid = null;   // هوية الجلسة الحالية — لتجاهل أحداث المصادقة المتكررة
 let imported = false;
@@ -804,7 +805,7 @@ function parseHash() { const raw = (location.hash || '#/home').replace(/^#\//, '
 function render() {
   // ما زال الدور قيد التحميل؟ أبقِ شاشة التحميل بدل وميض «يحتاج تفعيل» مؤقتاً
   if (!meResolved) { showLoading(true); return; }
-  if (!me || !me.is_active) { renderPending(); return; }
+  if (!memberCanUseApp(me)) { renderPending(); return; }
   hideSplash();   // ظهرت شاشة فعلية — أزِل شاشة الترحيب
   const { name, arg } = parseHash();
   const r = ROUTES[name] || ROUTES.home;
@@ -3750,17 +3751,12 @@ function guestOnboard() {
       <div style="font-size:.82rem;line-height:1.6;margin-bottom:6px">أهلاً <b>${esc(name)}</b>! أكمل بياناتك — <b>خطوة واحدة لا تتكرر</b>:</div>
       <div class="field"><input id="go_phone" class="req-in" type="tel" inputmode="tel" placeholder="📱 رقم الجوال — إجباري *"></div>
       <div class="field"><input id="go_pw" class="req-in" type="password" placeholder="🔒 كلمة المرور — إجباري *"></div>
-      <div class="field"><input id="go_nick" type="text" placeholder="اللقب (اختياري)"></div>
-      <div class="grid2">
-        <div class="field"><input id="go_city" type="text" placeholder="المدينة (اختياري)"></div>
-        <div class="field"><input id="go_birth" type="text" placeholder="سنة الميلاد مثل 1410هـ (اختياري)"></div>
-      </div>
       <div style="border:1px solid var(--line);border-radius:8px;padding:5px 8px;margin-bottom:6px">
         <div style="font-weight:800;font-size:.82rem;margin-bottom:3px">🔒 لخصوصيتك — رقم جوالك:</div>
         <label class="perm-chk"><input type="radio" name="go_priv" value="publish"><span>أسمح بنشره في دليل الموقع</span></label>
         <label class="perm-chk"><input type="radio" name="go_priv" value="private" checked><span>استخدام الموقع فقط (لا يُنشر)</span></label>
       </div>
-      <button class="btn" id="go_send" style="width:100%">✅ تسجيل بياناتي</button>
+      <button class="btn" id="go_send" style="width:100%">✅ إرسال طلب التسجيل</button>
       <button class="btn outline" id="go_backlogin" style="width:100%;margin-top:6px">→ رجوع لصفحة الدخول</button>
       </div>`, () => {
       document.getElementById('go_backlogin').addEventListener('click', async () => { try { await sb.auth.signOut(); } catch (e0) { /* */ } location.hash = ''; location.reload(); });
@@ -3770,7 +3766,7 @@ function guestOnboard() {
         if (val('go_pw').trim().length < 4) { toast('كلمة المرور إجبارية — ٤ أحرف/أرقام على الأقل'); return; }
         const priv = document.querySelector('input[name=\"go_priv\"]:checked');
         let regTok = ''; try { regTok = sessionStorage.getItem('almfrje_guest_regtok') || ''; } catch (e) { /* */ }
-        const body = { pid, regToken: regTok, phone, password: val('go_pw').trim(), nickname: val('go_nick').trim(), city: val('go_city').trim(), birth: val('go_birth').trim(), publish: !!(priv && priv.value === 'publish') };
+        const body = { pid, regToken: regTok, phone, password: val('go_pw').trim(), publish: !!(priv && priv.value === 'publish') };
         const pw = val('go_pw').trim();
         let regEmail = phone + '@almfrje.app';
         const ok = await guard(async () => {
@@ -3781,20 +3777,20 @@ function guestOnboard() {
           if (j.email) regEmail = j.email;
         });
         if (!ok) return;   // بقيت النافذة ليصحّح
-        // تصفّحٌ فوري: ادخل بحسابه الجديد (يبقى بانتظار توثيق الإدارة — يطّلع ولا يعدّل)
+        // ندخله بالحساب الجديد لعرض شاشة انتظار اعتماد الإدارة فقط؛ بيانات الموقع تبقى مغلقة.
         try { window._onbPoll = false; } catch (e) { /* */ }
         try { sessionStorage.removeItem('almfrje_greeted'); } catch (e) { /* */ }
         const { error: le } = await sb.auth.signInWithPassword({ email: regEmail, password: pinToPass(pw) });
         closeModal();
         if (le) {
           // تعذّر الدخول التلقائي (نادر) — أرشده للدخول اليدوي
-          openModal('✅ تم تسجيلك', `<div style="text-align:center;font-size:1rem;line-height:2;padding:6px 0">تمّ تسجيلك بنجاح ✓<br>ادخل بحسابك 📱 برقم جوالك وكلمة المرور التي اخترتها.</div>
+          openModal('✅ استُلم طلبك', `<div style="text-align:center;font-size:1rem;line-height:2;padding:6px 0">تمّ إرسال طلب التسجيل ✓<br>لن يُفتح الحساب إلا بعد تفعيله من الإدارة.</div>
             <button class="btn" id="go_done" style="width:100%">دخول</button>`, () => {
             document.getElementById('go_done').addEventListener('click', () => { location.hash = ''; location.reload(); });
           }, { noClose: true, noBgClose: true });
         } else {
-          toast('✅ تم تسجيلك — تصفّح الآن، وسيوثّق حسابك أحد المسؤولين قريباً');
-          // onAuthStateChange يلتقط الجلسة الجديدة فيدخل التطبيق تلقائياً
+          toast('✅ تم إرسال طلب التسجيل — بانتظار تفعيل الإدارة');
+          // onAuthStateChange يلتقط الجلسة ويعرض شاشة الانتظار فقط.
         }
       });
     }, { noClose: true, noBgClose: true });
@@ -5072,7 +5068,7 @@ const GUIDE = [
     { t: 'إرسال ملاحظة للإدارة', fn: 'إبلاغ الإدارة بخطأ أو طلب إضافة/تصحيح/ترتيب.', brief: 'يُؤخذ اسمك الذي دخلت به تلقائياً، وتختار الموضوع: إضافة مولود • ملاحظة • اقتراح • إعادة ترتيب الإخوان.', det: 'طلب إضافة مولود يصل منظّماً فيوافق عليه المدير أو المشرف بعد تأكيدات. وطلب «إعادة ترتيب الإخوان»: تختار الأب فتظهر قائمة أبنائه ترتّبها بالسهمين ▲▼ ثم ترسلها، فتعتمدها الإدارة أو ترفضها مع ردٍّ يصلك باسمها.' },
   ]},
   { sec: '🔐 دخول الإدارة والصلاحيات', role: 'admin', items: [
-    { t: 'خطوات التسجيل (للزائر)', fn: 'التسجيل مطلوبٌ للدخول على الموقع — خطوة واحدة لا تتكرر.', brief: '١) اكتب اسمك ثم آباءك حتى يتميّز فيدخل تلقائياً. ٢) تظهر نافذة «التسجيل مطلوب للدخول على الموقع». ٣) أدخل جوالك وكلمة مرورك (إجباريان — بحقلين أحمرين) واللقب/المدينة/سنة الميلاد إن شئت. ٤) اضغط «تسجيل بياناتي».', det: 'يقبل الجوال بأي صيغة (05xxxxxxxx أو 5xxxxxxxx أو +9665xxxxxxxx أو بأرقامٍ عربية ٠٥…). ومن اختار «استخدام الموقع فقط» فجواله محميٌّ حمايةً مطلقة: لا يظهر في ملفه ولا في أي كشفٍ أو دليل — لا يطّلع عليه إلا هو والإدارة. بعد التسجيل تظهر «شكراً لك — سوف يُفعَّل حسابك لاحقاً» بعد تحقق الإدارة من بياناتك، ثم تدخل من «المزيد ← دخول المسؤول» بجوالك وكلمة مرورك، وتجد رسائلك وردود الإدارة واضحةً في الرئيسية. وإن كان لك حسابٌ مسبقاً فستُدعى للدخول به مباشرة.' },
+    { t: 'خطوات التسجيل', fn: 'التسجيل متاح فقط لمن كان اسمه مسجلاً مسبقاً في الشجرة.', brief: '١) اكتب اسمك ثم آباءك حتى يطابق الموقع سجلك الموجود. ٢) أدخل الجوال وكلمة المرور، وهما الحد الأدنى الإجباري. ٣) اضغط «إرسال طلب التسجيل». ٤) انتظر تفعيل الإدارة؛ لا يفتح الموقع ولا تتاح الإضافة أو التعديل قبل التفعيل.', det: 'لا يقبل النظام إنشاء حساب باسم «زائر» أو باسم غير موجود مسبقاً في قاعدة البيانات. يقبل الجوال بأي صيغة (05xxxxxxxx أو 5xxxxxxxx أو +9665xxxxxxxx أو بأرقام عربية ٠٥…). يبقى الجوال خاصاً ما لم تسمح بنشره. بعد إرسال الطلب يظهر انتظار التفعيل، وبعد اعتماد الإدارة تدخل بجوالك وكلمة المرور.' },
     { t: 'دخول المسؤول / مشرف الفرع', fn: 'دخول الإدارة لإضافة البيانات وتعديلها.', brief: 'من «المزيد ← دخول المسؤول / مشرف الفرع» بالجوال أو اسم المستخدم والرقم السري.', det: 'مدير النظام له صلاحية كاملة على كل الأقسام. مشرف الفرع يضيف ويعدّل ضمن فرعه المصرّح به فقط، ولا يرى أقسام الإدارة العامة. شاشة دخول الإدارة لا تظهر عبر رابطٍ مُرسَل أبداً — أي رابطٍ يُفتح يعرض دخول الزائر فقط.' },
     { t: 'صندوق الوارد', fn: 'كل ملاحظات وطلبات الزوار في مكانٍ واحد.', brief: 'تبويبان: 📥 ملاحظات الزوار (بانتظار الحسم) و🗂️ الأرشيف (المحسومة). وشارة عددٍ حمراء تتسلسل من تبويب «المزيد» حتى البند لتقودك إليه، وتنبيهٌ برسائل الصندوق فور دخولك.', det: 'المدير يرى الكل؛ والمشرف ما يخصّ فروعه. من البطاقة: اعتماد المولود أو الترتيب، الرد باسم الإدارة من بنك الردود، حفظ جوال المرسل في ملفه، ثم تنتقل المحسومة للأرشيف.' },
     { t: 'المناقشات (الإدارة العليا)', fn: 'غرف نقاشٍ داخلية للمدير والمشرفين العامين فقط.', brief: 'المزيد ← «💬 المناقشات»: كل موضوعٍ محادثة مستقلة بأسلوب واتساب.', det: 'أنشئ موضوعاً بعنوانٍ واضح، وتحاور فيه بفقاعات رسائل (رسائلك بلونٍ مميّز والآخرون بأسمائهم)، مع فواصل الأيام ووقت كل رسالة، ومؤشرٍ أخضر للمواضيع التي فيها جديدٌ لم تقرأه، وتحديثٍ تلقائي أثناء فتح الغرفة. حذف الموضوع كاملاً للمدير وحده.' },
@@ -5164,7 +5160,7 @@ const FAQ = [
   { q: 'الاسم صحيح لكنه يقول «متوفّى» ولا يدخل؟', a: 'الدخول متاح للأحياء فقط. إن كانت حالتك مُسجَّلة «متوفّى» بالخطأ، راسِل الإدارة عبر «ملاحظتك تهمنا» لتصحيحها.' },
   { q: 'كيف أبحث عن شخص؟', a: 'اكتب اسمه في شريط البحث بأعلى الشاشة فتظهر النتائج فوراً (يتجاهل التشكيل و«ال» التعريف)، ويمكنك البحث بالتسلسل «محمد سالم». وللدقّة استخدم البحث المتقدّم (الاسم/الأب/الجد/الفرع/الجيل/المدينة/الحالة).' },
   { q: 'ماذا تعني ألوان الأسماء في الشجرة؟', a: 'اللون العادي = حيّ، والرمادي = متوفّى وله ذرية، والأحمر الداكن = متوفّى ولم يعقب. وتظهر دلالة الألوان أسفل قوائم الشجرة (والمسمّيات يحدّدها المدير).' },
-  { q: 'كيف أسجّل في الموقع؟', a: 'ادخل باسمك ثم آباءك حتى يتميّز اسمك، فتظهر نافذة «التسجيل مطلوب للدخول على الموقع»: أدخل جوالك (بأي صيغة) وكلمة مرورك — إجباريان — والبقية اختيارية، ثم «تسجيل بياناتي». بعد تحقق الإدارة يُفعَّل حسابك وتدخل من «المزيد ← دخول المسؤول» بجوالك وكلمة مرورك.' },
+  { q: 'كيف أسجّل في الموقع؟', a: 'يجب أن يكون اسمك موجوداً مسبقاً في الشجرة. طابق اسمك ثم أدخل الجوال وكلمة المرور واضغط «إرسال طلب التسجيل». لا يقبل التسجيل باسم «زائر» أو باسم غير موجود، ولا يفتح الموقع أو يسمح بالإضافة والتعديل حتى تعتمد الإدارة الحساب.' },
   { q: 'كيف أطلب إضافة مولود أو تصحيح خطأ؟', a: 'من بطاقة «ملاحظتك تهمنا» في الرئيسية اضغط «أرسل ملاحظة للإدارة». طلب المولود يصل منظّماً (اسم الأب والمولود وسنة الولادة والمدينة)، فيوافق عليه المدير أو مشرف الفرع بعد رسائل تأكيدية.' },
   { q: 'كيف أعرف صلة القرابة بيني وبين شخص؟', a: 'من «المزيد ← حاسبة صلة القرابة» اختر الشخصين، فتُحسب تلقائياً الصلة والجدّ المشترك الأقرب ومسار نسب كلٍّ منهما حتى الجدّ المشترك. أو من العدسة السريعة لأي شخص اختر «صلة قرابته بشخص».' },
   { q: 'أين أجد الإحصائيات الكاملة؟', a: 'من «المزيد ← 📊 الإحصائيات ← الإحصائيات الكاملة»، أو زر «📈 التقرير الإحصائي الكامل» أسفل مربّعات الرئيسية. يعرض الأعداد العامة وكل جيل والفروع وأكثر الأسماء والتوزيع حسب المدينة والزيارات.' },
@@ -7109,7 +7105,7 @@ async function enterApp(session) {
     } catch (e) { /* أفضل جهد — تجاهل */ }
   }
   meResolved = true;   // تحدّد الدور نهائياً الآن — يجوز عرض الحالة الصحيحة
-  if (!me.is_active) { showLoading(false); renderPending(); return; }
+  if (!memberCanUseApp(me)) { showLoading(false); renderPending(); return; }
   if (!isGuestUser()) {
     const notice = await noticeP;
     const account = notice && !notice.error && notice.data && notice.data.user;

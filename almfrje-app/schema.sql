@@ -119,27 +119,32 @@ create table if not exists public.almfrje_trash (
 -- ============================================================
 -- 7) دوال الصلاحية (SECURITY DEFINER لتفادي التكرار في RLS)
 -- ============================================================
+-- إغلاق أي طلب تسجيل قديم كان active مع وسم unverified.
+update public.almfrje_members
+   set is_active = false, perms = coalesce(perms, '{}'::jsonb) - 'unverified'
+ where is_active and coalesce((perms ->> 'unverified')::boolean, false);
+
 create or replace function public.almfrje_role() returns text
   language sql stable security definer set search_path = public as $$
-  select role from public.almfrje_members where user_id = auth.uid() and is_active;
+  select role from public.almfrje_members where user_id = auth.uid() and is_active and not coalesce((perms ->> 'unverified')::boolean, false);
 $$;
 
 create or replace function public.almfrje_is_member() returns boolean
-  language sql stable security definer set search_path = public as $$
-  select exists (select 1 from public.almfrje_members where user_id = auth.uid() and is_active);
+language sql stable security definer set search_path = public as $$
+  select exists (select 1 from public.almfrje_members where user_id = auth.uid() and is_active and not coalesce((perms ->> 'unverified')::boolean, false));
 $$;
 
 create or replace function public.almfrje_is_admin() returns boolean
   language sql stable security definer set search_path = public as $$
   select exists (select 1 from public.almfrje_members
-                 where user_id = auth.uid() and is_active and role = 'admin');
+                 where user_id = auth.uid() and is_active and not coalesce((perms ->> 'unverified')::boolean, false) and role = 'admin');
 $$;
 
 -- فرع العضو الحالي (NULL = يرى كل الفروع: مدير/زائر)
 create or replace function public.almfrje_my_branch() returns bigint
   language sql stable security definer set search_path = public as $$
   select branch_id from public.almfrje_members
-   where user_id = auth.uid() and is_active limit 1;
+   where user_id = auth.uid() and is_active and not coalesce((perms ->> 'unverified')::boolean, false) limit 1;
 $$;
 
 -- صلاحية إضافية للزائر (add/edit/export)
@@ -147,7 +152,7 @@ create or replace function public.almfrje_perm(act text) returns boolean
   language sql stable security definer set search_path = public as $$
   select public.almfrje_is_admin() or exists (
     select 1 from public.almfrje_members
-     where user_id = auth.uid() and is_active
+     where user_id = auth.uid() and is_active and not coalesce((perms ->> 'unverified')::boolean, false)
        and coalesce((perms ->> act)::boolean, false)
   );
 $$;

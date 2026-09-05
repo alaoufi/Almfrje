@@ -3,13 +3,13 @@ import { createClient } from '@supabase/supabase-js';
 import { almfrjeEnv } from '@/lib/almfrje-env';
 import { normalizePhone } from '@/lib/almfrje-phone';
 import { verifyRegToken } from '@/lib/almfrje-regtoken';
+import { memberCanUseApp, pendingMemberRecord, registrationInputError } from '@/lib/almfrje-registration-policy';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
-// التسجيل الذاتي للزائر المتحقَّق بالاسم: يُكمل بياناته (الجوال إجباري) فيُنشأ له
-// حساب «زائر مسجَّل» موقوفاً حتى تفعّله الإدارة، وتُستكمل بيانات شخصه في الشجرة
-// (تعبئة الفارغ فقط — لا استبدال لبياناتٍ قائمة).
+// التسجيل الذاتي محصور بشخص موجود مسبقاً في الشجرة، ويظل الحساب موقوفاً
+// بلا صلاحيات إلى أن تعتمد الإدارة تفعيله.
 export async function POST(request: NextRequest) {
   const { url, anon, service } = almfrjeEnv();
   if (!url || !anon || !service) return NextResponse.json({ ok: false, error: 'إعداد الخادم ناقص' }, { status: 500 });
@@ -28,8 +28,9 @@ export async function POST(request: NextRequest) {
 
   // العضو يحدّث بيانات حسابه لنفسه (الجوال/اسم المستخدم) — الاسم ممنوع من هنا
   if (String(b.action || '') === 'myaccount') {
-    const { data: memRow } = await admin0.from('almfrje_members').select('user_id,phone,is_active').eq('user_id', who.user.id).maybeSingle();
+    const { data: memRow } = await admin0.from('almfrje_members').select('user_id,phone,is_active,perms').eq('user_id', who.user.id).maybeSingle();
     if (!memRow) return NextResponse.json({ ok: false, error: 'لا حساب عضوية' }, { status: 404 });
+    if (!memberCanUseApp(memRow)) return NextResponse.json({ ok: false, error: 'الحساب غير مفعّل من الإدارة' }, { status: 403 });
     const newPhone = normalizePhone(b.phone);
     const username = b.username === undefined ? undefined : String(b.username || '').trim().slice(0, 40) || null;
     if (newPhone && newPhone.length < 9) return NextResponse.json({ ok: false, error: 'رقم جوال غير صحيح' }, { status: 400 });
@@ -63,8 +64,8 @@ export async function POST(request: NextRequest) {
 
   // العضو يحدّث بيانات ملفه الشخصي (شخصه المرتبط في الشجرة) — حقول محدّدة ولنفسه حصراً
   if (String(b.action || '') === 'myinfo') {
-    const { data: memRow } = await admin0.from('almfrje_members').select('user_id,person_id,is_active').eq('user_id', who.user.id).maybeSingle();
-    if (!memRow || !memRow.is_active) return NextResponse.json({ ok: false, error: 'الحساب غير مفعّل' }, { status: 403 });
+    const { data: memRow } = await admin0.from('almfrje_members').select('user_id,person_id,is_active,perms').eq('user_id', who.user.id).maybeSingle();
+    if (!memRow || !memberCanUseApp(memRow)) return NextResponse.json({ ok: false, error: 'الحساب غير مفعّل' }, { status: 403 });
     if (!memRow.person_id) return NextResponse.json({ ok: false, error: 'حسابك غير مرتبطٍ بشخصٍ في الشجرة — تواصل مع الإدارة' }, { status: 400 });
     const patch: Record<string, string> = {};
     const nick = String(b.nickname ?? '').trim().slice(0, 60);
@@ -82,8 +83,9 @@ export async function POST(request: NextRequest) {
   // تغيير خصوصية الجوال من «ملفي الشخصي» — لصاحب الحساب حصراً، مع تطبيق الأثر على ملفه بالشجرة
   if (String(b.action || '') === 'privacy') {
     const publish = b.publish === true;
-    const { data: memRow } = await admin0.from('almfrje_members').select('user_id,phone,person_id').eq('user_id', who.user.id).maybeSingle();
+    const { data: memRow } = await admin0.from('almfrje_members').select('user_id,phone,person_id,is_active,perms').eq('user_id', who.user.id).maybeSingle();
     if (!memRow) return NextResponse.json({ ok: false, error: 'لا حساب عضوية' }, { status: 404 });
+    if (!memberCanUseApp(memRow)) return NextResponse.json({ ok: false, error: 'الحساب غير مفعّل من الإدارة' }, { status: 403 });
     const { error: e1 } = await admin0.from('almfrje_members').update({ phone_public: publish }).eq('user_id', who.user.id);
     if (e1) return NextResponse.json({ ok: false, error: e1.message }, { status: 400 });
     const myPh = normalizePhone(memRow.phone);
@@ -99,25 +101,22 @@ export async function POST(request: NextRequest) {
   const pid = Number(b.pid);
   const phone = normalizePhone(b.phone);
   const password = String(b.password || '').trim();
-  const nickname = String(b.nickname || '').trim().slice(0, 60);
-  const city = String(b.city || '').trim().slice(0, 60);
-  const birth = String(b.birth || '').trim().slice(0, 30);
   const publish = b.publish === true;   // «أسمح بنشره في دليل الموقع» — وإلا فللموقع فقط
   if (!Number.isFinite(pid) || pid <= 0) return NextResponse.json({ ok: false, error: 'مُعرّف الشخص ناقص — ادخل باسمك أولاً' }, { status: 400 });
   // منع الانتحال: لا تسجيل إلا برمزٍ موقّع يُثبت أن هذه الجلسة طابقت هذا الشخص فعلاً عبر
   // /api/almfrje-guest-verify (لا يكفي تمرير pid عشوائي). ينتهي الرمز بعد ساعة.
-  if (!(await verifyRegToken(b.regToken, pid, service))) {
-    return NextResponse.json({ ok: false, error: 'انتهت صلاحية التحقّق — اضغط 🔄 لتحديث الصفحة ثم أعد إدخال اسمك للتسجيل.' }, { status: 403 });
-  }
-  if (phone.length < 9) return NextResponse.json({ ok: false, error: 'أدخل رقم جوال صحيح (إجباري)' }, { status: 400 });
-  if (password.length < 4) return NextResponse.json({ ok: false, error: 'كلمة المرور إجبارية — ٤ أحرف/أرقام على الأقل' }, { status: 400 });
+  const tokenVerified = await verifyRegToken(b.regToken, pid, service);
 
   const admin = admin0;
 
   const { data: person } = await admin.from('almfrje_persons')
     .select('id,name,father_id,status,phone,nickname,city,birth').eq('id', pid).maybeSingle();
-  if (!person) return NextResponse.json({ ok: false, error: 'لم يُعثر على اسمك في الشجرة' }, { status: 404 });
-  if (person.status === 'dead') return NextResponse.json({ ok: false, error: 'لا يمكن التسجيل بهذا الاسم' }, { status: 400 });
+  const inputError = registrationInputError({ person, phone, password, tokenVerified });
+  if (inputError) {
+    const status = !tokenVerified ? 403 : !person ? 404 : 400;
+    return NextResponse.json({ ok: false, error: inputError }, { status });
+  }
+  if (!person) return NextResponse.json({ ok: false, error: 'لا يسمح بالتسجيل إلا لمن كان مسجلاً مسبقاً في قاعدة البيانات' }, { status: 404 });
 
   // ازدواج: حسابٌ بنفس الجوال أو لنفس الشخص
   const { data: dup } = await admin.from('almfrje_members').select('user_id,phone,person_id').or(`phone.eq.${phone},person_id.eq.${pid}`).limit(1);
@@ -159,23 +158,14 @@ export async function POST(request: NextRequest) {
     if (/already|exists|registered|duplicate/i.test(m)) return NextResponse.json({ ok: false, error: 'الجوال مسجّل مسبقاً — يمكنك الدخول به مباشرة.' }, { status: 409 });
     return NextResponse.json({ ok: false, error: m }, { status: 400 });
   }
-  // متصفّح فوراً (is_active=true) لكنه بانتظار توثيق الإدارة (perms.unverified) — لا يعدّل، يطّلع فقط
-  const { error: ue } = await admin.from('almfrje_members').upsert({
-    user_id: created.user.id, full_name, phone, role: 'viewer', is_active: true, person_id: pid, perms: { unverified: true }, phone_public: publish,
-  }, { onConflict: 'user_id' });
-  if (ue) return NextResponse.json({ ok: false, error: ue.message }, { status: 400 });
+  const { error: ue } = await admin.from('almfrje_members').upsert(pendingMemberRecord({
+    userId: created.user.id, fullName: full_name, phone, personId: pid, phonePublic: publish,
+  }), { onConflict: 'user_id' });
+  if (ue) {
+    await admin.auth.admin.deleteUser(created.user.id);
+    return NextResponse.json({ ok: false, error: ue.message }, { status: 400 });
+  }
 
-  // استكمال بيانات شخصه — تعبئة الفارغ فقط
-  const patch: Record<string, string> = {};
-  if (publish && !String(person.phone || '').trim()) patch.phone = phone;   // يُنشر في ملفه فقط بموافقته
-  // طلب الخصوصية = حماية مطلقة: إن كان جوالُه منشوراً في ملفه بالشجرة يُسحب منه
-  // (يبقى محفوظاً في حسابه — يراه هو والمدير فقط بحماية القاعدة)
-  if (!publish && String(person.phone || '').trim() && normalizePhone(person.phone) === phone) patch.phone = '';
-  if (nickname && !String(person.nickname || '').trim()) patch.nickname = nickname;
-  if (city && !String(person.city || '').trim()) patch.city = city;
-  if (birth && !String(person.birth || '').trim()) patch.birth = birth;
-  if (Object.keys(patch).length) { try { await admin.from('almfrje_persons').update(patch).eq('id', pid); } catch { /* */ } }
-
-  // نعيد البريد كي تسجّل الواجهة دخوله فوراً بحسابه الجديد (تصفّح مباشر بانتظار التوثيق)
+  // تسجيل الدخول التالي يعرض شاشة انتظار التفعيل فقط، ولا يفتح بيانات الموقع.
   return NextResponse.json({ ok: true, email: `${phone}@almfrje.app` });
 }

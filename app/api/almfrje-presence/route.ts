@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { almfrjeEnv } from '@/lib/almfrje-env';
+import { memberCanUseApp } from '@/lib/almfrje-registration-policy';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -22,8 +23,8 @@ export async function POST(request: NextRequest) {
   const { data: who } = await caller.auth.getUser();
   if (!who || !who.user) return NextResponse.json({ ok: false, error: 'جلسة غير صالحة' }, { status: 401 });
   const admin = createClient(url, service, { auth: { persistSession: false, autoRefreshToken: false } });
-  const { data: mem } = await admin.from('almfrje_members').select('is_active,role,full_name,branch_id,person_id').eq('user_id', who.user.id).maybeSingle();
-  if (!mem || !mem.is_active) return NextResponse.json({ ok: false, error: 'الحساب غير مفعّل' }, { status: 403 });
+  const { data: mem } = await admin.from('almfrje_members').select('is_active,perms,role,full_name,branch_id,person_id').eq('user_id', who.user.id).maybeSingle();
+  if (!mem || !memberCanUseApp(mem)) return NextResponse.json({ ok: false, error: 'الحساب غير مفعّل' }, { status: 403 });
   const canSeeNames = mem.role === 'admin' || mem.role === 'general_manager';   // الإدارة العليا ترى الأسماء
 
   let body: any; try { body = await request.json(); } catch { body = {}; }

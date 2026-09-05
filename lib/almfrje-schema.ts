@@ -3,7 +3,7 @@
 // كل الأوامر IF NOT EXISTS / OR REPLACE فيمكن تنفيذها مراراً بأمان.
 // إصدار المخطّط: يُرفع مع كل تعديلٍ بنيوي — يربط به كاشُ /api/almfrje-setup فيُعاد
 // تشغيل الترقية عند تغيّره (وإلا بقي كاشٌ قديمٌ يتخطّى الأعمدة الجديدة).
-export const ALMFRJE_SCHEMA_VERSION = '2026-08-24-1';
+export const ALMFRJE_SCHEMA_VERSION = '2026-09-05-1';
 export const ALMFRJE_SCHEMA_SQL = `
       CREATE EXTENSION IF NOT EXISTS pg_trgm;
 
@@ -141,22 +141,26 @@ export const ALMFRJE_SCHEMA_SQL = `
       CREATE INDEX IF NOT EXISTS almfrje_backups_created_idx ON public.almfrje_backups(created_at desc);
 
       -- 7) دوال الصلاحية
+      -- إغلاق الحسابات المعلّقة القديمة التي كانت موسومة unverified لكنها active.
+      UPDATE public.almfrje_members
+         SET is_active = false, perms = coalesce(perms, '{}'::jsonb) - 'unverified'
+       WHERE is_active and coalesce((perms ->> 'unverified')::boolean, false);
       CREATE OR REPLACE FUNCTION public.almfrje_role() RETURNS text
         LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $func$
-        select role from public.almfrje_members where user_id = auth.uid() and is_active; $func$;
+        select role from public.almfrje_members where user_id = auth.uid() and is_active and not coalesce((perms ->> 'unverified')::boolean, false); $func$;
       CREATE OR REPLACE FUNCTION public.almfrje_is_member() RETURNS boolean
         LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $func$
-        select exists (select 1 from public.almfrje_members where user_id = auth.uid() and is_active); $func$;
+        select exists (select 1 from public.almfrje_members where user_id = auth.uid() and is_active and not coalesce((perms ->> 'unverified')::boolean, false)); $func$;
       CREATE OR REPLACE FUNCTION public.almfrje_is_admin() RETURNS boolean
         LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $func$
-        select exists (select 1 from public.almfrje_members where user_id = auth.uid() and is_active and role = 'admin'); $func$;
+        select exists (select 1 from public.almfrje_members where user_id = auth.uid() and is_active and not coalesce((perms ->> 'unverified')::boolean, false) and role = 'admin'); $func$;
       -- مشرف (فرع أو عام): الدوران المخوّلان بالإضافة والتعديل ضمن نطاقهما
       CREATE OR REPLACE FUNCTION public.almfrje_is_supervisor() RETURNS boolean
         LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $func$
-        select exists (select 1 from public.almfrje_members where user_id = auth.uid() and is_active and role in ('branch_manager','general_manager')); $func$;
+        select exists (select 1 from public.almfrje_members where user_id = auth.uid() and is_active and not coalesce((perms ->> 'unverified')::boolean, false) and role in ('branch_manager','general_manager')); $func$;
       CREATE OR REPLACE FUNCTION public.almfrje_my_branch() RETURNS bigint
         LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $func$
-        select branch_id from public.almfrje_members where user_id = auth.uid() and is_active limit 1; $func$;
+        select branch_id from public.almfrje_members where user_id = auth.uid() and is_active and not coalesce((perms ->> 'unverified')::boolean, false) limit 1; $func$;
       -- هل يُشرف المستخدم الحالي على هذا الفرع؟ (يدعم branch_id المفرد + مصفوفة branch_ids)
       -- المشرف العام بلا فروعٍ محدّدة = يشرف على كل الفروع.
       -- مهم: عناصر branch_ids تُخزَّن أرقاماً jsonb، ومعامل ? لا يطابق إلا النصوص —
@@ -165,7 +169,7 @@ export const ALMFRJE_SCHEMA_SQL = `
         LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $func$
         select exists (
           select 1 from public.almfrje_members m
-           where m.user_id = auth.uid() and m.is_active
+           where m.user_id = auth.uid() and m.is_active and not coalesce((m.perms ->> 'unverified')::boolean, false)
              and ((m.role = 'general_manager' and m.branch_id is null and (m.branch_ids is null or m.branch_ids = '[]'::jsonb))
                   or m.branch_id = bid
                   or (m.branch_ids @> to_jsonb(bid))
@@ -173,7 +177,7 @@ export const ALMFRJE_SCHEMA_SQL = `
       CREATE OR REPLACE FUNCTION public.almfrje_perm(act text) RETURNS boolean
         LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $func$
         select public.almfrje_is_admin() or exists (
-          select 1 from public.almfrje_members where user_id = auth.uid() and is_active
+          select 1 from public.almfrje_members where user_id = auth.uid() and is_active and not coalesce((perms ->> 'unverified')::boolean, false)
             and coalesce((perms ->> act)::boolean, false)); $func$;
       -- الجميع (الأعضاء المفعّلون) يرون كامل الشجرة؛ التقييد على التعديل لا العرض.
       CREATE OR REPLACE FUNCTION public.almfrje_can_see_person(pid bigint) RETURNS boolean
@@ -390,8 +394,8 @@ export const ALMFRJE_SCHEMA_SQL = `
       -- ختم إصدار المخطط: يرتفع مع كل تعديلٍ للمخطط، ووجوده بالقيمة الأحدث في القاعدة
       -- دليلٌ قاطع أن قناة الترقية التلقائية (/api/almfrje-setup) تعمل.
       INSERT INTO public.almfrje_settings (key, value)
-        VALUES ('schema_rev', '"2026-08-24-1"'::jsonb)
-        ON CONFLICT (key) DO UPDATE SET value = '"2026-08-24-1"'::jsonb, updated_at = now();
+        VALUES ('schema_rev', '"2026-09-05-1"'::jsonb)
+        ON CONFLICT (key) DO UPDATE SET value = '"2026-09-05-1"'::jsonb, updated_at = now();
 
       -- ملاحظات الزوار: يرسلها أي زائر/عضو، ويراجعها المدير ويضع علامة «تم».
       CREATE TABLE IF NOT EXISTS public.almfrje_feedback (

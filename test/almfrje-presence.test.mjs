@@ -36,6 +36,9 @@ function harness() {
   const exports = {};
   new Function('require', 'exports', compiled)((name) => {
     if (name === '@/lib/almfrje-env') return { almfrjeEnv: () => ({ url: 'https://fixture.test', anon: 'anon', service: 'service' }) };
+    if (name === '@/lib/almfrje-registration-policy') return {
+      memberCanUseApp: (member) => !!(member && member.is_active && !(member.perms && member.perms.unverified === true)),
+    };
     if (name === '@supabase/supabase-js') return { createClient: (_url, key, options) => key === 'service' ? db : {
       auth: { async getUser() {
         const id = options.global.headers.Authorization.replace('Bearer ', '');
@@ -99,6 +102,9 @@ test('viewer gets counts without names and inactive/invalid callers cannot regis
   const viewer = await h.post(B);
   assert.equal(viewer.body.people, undefined);
   assert.equal(viewer.body.online, 2);
+  h.members[B].perms = { unverified: true };
+  assert.equal((await h.post(B)).status, 403);
+  h.members[B].perms = {};
   h.members[B].is_active = false;
   assert.equal((await h.post(B)).status, 403);
   assert.equal((await h.post('invalid')).status, 401);

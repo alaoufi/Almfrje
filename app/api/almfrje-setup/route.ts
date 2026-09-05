@@ -46,15 +46,16 @@ const STORAGE_SQL = `
 
   drop policy if exists "almfrje_insert" on storage.objects;
   create policy "almfrje_insert" on storage.objects for insert to authenticated
-    with check (bucket_id = 'almfrje');
+    with check (bucket_id = 'almfrje' and public.almfrje_is_member());
 
   drop policy if exists "almfrje_update" on storage.objects;
   create policy "almfrje_update" on storage.objects for update to authenticated
-    using (bucket_id = 'almfrje') with check (bucket_id = 'almfrje');
+    using (bucket_id = 'almfrje' and public.almfrje_is_member())
+    with check (bucket_id = 'almfrje' and public.almfrje_is_member());
 
   drop policy if exists "almfrje_delete" on storage.objects;
   create policy "almfrje_delete" on storage.objects for delete to authenticated
-    using (bucket_id = 'almfrje');
+    using (bucket_id = 'almfrje' and public.almfrje_is_member());
 `;
 
 async function runSql(pat: string, ref: string, query: string) {
