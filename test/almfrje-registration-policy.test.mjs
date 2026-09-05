@@ -36,6 +36,14 @@ test('browser gate also blocks legacy unverified accounts and promises no immedi
   assert.match(html, /app\.js\?v=20260905c/);
 });
 
+test('database setup accepts an already-applied security schema before requiring PAT', () => {
+  const source = fs.readFileSync(new URL('../app/api/almfrje-setup/route.ts', import.meta.url), 'utf8');
+  const revisionCheck = source.indexOf("eq('key', 'schema_rev')");
+  const managementUpgrade = source.indexOf('if (pat)');
+  assert.ok(revisionCheck > 0 && managementUpgrade > revisionCheck);
+  assert.match(source, /via: 'schema_rev'/);
+});
+
 test('new self-registration is inactive and has no administrative permissions', () => {
   assert.deepEqual(pendingMemberRecord({ userId: 'u1', fullName: 'محمد بن علي', phone: '0500000000', personId: 9, phonePublic: true }), {
     user_id: 'u1', full_name: 'محمد بن علي', phone: '0500000000', role: 'viewer',

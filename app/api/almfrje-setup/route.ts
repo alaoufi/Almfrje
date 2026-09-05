@@ -96,9 +96,10 @@ async function runSqlPg(conn: string, query: string) {
 }
 
 async function handle() {
-  const pat = almfrjeEnv().pat;
+  const env = almfrjeEnv();
+  const pat = env.pat;
   // ترقية المفارجة تستهدف قاعدتها وحدها فقط (لا رجوع للقاعدة المشتركة) — عزل تام عن مراحي/الاستشارات.
-  const supaUrl = almfrjeEnv().url || '';
+  const supaUrl = env.url || '';
   const m = supaUrl.match(/https:\/\/([a-z0-9]+)\.supabase\.co/i);
   if (!m) return NextResponse.json({ ok: false, reason: 'تعذّر استخراج project ref' }, { status: 200 });
   const ref = m[1];
@@ -106,6 +107,19 @@ async function handle() {
   // إن سبق إعداد هذا الإصدار من المخطط بنجاح في هذه الدورة، اكتفِ بذلك (المخطط ثقيل نسبياً).
   // مربوطٌ بالإصدار: تغيّرُ المخطط (عمودٌ جديد) يبطل الكاش فتُعاد الترقية.
   if (_done && _done.ok && _done.ver === ALMFRJE_SCHEMA_VERSION) return NextResponse.json({ ok: true, cached: true });
+
+  // قد تكون الترقية طُبّقت مباشرةً من لوحة قاعدة البيانات. افحص الختم أولاً حتى لا
+  // نعلن فشلاً كاذباً بسبب PAT منتهي بينما المخطط الأمني الحالي مطبّق فعلاً.
+  if (env.service) {
+    try {
+      const admin = createClient(supaUrl, env.service, { auth: { persistSession: false, autoRefreshToken: false } });
+      const { data: rev } = await admin.from('almfrje_settings').select('value').eq('key', 'schema_rev').maybeSingle();
+      if (String(rev?.value || '') === ALMFRJE_SCHEMA_VERSION) {
+        _done = { ok: true, at: Date.now(), ver: ALMFRJE_SCHEMA_VERSION };
+        return NextResponse.json({ ok: true, cached: true, via: 'schema_rev' });
+      }
+    } catch { /* تابع إلى قنوات الترقية الفعلية */ }
+  }
 
   // ١) القناة الأولى: Management API بمفتاح PAT
   let patError: unknown = null;
